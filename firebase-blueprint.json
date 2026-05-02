@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "SubdomainRequest": {
+      "title": "Subdomain Request",
+      "description": "User request for a personal profile page path",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "displayName": { "type": "string" },
+        "subdomain": { "type": "string" },
+        "githubRepo": { "type": "string" },
+        "status": { 
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "adminUsername": { "type": "string" },
+        "adminPassword": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "adminNote": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userEmail", "subdomain", "status", "createdAt"]
+    },
+    "SiteConfig": {
+      "title": "Site Configuration",
+      "description": "Custom content for a personal profile page",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "slug": { "type": "string" },
+        "displayName": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "theme": { "type": "string" },
+        "socialLinks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "platform": { "type": "string" },
+              "url": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "content": { "type": "string" }
+            }
+          }
+        },
+        "embeddedVideos": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "slug"]
+    },
+    "DnsRequest": {
+      "title": "Subdomain DNS Request",
+      "description": "User request for a custom DNS record on a subdomain",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "subdomain": { "type": "string" },
+        "type": { "type": "string", "enum": ["A", "CNAME", "TXT", "NS", "AAAA"] },
+        "value": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subdomain", "type", "value", "status"]
+    }
+  },
+  "firestore": {
+    "subdomainRequests/{requestId}": {
+      "schema": "SubdomainRequest",
+      "description": "Collection of subdomain requests from users"
+    },
+    "siteConfigs/{configId}": {
+      "schema": "SiteConfig",
+      "description": "Configuration and content for personal sites"
+    },
+    "dnsRequests/{requestId}": {
+      "schema": "DnsRequest",
+      "description": "Requests for custom subdomain DNS records"
+    }
+  }
+}
