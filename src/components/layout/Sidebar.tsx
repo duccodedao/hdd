@@ -46,7 +46,6 @@ const navGroups = [
   {
     title: 'Khác',
     items: [
-      { name: 'Giới thiệu', path: '/about', icon: Info },
       { name: 'Liên hệ', path: '/contact', icon: Phone },
     ]
   }
@@ -75,8 +74,8 @@ export default function Sidebar({ className }: SidebarProps) {
           <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
         </motion.div>
         <div>
-          <h2 className="font-display font-medium text-lg text-slate-900 dark:text-white leading-none tracking-tight italic">Bmass HD</h2>
-          <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400  tracking-normal mt-1">Hệ sinh thái</p>
+          <h2 className="font-display font-medium text-lg text-slate-900 dark:text-white leading-none tracking-tight italic">Sơn Lý Hồng Đức</h2>
+          <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400  tracking-normal mt-1">Bmass</p>
         </div>
       </div>
 

@@ -57,6 +57,15 @@ export default function MoviesPage() {
 
   useEffect(() => {
     const fetchFilters = async () => {
+      const cachedGenres = sessionStorage.getItem('movies_genres');
+      const cachedCountries = sessionStorage.getItem('movies_countries');
+
+      if (cachedGenres && cachedCountries) {
+        setGenres(JSON.parse(cachedGenres));
+        setCountries(JSON.parse(cachedCountries));
+        return;
+      }
+
       try {
         const [genRes, countRes] = await Promise.all([
           fetch('https://phimapi.com/the-loai'),
@@ -65,6 +74,8 @@ export default function MoviesPage() {
         const [genData, countData] = await Promise.all([genRes.json(), countRes.json()]);
         setGenres(genData);
         setCountries(countData);
+        sessionStorage.setItem('movies_genres', JSON.stringify(genData));
+        sessionStorage.setItem('movies_countries', JSON.stringify(countData));
       } catch (err) {
         console.error("Fetch filters error:", err);
       }
@@ -162,14 +173,14 @@ export default function MoviesPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
           <div className="space-y-4">
             <motion.div 
-               initial={{ opacity: 0, y: -10 }}
-               animate={{ opacity: 1, y: 0 }}
-               className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-medium tracking-normal border border-indigo-500/10 uppercase"
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-full text-[10px] font-bold tracking-widest uppercase"
             >
-              <Play className="w-3.5 h-3.5" /> Entertainment Hub
+              <Play className="w-3.5 h-3.5" /> Bmass Cinema
             </motion.div>
             <h1 className="text-5xl md:text-8xl font-display font-medium tracking-tight italic leading-none text-slate-900 dark:text-white">
-              Phòng <span className="text-indigo-600">Chiếu</span>
+              Phim <span className="text-indigo-600">Trực Tuyến</span>
             </h1>
           </div>
 

@@ -622,7 +622,7 @@ export default function Profile() {
           <div className="bg-white dark:bg-black rounded-2xl p-8 border border-slate-200 dark:border-white/10 shadow-xl shadow-black/[0.01]">
             <h3 className="font-medium text-slate-900 dark:text-white mb-8 flex items-center gap-3  tracking-tight text-xl italic">
               <Shield className="w-6 h-6 text-indigo-500" />
-              Trung tâm bảo mật
+              Bảo mật tài khoản
             </h3>
             
             <div className="space-y-4">
@@ -677,7 +677,7 @@ export default function Profile() {
             <h3 className="font-medium text-white/40  tracking-normal text-[10px] mb-8">Phân tích hệ thống</h3>
             <div className="space-y-6">
               <div>
-                <p className="text-[10px] font-medium text-white/30  tracking-[0.2em] mb-2 leading-none">GIA NHẬP BMASS HD</p>
+                <p className="text-[10px] font-medium text-white/30  tracking-[0.2em] mb-2 leading-none">GIA NHẬP ECOSYSTEM</p>
                 <p className="text-2xl font-medium tracking-tight italic">
                   {userData?.createdAt ? toSafeDate(userData.createdAt).toLocaleDateString('vi-VN') : 'Unknown'}
                 </p>

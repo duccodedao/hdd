@@ -14,7 +14,6 @@ import AuthLayout from './components/layout/AuthLayout';
 // Pages
 import LoadingScreen from './components/ui/LoadingScreen';
 import ConfirmModal from './components/ui/ConfirmModal';
-import Home from './pages/Home';
 import Auth from './pages/Auth';
 import AuthActionPage from './pages/AuthActionPage';
 import Profile from './pages/Profile';
@@ -215,9 +214,9 @@ export default function App() {
             <Route path="/auth/action" element={<AuthActionPage />} />
 
             {/* Main App Routes */}
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Home />} />
-              <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<AboutPage />} />
+                <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="products" element={<TabGuard tabKey="products"><ProductsPage /></TabGuard>} />
               <Route path="banks" element={<TabGuard tabKey="banks"><BanksPage /></TabGuard>} />

@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -10,7 +10,8 @@ export default function Topbar() {
   const { toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
   const { user, userData } = useAuthStore();
   const [time, setTime] = useState(new Date());
-  const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
+  const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
+  const [locationName, setLocationName] = useState<string>('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
   const navigate = useNavigate();
@@ -55,24 +56,55 @@ export default function Topbar() {
   }, [user, initialLoad, userData]);
 
   useEffect(() => {
+    const getWeatherDescription = (code: number) => {
+      const descriptions: { [key: number]: string } = {
+        0: 'Trời quang', 1: 'Ít mây', 2: 'Mây rải rác', 3: 'Nhiều mây', 45: 'Sương mù', 
+        48: 'Sương muối', 51: 'Mưa phùn nhẹ', 53: 'Mưa phùn', 55: 'Mưa phùn nặng',
+        61: 'Mưa nhẹ', 63: 'Mưa vừa', 65: 'Mưa to', 71: 'Tuyết nhẹ', 73: 'Tuyết vừa', 
+        75: 'Tuyết mạnh', 80: 'Mưa rào nhẹ', 81: 'Mưa rào vừa', 82: 'Mưa rào mạnh',
+        95: 'Dông', 96: 'Dông kèm theo mưa đá nhẹ', 99: 'Dông kèm theo mưa đá mạnh'
+      };
+      return descriptions[code] || 'Không rõ';
+    };
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          const { latitude, longitude } = position.coords;
           try {
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&current_weather=true`);
-            const data = await res.json();
-            if (data?.current_weather) {
+            // Fetch Weather
+            const weatherPromise = fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+            
+            // Fetch Location Name (Reverse Geocoding)
+            const geoPromise = fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`, {
+              headers: { 'Accept-Language': 'vi' }
+            });
+
+            const [weatherRes, geoRes] = await Promise.all([weatherPromise, geoPromise]);
+            const weatherData = await weatherRes.json();
+            const geoData = await geoRes.json();
+
+            if (weatherData?.current_weather) {
               setWeather({
-                temp: Math.round(data.current_weather.temperature),
-                code: data.current_weather.weathercode
+                temp: Math.round(weatherData.current_weather.temperature),
+                code: weatherData.current_weather.weathercode,
+                description: getWeatherDescription(weatherData.current_weather.weathercode)
               });
             }
+
+            if (geoData?.address) {
+              const city = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.suburb || geoData.address.county || '';
+              const state = geoData.address.state || geoData.address.city || '';
+              setLocationName(city && state && city !== state ? `${city}, ${state}` : city || state || 'Vị trí không xác định');
+            }
           } catch (e) {
-            console.error("Không thể lấy dữ liệu thời tiết:", e);
+            console.error("Lỗi dữ liệu:", e);
           }
         },
         (error) => {
           console.error("Lỗi vị trí:", error);
+          // Fallback if permission denied or error
+          setLocationName('Việt Nam');
         }
       );
     }
@@ -104,13 +136,14 @@ export default function Topbar() {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="hidden md:flex items-center gap-5 px-6 py-2.5 bg-white shadow-sm dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 min-w-[300px]">
+        <div className="hidden md:flex items-center gap-5 px-6 py-2.5 bg-white shadow-sm dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 min-w-[400px]">
            {weather ? (
              <div className="flex items-center gap-3 pr-5 border-r border-slate-100 dark:border-white/10">
-               <div>
+               <div className="flex flex-col items-center">
                   {getWeatherIcon(weather.code)}
+                  <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{weather.description}</span>
                </div>
-               <span className="font-medium text-slate-900 dark:text-slate-100 italic">{weather.temp}°C</span>
+               <span className="font-medium text-slate-900 dark:text-slate-100 italic text-lg">{weather.temp}°C</span>
              </div>
            ) : (
               <div className="flex items-center gap-3 pr-5 border-r border-slate-100 dark:border-white/10">
@@ -118,13 +151,26 @@ export default function Topbar() {
                <span className="text-xs font-medium text-slate-400">Loading...</span>
              </div>
            )}
-           <div className="flex flex-col">
-             <span className="text-sm font-medium tracking-tight text-slate-900 dark:text-slate-100 leading-none mb-1 shadow-white">
-               {time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-             </span>
-             <span className="text-[9px]  font-medium text-slate-400 tracking-[0.1em] leading-none">
-               {formatDate(time)}
-             </span>
+
+           <div className="flex items-center gap-4 flex-1">
+             <div className="flex flex-col border-r border-slate-100 dark:border-white/10 pr-4">
+               <span className="text-sm font-medium tracking-tight text-slate-900 dark:text-slate-100 leading-none mb-1 shadow-white">
+                 {time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+               </span>
+               <span className="text-[9px]  font-medium text-slate-400 tracking-[0.1em] leading-none">
+                 {formatDate(time)}
+               </span>
+             </div>
+
+             <div className="flex flex-col">
+               <div className="flex items-center gap-1.5 mb-1 group">
+                 <MapPin className="w-3 h-3 text-red-500 group-hover:animate-bounce" />
+                 <span className="text-[10px] font-bold text-slate-900 dark:text-slate-100 truncate max-w-[150px]">
+                   {locationName || 'Đang lấy vị trí...'}
+                 </span>
+               </div>
+               <span className="text-[8px] font-medium text-slate-400 tracking-widest uppercase">VỊ TRÍ HIỆN TẠI</span>
+             </div>
            </div>
         </div>
       </div>

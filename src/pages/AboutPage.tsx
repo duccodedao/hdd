@@ -13,10 +13,10 @@ interface AboutConfig {
 }
 
 const DEFAULT_ABOUT: AboutConfig = {
-  introTitle: "Hệ Sinh Thái Personal Profile",
-  introDesc: "Đây không chỉ là một website profile thông thường, mà là một nền tảng quản trị cá nhân All-in-One. Được xây dựng trên nền tảng công nghệ Web 5.0, hệ thống mang lại sự kết hợp hoàn hảo giữa tốc độ, bảo mật và trải nghiệm người dùng tinh tế.",
-  adminName: "Đội ngũ Chúng tôi",
-  adminBio: "Xin chào, Chúng tôi là những người đứng sau dự án này. Với niềm đam mê công nghệ và thiết kế, Chúng tôi đã dành thời gian để kiến tạo nên hệ sinh thái này nhằm mục đích quản lý, chia sẻ và tối ưu hóa workflow cá nhân. Mọi dòng code đều được chăm chút để đạt tới độ hoàn thiện cao nhất.",
+  introTitle: "Sơn Lý Hồng Đức Ecosystem",
+  introDesc: "Hệ sinh thái Profile chuyên nghiệp All-in-One. Tối ưu trải nghiệm, tinh gọn giao diện và đảm bảo hiệu suất cực hạn.",
+  adminName: "Sơn Lý Hồng Đức",
+  adminBio: "Xin chào, tôi là Sơn Lý Hồng Đức (Bmass). Với tầm nhìn kiến tạo hệ sinh thái số hiện đại, tôi phát triển nền tảng này để tối ưu hóa quản trị và truyền tải giá trị thực qua từng dòng code. Đơn giản, tinh tế và hiệu quả là tôn chỉ của tôi.",
   adminPhoto: "https://tytpht.hdd.io.vn/img/bmassloadings.png"
 };
 
@@ -58,11 +58,11 @@ export default function AboutPage() {
         
         <div className="space-y-3 md:space-y-4">
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-5xl md:text-8xl font-display font-medium tracking-tight text-slate-900 dark:text-white italic leading-[1.1]"
           >
-            {config.introTitle.split(' ').slice(0, -2).join(' ')} <span className="text-blue-600">{config.introTitle.split(' ').slice(-2).join(' ')}</span>
+            {config.introTitle}
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -134,7 +134,7 @@ export default function AboutPage() {
       </section>
 
       <footer className="text-center text-slate-400 text-xs font-bold  tracking-normal">
-        Hệ sinh thái BmassID Ecosystem
+        Sơn Lý Hồng Đức © 2026
       </footer>
     </div>
   );
