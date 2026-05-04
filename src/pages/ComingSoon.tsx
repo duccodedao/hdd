@@ -15,14 +15,14 @@ export default function ComingSoon({ title }: { title: string }) {
         transition={{ type: "spring", stiffness: 200, damping: 20 }}
         className="relative z-10"
       >
-        <div className="w-24 h-24 mb-8 bg-white/5 backdrop-blur-xl rounded-[2rem] p-4 border border-white/10 shadow-2xl flex items-center justify-center mx-auto">
+        <div className="w-24 h-24 mb-8 bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-2xl flex items-center justify-center mx-auto">
           <Sparkles className="w-12 h-12 text-blue-500" />
         </div>
         <div className="absolute -inset-2 bg-blue-500/20 blur-xl rounded-full"></div>
       </motion.div>
 
       <div className="relative z-10 max-w-lg">
-        <h1 className="text-3xl md:text-5xl font-black mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-400">
+        <h1 className="text-3xl md:text-5xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-400">
           {title}
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mb-10 text-lg leading-relaxed">

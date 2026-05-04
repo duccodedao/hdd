@@ -33,11 +33,11 @@ export default function MaintenancePage() {
         </motion.div>
 
         <div className="space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-amber-500/20">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-full text-[10px] font-medium  tracking-[0.2em] border border-amber-500/20">
             <Hammer className="w-3 h-3" /> System Upgrade In Progress
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">
+          <h1 className="text-4xl md:text-6xl font-medium text-slate-900 dark:text-white tracking-tight leading-tight">
             Hệ thống đang <span className="text-blue-600 dark:text-blue-500 italic">bảo trì</span>
           </h1>
 
@@ -46,7 +46,7 @@ export default function MaintenancePage() {
           </p>
 
           <div className="pt-8 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 py-4 rounded-[2rem] shadow-sm">
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 py-4 rounded-2xl shadow-sm">
               <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                 Dự kiến hoàn thành: <span className="text-blue-600 dark:text-blue-400 italic">Sớm nhất có thể</span>
@@ -56,15 +56,15 @@ export default function MaintenancePage() {
             <div className="flex items-center gap-8 text-slate-400 pt-8 opacity-50 grayscale">
                <div className="flex flex-col items-center gap-1">
                  <ServerCrash className="w-6 h-6" />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">Server</span>
+                 <span className="text-[10px]  font-bold tracking-normal">Server</span>
                </div>
                <div className="flex flex-col items-center gap-1">
                  <Loader2 className="w-6 h-6" />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">Update</span>
+                 <span className="text-[10px]  font-bold tracking-normal">Update</span>
                </div>
                <div className="flex flex-col items-center gap-1">
                  <Sparkles className="w-6 h-6" />
-                 <span className="text-[10px] uppercase font-bold tracking-widest">Optimized</span>
+                 <span className="text-[10px]  font-bold tracking-normal">Optimized</span>
                </div>
             </div>
           </div>
@@ -73,8 +73,8 @@ export default function MaintenancePage() {
 
       {/* Modern Footer Branding */}
       <div className="absolute bottom-10 left-0 w-full text-center">
-         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 dark:text-white/20">
-           Admin Pro Ecosystem • 2026
+         <p className="text-[10px] font-medium  tracking-[0.4em] text-slate-300 dark:text-white/20">
+           BmassID Ecosystem • 2026
          </p>
       </div>
     </div>

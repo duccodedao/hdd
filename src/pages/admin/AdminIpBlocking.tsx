@@ -30,7 +30,7 @@ export default function AdminIpBlocking() {
         ip: newIp,
         reason: reason || 'N/A',
         blockedAt: serverTimestamp(),
-        blockedBy: userData?.displayName || 'Admin'
+        blockedBy: userData?.displayName || 'Quản trị'
       });
       toast.success('Đã chặn IP!');
       setNewIp('');

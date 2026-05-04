@@ -57,7 +57,7 @@ export default function ContactPage() {
     },
     { 
       name: 'Facebook Page', 
-      value: 'Admin System', 
+      value: 'Chúng tôi', 
       icon: Facebook, 
       url: socialConfig.facebook || 'https://facebook.com/sonlyhongduc', 
       color: 'bg-blue-600',
@@ -97,7 +97,7 @@ export default function ContactPage() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[3rem] p-8 shadow-2xl"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl p-8 shadow-2xl"
             >
               <button 
                 onClick={() => setShowRequestModal(false)}
@@ -106,7 +106,7 @@ export default function ContactPage() {
                 <X className="w-6 h-6" />
               </button>
 
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">Gửi tin nhắn cho Admin</h2>
+              <h2 className="text-2xl font-medium text-slate-900 dark:text-white mb-6">Gửi tin nhắn cho Chúng tôi</h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -157,16 +157,16 @@ export default function ContactPage() {
 // ... rest of the file stays same
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black uppercase tracking-widest"
+          className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-medium  tracking-normal"
         >
-          <Zap className="w-3.5 h-3.5" /> Get in Touch
+          <Zap className="w-3.5 h-3.5" /> Liên hệ
         </motion.div>
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-3xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white"
+          className="text-3xl lg:text-6xl font-medium tracking-tight text-slate-900 dark:text-white"
         >
-          Kết nối với <span className="text-blue-600 italic">Admin</span>
+          Kết nối với <span className="text-blue-600 italic">Chúng tôi</span>
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
@@ -189,15 +189,15 @@ export default function ContactPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 + idx * 0.05 }}
-            className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 rounded-[2.5rem] hover:shadow-2xl hover:shadow-blue-500/10 transition-all flex flex-col h-full items-center text-center overflow-hidden"
+            className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 rounded-2xl hover:shadow-2xl hover:shadow-blue-500/10 transition-all flex flex-col h-full items-center text-center overflow-hidden"
           >
             <div className={`w-14 h-14 md:w-16 md:h-16 rounded-2xl ${contact.color} text-white flex items-center justify-center mb-6 shadow-lg shadow-black/5 group-hover:scale-110 transition-transform`}>
               <contact.icon className="w-7 h-7 md:w-8 md:h-8" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-tighter">{contact.name}</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2  tracking-tight">{contact.name}</h3>
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-2">{contact.desc}</p>
             <div className="mt-auto pt-4 border-t border-slate-100 dark:border-white/5 w-full">
-               <span className="text-[10px] md:text-xs font-black text-blue-600 dark:text-blue-400 group-hover:underline uppercase tracking-widest">{contact.value}</span>
+               <span className="text-[10px] md:text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:underline  tracking-normal">{contact.value}</span>
             </div>
           </motion.a>
         ))}
@@ -208,34 +208,34 @@ export default function ContactPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="relative bg-slate-900 dark:bg-blue-600 rounded-[2.5rem] md:rounded-[3rem] p-8 lg:p-16 overflow-hidden"
+          className="relative bg-slate-900 dark:bg-blue-600 rounded-2xl md:rounded-2xl p-8 lg:p-16 overflow-hidden"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
           <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-white opacity-5 rounded-full blur-3xl"></div>
           
           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12">
             <div className="space-y-4 md:space-y-6 text-center lg:text-left flex-1">
-              <h2 className="text-2xl lg:text-5xl font-black text-white leading-tight uppercase tracking-tighter">Gửi yêu cầu trực tiếp</h2>
+              <h2 className="text-2xl lg:text-5xl font-medium text-white leading-tight  tracking-tight">Gửi yêu cầu trực tiếp</h2>
               <p className="text-sm md:text-lg text-slate-300 max-w-xl line-clamp-2 md:line-clamp-none font-medium">Bạn có ý tưởng hay hoặc cần hỗ trợ chuyên sâu? Đừng ngần ngại gửi tin nhắn trực tiếp.</p>
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 md:gap-6">
                 <div className="flex items-center gap-2 text-white">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
                     <MapPin className="w-4 h-4" />
                   </div>
-                  <span className="text-xs font-black uppercase tracking-widest">Vietnam</span>
+                  <span className="text-xs font-medium  tracking-normal">Vietnam</span>
                 </div>
                 <div className="flex items-center gap-2 text-white">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
                     <Globe className="w-4 h-4" />
                   </div>
-                  <span className="text-xs font-black uppercase tracking-widest">Active Worldwide</span>
+                  <span className="text-xs font-medium  tracking-normal">Toàn cầu</span>
                 </div>
               </div>
             </div>
             
             <button 
               onClick={() => setShowRequestModal(true)}
-              className="w-full lg:w-auto shrink-0 bg-white text-slate-900 px-10 py-5 rounded-3xl font-black uppercase tracking-widest text-xs md:text-sm hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3"
+              className="w-full lg:w-auto shrink-0 bg-white text-slate-900 px-10 py-5 rounded-3xl font-medium  tracking-normal text-xs md:text-sm hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3"
             >
                <Send className="w-4 h-4 fill-slate-900" /> Nhắn ngay
             </button>

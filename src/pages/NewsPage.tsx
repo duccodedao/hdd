@@ -14,6 +14,7 @@ interface NewsItem {
 }
 
 import NoData from '../components/ui/NoData';
+import GuestView from '../components/ui/GuestView';
 
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -76,7 +77,7 @@ export default function NewsPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] bg-[#050508]/50 rounded-[3rem] p-8 m-4">
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] bg-[#050508]/50 rounded-2xl p-8 m-4">
         <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
         <p className="text-slate-500 font-bold animate-pulse">Đang cập nhật tin tức mới nhất...</p>
       </div>
@@ -90,11 +91,11 @@ export default function NewsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-full text-xs font-black uppercase tracking-widest"
+            className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-full text-xs font-medium  tracking-normal"
           >
             <TrendingUp className="w-3.5 h-3.5" /> Breaking News
           </motion.div>
-          <h1 className="text-3xl lg:text-5xl font-black tracking-tighter text-slate-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-3xl lg:text-5xl font-medium tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
             <Newspaper className="w-10 h-10 text-rose-600" />
             Tin tức Thế giới
           </h1>
@@ -114,14 +115,15 @@ export default function NewsPage() {
           <button 
             onClick={fetchNews}
             disabled={refreshing}
-            className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-50 dark:hover:bg-white/10 transition-all flex items-center gap-2"
+            className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-6 py-3.5 rounded-2xl font-medium  tracking-normal text-xs hover:bg-slate-50 dark:hover:bg-white/10 transition-all flex items-center gap-2"
           >
             <RefreshCcw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> 
           </button>
         </div>
       </div>
 
-      {news.length === 0 ? (
+      <GuestView title="Kênh tin tức Thế giới" description="Đăng nhập để xem đầy đủ các bản tin hot, theo dõi các xu hướng công nghệ và kinh tế mới nhất được cập nhật liên tục.">
+        {news.length === 0 ? (
         <NoData 
           message="Chưa tìm thấy tin tức" 
           description="Hiện tại chưa có tin mới nào hoặc đang gặp lỗi kết nối. Vui lòng quay lại sau."
@@ -135,7 +137,7 @@ export default function NewsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] overflow-hidden hover:shadow-2xl hover:shadow-rose-500/5 transition-all flex flex-col"
+              className="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-rose-500/5 transition-all flex flex-col"
             >
               <div className="relative aspect-[16/9] overflow-hidden">
                 <img 
@@ -150,14 +152,14 @@ export default function NewsPage() {
                   }}
                 />
                 <div className="absolute top-4 left-4">
-                  <span className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-lg">
+                  <span className="bg-rose-600 text-white text-[10px] font-medium  tracking-normal px-3 py-1.5 rounded-xl shadow-lg">
                     HOT NEWS
                   </span>
                 </div>
               </div>
               
               <div className="p-8 flex-1 flex flex-col">
-                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
+                <div className="flex items-center gap-4 text-[10px] font-medium  tracking-normal text-slate-400 mb-4">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5" />
                     {format(new Date(item.pubDate), 'dd/MM/yyyy', { locale: vi })}
@@ -169,7 +171,7 @@ export default function NewsPage() {
                   </span>
                 </div>
                 
-                <h2 className="text-xl font-black text-slate-900 dark:text-white mb-4 line-clamp-2 leading-tight group-hover:text-rose-600 transition-colors uppercase">
+                <h2 className="text-xl font-medium text-slate-900 dark:text-white mb-4 line-clamp-2 leading-tight group-hover:text-rose-600 transition-colors ">
                   {item.title}
                 </h2>
                 
@@ -182,7 +184,7 @@ export default function NewsPage() {
                     href={item.link} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 group-hover:underline"
+                    className="inline-flex items-center gap-2 text-xs font-medium  tracking-normal text-rose-600 dark:text-rose-400 group-hover:underline"
                   >
                     Xem chi tiết <ExternalLink className="w-4 h-4" />
                   </a>
@@ -193,6 +195,7 @@ export default function NewsPage() {
           ))}
         </div>
       )}
+      </GuestView>
     </div>
   );
 }

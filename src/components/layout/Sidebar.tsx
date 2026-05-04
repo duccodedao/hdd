@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { 
-  Home, Grid, Box, Info, UserCircle, 
-  Bell, Phone, Shield, LogOut, FileText, Newspaper, TrendingUp, Gift, Landmark, LineChart, Globe, Server
+  Home, Grid, Box, Info, UserCircle, Play,
+  Bell, Phone, Shield, LogOut, FileText, Newspaper, TrendingUp, Gift, Landmark, LineChart, Globe, Server, CheckSquare
 } from 'lucide-react';
 import { collection, query, onSnapshot, getFirestore } from 'firebase/firestore';
 import { cn } from '../../lib/utils';
@@ -17,6 +18,7 @@ const navGroups = [
     items: [
       { name: 'Trang chủ', path: '/', icon: Home },
       { name: 'Tài khoản', path: '/profile', icon: UserCircle },
+      { name: 'Công việc', path: '/tasks', icon: CheckSquare },
     ]
   },
   {
@@ -26,6 +28,12 @@ const navGroups = [
       { name: 'Airdrop', path: '/airdrop', icon: Gift },
       { name: 'Ngân hàng', path: '/banks', icon: Landmark },
       { name: 'Sàn giao dịch', path: '/exchanges', icon: LineChart },
+    ]
+  },
+  {
+    title: 'Giải trí',
+    items: [
+      { name: 'Xem Phim', path: '/movies', icon: Play },
     ]
   },
   {
@@ -49,7 +57,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ className }: SidebarProps) {
-  const { isAdmin, user, userData } = useAuthStore();
+  const { isAdmin, user } = useAuthStore();
   const { setSidebarOpen } = useAppStore();
   const location = useLocation();
 
@@ -58,22 +66,25 @@ export default function Sidebar({ className }: SidebarProps) {
   };
 
   return (
-    <aside className={cn("flex flex-col h-full", className)}>
-      <div className="p-6 flex items-center gap-4">
-        <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center p-2 border border-slate-200 dark:border-white/20">
-          <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain" />
-        </div>
+    <aside className={cn("flex flex-col h-full bg-white/80 dark:bg-black/80 backdrop-blur-2xl border-r border-slate-200 dark:border-white/10", className)}>
+      <div className="p-8 flex items-center gap-4">
+        <motion.div 
+          whileHover={{ rotate: -10, scale: 1.1 }}
+          className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center p-2.5 shadow-xl shadow-blue-500/20 cursor-pointer"
+        >
+          <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
+        </motion.div>
         <div>
-          <h2 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Hệ Sinh Thái</h2>
-          <p className="text-xs text-blue-600 dark:text-blue-400">BmassHD</p>
+          <h2 className="font-display font-medium text-lg text-slate-900 dark:text-white leading-none tracking-tight italic">Bmass HD</h2>
+          <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400  tracking-normal mt-1">Hệ sinh thái</p>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 space-y-6 pb-4">
+      <nav className="flex-1 overflow-y-auto px-6 space-y-8 pb-8 no-scrollbar">
         {navGroups.map((group, idx) => (
           <div key={idx}>
-            <p className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{group.title}</p>
-            <div className="space-y-1">
+            <p className="px-4 text-[10px] font-medium text-slate-400 dark:text-slate-500  tracking-[0.2em] mb-4">{group.title}</p>
+            <div className="space-y-1.5 font-sans">
               {group.items.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
@@ -86,16 +97,17 @@ export default function Sidebar({ className }: SidebarProps) {
                       }
                     }}
                     className={cn(
-                      "flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group text-sm font-medium",
+                      "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group text-sm font-bold tracking-tight",
                       isActive 
-                        ? "bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400" 
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                        ? "bg-blue-600 text-white shadow-xl shadow-blue-600/20" 
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/50 dark:hover:bg-white/5"
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <item.icon className={cn("w-5 h-5", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white")} />
-                      {item.name}
-                    </div>
+                    <item.icon className={cn("w-5 h-5 transition-transform duration-300 group-hover:scale-110", isActive ? "text-white" : "text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white")} />
+                    <span className="flex-1">{item.name}</span>
+                    {isActive && (
+                      <motion.div layoutId="active-pill" className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                    )}
                   </NavLink>
                 );
               })}
@@ -104,8 +116,8 @@ export default function Sidebar({ className }: SidebarProps) {
         ))}
 
         {isAdmin && (
-          <div className="pt-4 mt-4 border-t border-slate-200 dark:border-white/10">
-            <p className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Quản trị</p>
+          <div className="pt-8 border-t border-slate-100 dark:border-white/5">
+            <p className="px-4 text-[10px] font-medium text-amber-500  tracking-[0.2em] mb-4">Quản trị</p>
             <NavLink
               to="/admin"
               onClick={() => {
@@ -114,27 +126,37 @@ export default function Sidebar({ className }: SidebarProps) {
                 }
               }}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-sm font-medium",
+                "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group text-sm font-bold tracking-tight",
                 location.pathname.startsWith('/admin')
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-500" 
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                  ? "bg-amber-500 text-white shadow-xl shadow-amber-500/20" 
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/50 dark:hover:bg-white/5"
               )}
             >
-              <Shield className={cn("w-5 h-5", location.pathname.startsWith('/admin') ? "text-amber-600 dark:text-amber-500" : "text-slate-400 group-hover:text-amber-500")} />
-              Admin Panel
+              <Shield className={cn("w-5 h-5 transition-transform duration-300 group-hover:scale-110", location.pathname.startsWith('/admin') ? "text-white" : "text-slate-400 group-hover:text-amber-500")} />
+              <span>Quản trị Hệ thống</span>
             </NavLink>
           </div>
         )}
       </nav>
 
-      <div className="p-4 border-t border-slate-200 dark:border-white/10">
-        <button
-          onClick={handleLogout}
-          className="flex items-center w-full gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 dark:text-red-500 dark:hover:text-red-400"
-        >
-          <LogOut className="w-5 h-5" />
-          Đăng xuất
-        </button>
+      <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/30 dark:bg-black/20">
+        {user ? (
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 dark:text-red-500 shadow-sm hover:shadow-md"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Đăng xuất</span>
+          </button>
+        ) : (
+          <NavLink
+            to="/login"
+            className="flex items-center w-full gap-3 px-4 py-3.5 bg-blue-600 text-white rounded-2xl transition-all duration-300 text-sm font-medium  tracking-normal hover:bg-blue-700 shadow-xl shadow-blue-600/20 active:scale-95 flex justify-center"
+          >
+            <LogOut className="w-5 h-5 rotate-180" />
+            <span>Đăng nhập</span>
+          </NavLink>
+        )}
       </div>
     </aside>
   );

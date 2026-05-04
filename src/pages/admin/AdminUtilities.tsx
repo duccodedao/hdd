@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Plus, Trash2, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -7,19 +7,66 @@ import { useConfirmStore } from '../../store/confirmStore';
 
 export default function AdminUtilities() {
   const [utilities, setUtilities] = useState<any[]>([]);
+  const [forbiddenSubdomains, setForbiddenSubdomains] = useState<any[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [embedUrl, setEmbedUrl] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [newForbiddenSubdomain, setNewForbiddenSubdomain] = useState('');
   const { openConfirm } = useConfirmStore();
 
   useEffect(() => {
-    const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Utilities listener
+    const qUtils = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
+    const unsubUtils = onSnapshot(qUtils, (snapshot) => {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+
+    // Forbidden subdomains listener
+    const qForbidden = query(collection(db, 'forbidden_subdomains'), orderBy('subdomain', 'asc'));
+    const unsubForbidden = onSnapshot(qForbidden, (snapshot) => {
+      setForbiddenSubdomains(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubUtils();
+      unsubForbidden();
+    };
   }, []);
+
+  const handleAddForbiddenSubdomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = newForbiddenSubdomain.trim().toLowerCase();
+    if (!val) return;
+    if (forbiddenSubdomains.some(s => s.subdomain === val)) return toast.error('Đã tồn tại!');
+    try {
+      await addDoc(collection(db, 'forbidden_subdomains'), {
+        subdomain: val,
+        createdAt: serverTimestamp()
+      });
+      setNewForbiddenSubdomain('');
+      toast.success('Đã chặn subdomain');
+    } catch (e) {
+      toast.error('Lỗi khi thêm');
+    }
+  };
+
+  const deleteForbiddenSubdomain = (id: string) => {
+    openConfirm({
+      title: 'Xóa chặn',
+      message: 'Giải phóng subdomain này?',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'forbidden_subdomains', id));
+          toast.success('Đã xóa');
+        } catch (e) {
+          toast.error('Lỗi khi xóa');
+        }
+      }
+    });
+  };
 
   const resetForm = () => {
     setTitle(''); setDescription(''); setEmbedUrl(''); setEditingId(null);
@@ -109,10 +156,10 @@ export default function AdminUtilities() {
           <table className="w-full text-left text-sm text-slate-900 dark:text-white">
             <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
               <tr>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Tên</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Mô tả</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Link nhúng</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-right">Thao tác</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Tên</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Mô tả</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Link nhúng</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
@@ -129,6 +176,35 @@ export default function AdminUtilities() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Subdomain bị cấm (Banned Slugs)</h2>
+        <form onSubmit={handleAddForbiddenSubdomain} className="flex gap-4 mb-6">
+          <input 
+            type="text" 
+            value={newForbiddenSubdomain}
+            onChange={(e) => setNewForbiddenSubdomain(e.target.value)}
+            placeholder="Nhập subdomain/slug muốn cấm..."
+            className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 text-slate-900 dark:text-white"
+          />
+          <button type="submit" className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Chặn ngay</button>
+        </form>
+
+        <div className="flex flex-wrap gap-2">
+           {forbiddenSubdomains.length === 0 ? (
+             <p className="text-xs font-bold text-slate-400 italic">Chưa có danh sách bị cấm.</p>
+           ) : (
+             forbiddenSubdomains.map(s => (
+               <div key={s.id} className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg group">
+                  <span className="text-xs font-bold text-red-600 dark:text-red-400">{s.subdomain}</span>
+                  <button onClick={() => deleteForbiddenSubdomain(s.id)} className="p-1 hover:text-red-700 text-slate-300">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+               </div>
+             ))
+           )}
         </div>
       </div>
     </div>

@@ -95,77 +95,84 @@ export default function Topbar() {
   };
 
   return (
-    <header className="h-20 flex-shrink-0 border-b border-slate-200 dark:border-white/5 backdrop-blur-md bg-white/50 dark:bg-transparent z-30 flex items-center justify-between px-4 lg:px-8">
-      <div className="flex items-center gap-4">
+    <header className="h-20 flex-shrink-0 border-b border-slate-100 dark:border-white/5 backdrop-blur-xl bg-white/60 dark:bg-black/20 z-30 flex items-center justify-between px-6 lg:px-10">
+      <div className="flex items-center gap-6">
         <button 
           onClick={toggleSidebar}
-          className="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-colors"
+          className="lg:hidden p-3 rounded-2xl text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 min-w-64">
+        <div className="hidden md:flex items-center gap-5 px-6 py-2.5 bg-white shadow-sm dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 min-w-[300px]">
            {weather ? (
-             <div className="flex items-center gap-2 pr-4 border-r border-slate-300 dark:border-white/10">
-               {getWeatherIcon(weather.code)}
-               <span className="font-bold text-slate-700 dark:text-slate-200">{weather.temp}°C</span>
+             <div className="flex items-center gap-3 pr-5 border-r border-slate-100 dark:border-white/10">
+               <div>
+                  {getWeatherIcon(weather.code)}
+               </div>
+               <span className="font-medium text-slate-900 dark:text-slate-100 italic">{weather.temp}°C</span>
              </div>
            ) : (
-              <div className="flex items-center gap-2 pr-4 border-r border-slate-300 dark:border-white/10">
-               <Sun className="w-5 h-5 text-slate-400 animate-pulse" />
-               <span className="text-sm text-slate-500">NaN°C</span>
+              <div className="flex items-center gap-3 pr-5 border-r border-slate-100 dark:border-white/10">
+               <Sun className="w-5 h-5 text-slate-300 animate-pulse" />
+               <span className="text-xs font-medium text-slate-400">Loading...</span>
              </div>
            )}
            <div className="flex flex-col">
-             <span className="text-sm font-bold tracking-tight text-slate-800 dark:text-slate-100 leading-none mb-1">
+             <span className="text-sm font-medium tracking-tight text-slate-900 dark:text-slate-100 leading-none mb-1 shadow-white">
                {time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
              </span>
-             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider leading-none">
+             <span className="text-[9px]  font-medium text-slate-400 tracking-[0.1em] leading-none">
                {formatDate(time)}
              </span>
            </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={toggleDarkMode}
-          className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-105"
-          title={darkMode ? 'Chế độ sáng' : 'Chế độ tối'}
-        >
-          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </button>
-
+      <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
+          <button 
+            onClick={toggleDarkMode}
+            className="p-3 rounded-2xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm active:scale-90"
+            title={darkMode ? 'Chế độ sáng' : 'Chế độ tối'}
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
           <button
             onClick={() => navigate('/notifications')}
-            className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-105 relative mr-2"
+            className="p-3 rounded-2xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm active:scale-90 relative"
             title="Thông báo"
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg">
+              <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-medium text-white shadow-xl shadow-red-500/40 ring-2 ring-white dark:ring-black">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
-          
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-900 dark:text-white leading-none">
-              {userData?.displayName || 'Người dùng'}
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              {userData?.role === 'admin' || userData?.role === 'superadmin' ? 'Quản trị viên' : 'Thành viên'}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 dark:bg-white/10 border-2 border-slate-200 dark:border-white/20 flex-shrink-0 flex items-center justify-center">
+        </div>
+        
+        <div 
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-3 cursor-pointer group p-1.5 pr-4 rounded-3xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+        >
+          <div className="w-10 h-10 rounded-2xl overflow-hidden bg-slate-100 dark:bg-blue-500/10 border-2 border-white dark:border-white/10 shadow-sm flex-shrink-0 flex items-center justify-center ring-1 ring-slate-100 dark:ring-white/5">
             {userData?.photoURL ? (
               <img src={userData.photoURL} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+              <div className="w-full h-full flex items-center justify-center text-blue-600 font-medium italic text-lg">
                 {userData?.displayName?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
+          </div>
+          <div className="text-left hidden sm:block">
+            <p className="text-sm font-medium text-slate-900 dark:text-white leading-none  tracking-tight italic">
+              {userData?.displayName || 'Guest'}
+            </p>
+            <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400 mt-1  tracking-normal opacity-60">
+              {userData?.role === 'admin' || userData?.role === 'superadmin' ? 'SYSTEM ADM' : 'MEMBER'}
+            </p>
           </div>
         </div>
       </div>

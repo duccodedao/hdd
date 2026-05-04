@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch, where, or } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Bell, CheckCircle2, ChevronRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,6 +15,7 @@ interface NotificationData {
   createdAt: number;
   readBy: string[]; // array of UIDs
   iconType?: string;
+  targetUserId?: string | null;
 }
 
 import NoData from '../components/ui/NoData';
@@ -25,18 +26,28 @@ export default function NotificationsPage() {
   const [activeItem, setActiveItem] = useState<NotificationData | null>(null);
 
   useEffect(() => {
-    // In actual production, add pagination via query config.
-    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+    if (!user) return;
+    
+    // Query for global notifications (targetUserId null or 'all') and personal ones
+    const q = query(
+      collection(db, 'notifications'),
+      orderBy('createdAt', 'desc')
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs: NotificationData[] = [];
       snapshot.forEach(doc => {
-        msgs.push({ id: doc.id, ...doc.data() } as NotificationData);
+        const data = doc.data() as NotificationData;
+        // Client-side filtering as 'or' with different fields + orderBy is complex in Firestore
+        if (!data.targetUserId || data.targetUserId === 'all' || data.targetUserId === user.uid) {
+          msgs.push({ id: doc.id, ...data });
+        }
       });
       setNotifications(msgs);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const markAsRead = async (id: string, readBy: string[]) => {
     if (!user || readBy?.includes(user.uid)) return;
@@ -126,12 +137,12 @@ export default function NotificationsPage() {
 
       <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-8">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Thông báo</h1>
+          <h1 className="text-4xl font-medium text-slate-900 dark:text-white tracking-tight mb-2">Thông báo</h1>
           <p className="text-slate-500 text-lg">Cật nhật những thông tin mới nhất từ hệ thống.</p>
         </div>
         <button 
           onClick={markAllRead}
-          className="text-sm font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 bg-blue-500/5 px-4 py-2 rounded-xl transition-all"
+          className="text-sm font-medium  tracking-normal text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 bg-blue-500/5 px-4 py-2 rounded-xl transition-all"
         >
           <CheckCircle2 className="w-4 h-4" />
           Đọc tất cả
@@ -179,7 +190,7 @@ export default function NotificationsPage() {
                         {!isRead && (
                           <button 
                             onClick={() => markAsRead(item.id, item.readBy || [])}
-                            className="text-xs font-semibold text-blue-500 hover:text-blue-700 uppercase tracking-wider"
+                            className="text-xs font-semibold text-blue-500 hover:text-blue-700  tracking-wider"
                           >
                             Đánh dấu đã đọc
                           </button>

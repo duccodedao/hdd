@@ -8,8 +8,6 @@ interface AppState {
   setMaintenanceMode: (status: boolean) => void;
   maintenanceTabs: { [key: string]: boolean };
   setMaintenanceTabs: (tabs: { [key: string]: boolean }) => void;
-  domainExpiryDate: string | null;
-  setDomainExpiryDate: (date: string | null) => void;
   isOnline: boolean;
   setOnlineStatus: (status: boolean) => void;
   darkMode: boolean;
@@ -28,15 +26,10 @@ export const useAppStore = create<AppState>((set) => ({
     products: false,
     utilities: false,
     games: false,
-    files: false,
-    news: false,
-    market: false,
     banks: false,
     exchanges: false,
   },
   setMaintenanceTabs: (tabs) => set({ maintenanceTabs: tabs }),
-  domainExpiryDate: null,
-  setDomainExpiryDate: (date) => set({ domainExpiryDate: date }),
   isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
   setOnlineStatus: (status) => set({ isOnline: status }),
   darkMode: typeof window !== 'undefined' ? (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) : false,

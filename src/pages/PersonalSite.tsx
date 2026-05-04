@@ -127,7 +127,7 @@ export default function PersonalSite() {
     if (loginForm.username === siteRequest?.adminUsername && loginForm.password === siteRequest?.adminPassword) {
       setIsSubAdmin(true);
       setShowLogin(false);
-      toast.success('Đăng nhập Admin thành công');
+      toast.success('Đăng nhập Quản trị thành công');
     } else {
       toast.error('Sai tài khoản hoặc mật khẩu');
     }
@@ -148,13 +148,13 @@ export default function PersonalSite() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 dark:border-white/5"
+          className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-100 dark:border-white/5"
         >
           <div className="w-16 h-16 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 mx-auto">
             <Key className="w-8 h-8 text-blue-600" />
           </div>
-          <h2 className="text-2xl font-black text-center mb-2 text-slate-900 dark:text-white">Xác thực API Key</h2>
-          <p className="text-slate-500 text-center text-sm mb-8 font-bold">Vui lòng nhập mã API được cấp bởi Admin tổng để truy cập lần đầu.</p>
+          <h2 className="text-2xl font-medium text-center mb-2 text-slate-900 dark:text-white">Xác thực API Key</h2>
+          <p className="text-slate-500 text-center text-sm mb-8 font-bold">Vui lòng nhập mã API được cấp bởi Chúng tôi để truy cập lần đầu.</p>
           <form onSubmit={handleApiKeySubmit} className="space-y-4">
             <input 
               type="password" 
@@ -164,7 +164,7 @@ export default function PersonalSite() {
               className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none font-bold dark:text-white"
               required
             />
-            <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-600/20 hover:scale-[1.02] transition-all">
+            <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-medium  tracking-normal text-sm shadow-xl shadow-blue-600/20 hover:scale-[1.02] transition-all">
               Tiếp tục
             </button>
           </form>
@@ -180,13 +180,13 @@ export default function PersonalSite() {
         <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-white/10 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Settings className="w-5 h-5 text-blue-600 animate-spin-slow" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Admin Mode</span>
+            <span className="text-[10px] font-medium  tracking-normal text-blue-600">Chế độ Quản trị</span>
           </div>
           <button 
             onClick={() => setIsSubAdmin(false)}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-500 transition-colors"
+            className="flex items-center gap-2 text-[10px] font-medium  tracking-normal text-slate-500 hover:text-red-500 transition-colors"
           >
-            <LogOut className="w-4 h-4" /> Thoát Admin
+            <LogOut className="w-4 h-4" /> Thoát Quản trị
           </button>
         </div>
       )}
@@ -195,7 +195,7 @@ export default function PersonalSite() {
       <div className={`max-w-4xl mx-auto px-4 ${isSubAdmin ? 'pt-24' : 'pt-12'} pb-32`}>
         {/* Profile Header */}
         <div className="text-center mb-16 relative">
-          <div className="w-32 h-32 md:w-40 md:h-40 rounded-[3rem] bg-gradient-to-br from-blue-600 to-indigo-600 mx-auto mb-6 flex items-center justify-center shadow-2xl relative overflow-hidden group">
+          <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 mx-auto mb-6 flex items-center justify-center shadow-2xl relative overflow-hidden group">
             {config?.avatarUrl ? (
               <img src={config.avatarUrl} alt="avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -207,14 +207,14 @@ export default function PersonalSite() {
                     const url = prompt('Nhập URL ảnh đại diện:', config?.avatarUrl);
                     if (url !== null) saveConfig({ ...config!, avatarUrl: url });
                   }}
-                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase"
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-medium "
                 >
                   Đổi ảnh
                 </button>
             )}
           </div>
           
-          <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 group relative inline-flex items-center gap-2">
+          <h1 className="text-3xl md:text-5xl font-medium tracking-tight mb-4 group relative inline-flex items-center gap-2">
             {config?.displayName}
             {isSubAdmin && (
                <button 
@@ -256,13 +256,13 @@ export default function PersonalSite() {
               className="flex items-center gap-3 px-6 py-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-2xl shadow-lg shadow-slate-200/20 dark:shadow-none hover:border-blue-600 transition-colors"
             >
               {getSocialIcon(social.platform)}
-              <span className="font-black text-xs uppercase tracking-widest">{social.label}</span>
+              <span className="font-medium text-xs  tracking-normal">{social.label}</span>
             </motion.a>
           ))}
           {isSubAdmin && (
             <button 
               onClick={addSocialLink}
-              className="px-6 py-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-slate-400 hover:text-blue-600 hover:border-blue-600 transition-all flex items-center gap-2 font-black uppercase text-[10px] tracking-widest"
+              className="px-6 py-4 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-slate-400 hover:text-blue-600 hover:border-blue-600 transition-all flex items-center gap-2 font-medium  text-[10px] tracking-normal"
             >
               <Plus className="w-4 h-4" /> Thêm Mạng Xã Hội
             </button>
@@ -275,7 +275,7 @@ export default function PersonalSite() {
             {config?.tabs.map(tab => (
               <button 
                 key={tab.id}
-                className="px-6 py-3 bg-white dark:bg-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-600 whitespace-nowrap border border-slate-100 dark:border-white/5 hover:border-blue-600 transition-all"
+                className="px-6 py-3 bg-white dark:bg-slate-900 rounded-xl font-medium text-[10px]  tracking-normal text-slate-600 whitespace-nowrap border border-slate-100 dark:border-white/5 hover:border-blue-600 transition-all"
               >
                 {tab.title}
               </button>
@@ -292,8 +292,8 @@ export default function PersonalSite() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {config?.tabs.map(tab => (
-              <div key={tab.id} className="glass-card p-10 rounded-[3rem] relative group border-slate-100 dark:border-white/5">
-                <h3 className="text-2xl font-black mb-6 tracking-tight flex items-center justify-between">
+              <div key={tab.id} className="glass-card p-10 rounded-2xl relative group border-slate-100 dark:border-white/5">
+                <h3 className="text-2xl font-medium mb-6 tracking-tight flex items-center justify-between">
                   {tab.title}
                   {isSubAdmin && (
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -313,7 +313,7 @@ export default function PersonalSite() {
         {/* Video Embeds */}
         {config?.embeddedVideos && config.embeddedVideos.length > 0 && (
           <div className="space-y-8">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
+            <h3 className="text-[10px] font-medium  tracking-normal text-slate-400 px-2 flex items-center gap-2">
               <Video className="w-4 h-4" /> Video nổi bật
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -337,7 +337,7 @@ export default function PersonalSite() {
               {isSubAdmin && (
                 <button 
                   onClick={addVideo}
-                  className="aspect-video border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-600 transition-all font-black uppercase text-[10px] tracking-widest gap-4"
+                  className="aspect-video border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-600 transition-all font-medium  text-[10px] tracking-normal gap-4"
                 >
                   <Plus className="w-10 h-10" />
                   Thêm Youtube/Tiktok Video
@@ -351,9 +351,9 @@ export default function PersonalSite() {
         <div className="mt-32 text-center border-t border-slate-100 dark:border-white/10 pt-16">
            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 rounded-full border border-slate-200 dark:border-white/10 shadow-sm mb-6">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live on {window.location.host} Ecosystem</span>
+              <span className="text-[10px] font-medium  tracking-normal text-slate-500">Live on {window.location.host} Ecosystem</span>
            </div>
-           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">&copy; 2026 Admin Pro Ecosystem. All rights reserved.</p>
+           <p className="text-slate-400 text-[10px] font-bold  tracking-normal">&copy; 2026 BmassID Ecosystem. All rights reserved.</p>
         </div>
       </div>
 
@@ -382,14 +382,14 @@ export default function PersonalSite() {
               initial={{ opacity: 0, y: 20, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.9 }}
-              className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-white/5 relative"
+              className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-2xl shadow-2xl max-w-md w-full border border-white/5 relative"
             >
-              <h2 className="text-3xl font-black mb-2 text-slate-900 dark:text-white uppercase tracking-tighter">Admin Login</h2>
+              <h2 className="text-3xl font-medium mb-2 text-slate-900 dark:text-white  tracking-tight">Đăng nhập Quản trị</h2>
               <p className="text-slate-500 text-sm mb-8 font-bold italic">Truy cập quyền quản trị trang cá nhân này.</p>
               <form onSubmit={handleLogin} className="space-y-6">
                 <input 
                   type="text" 
-                  placeholder="Username cấp bởi admin..."
+                  placeholder="Username cấp bởi Chúng tôi..."
                   className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold dark:text-white"
                   value={loginForm.username}
                   onChange={e => setLoginForm({...loginForm, username: e.target.value})}
@@ -401,7 +401,7 @@ export default function PersonalSite() {
                   value={loginForm.password}
                   onChange={e => setLoginForm({...loginForm, password: e.target.value})}
                 />
-                <button className="w-full py-5 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-95 transition-all">
+                <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-medium  tracking-normal text-xs shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-95 transition-all">
                   Đăng nhập ngay
                 </button>
               </form>

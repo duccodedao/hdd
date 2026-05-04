@@ -15,7 +15,9 @@ import {
   Loader2,
   Trash2,
   Code,
-  Copy
+  Copy,
+  Database,
+  ChevronRight
 } from 'lucide-react';
 import { 
   collection, 
@@ -28,7 +30,8 @@ import {
   Timestamp,
   deleteDoc,
   doc,
-  writeBatch
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
@@ -45,6 +48,7 @@ interface DnsRequest {
   userId: string;
   userEmail: string;
   subdomain: string;
+  domain?: string;
   type: 'A' | 'CNAME' | 'TXT' | 'NS' | 'AAAA';
   value: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -54,45 +58,67 @@ interface DnsRequest {
 
 interface RecordInput {
   subdomain: string;
+  domain: string;
   type: 'A' | 'CNAME' | 'TXT' | 'NS' | 'AAAA';
   value: string;
 }
 
+interface SupportedDomain {
+  id: string;
+  domain: string;
+}
+
 import { useAppStore } from '../store/appStore';
+
+import { OfflineGuard } from '../components/OfflineGuard';
 
 export default function DnsRequestPage() {
   const { user } = useAuthStore();
   const { openConfirm } = useConfirmStore();
-  const { domainExpiryDate } = useAppStore();
   
   const [requests, setRequests] = useState<DnsRequest[]>([]);
+  const [supportedDomains, setSupportedDomains] = useState<SupportedDomain[]>([]);
+  const [forbiddenList, setForbiddenList] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [records, setRecords] = useState<RecordInput[]>([
-    { subdomain: '', type: 'CNAME', value: '' }
+    { subdomain: '', domain: CURR_HOST, type: 'CNAME', value: '' }
   ]);
 
-  const calculateDaysLeft = () => {
-    if (!domainExpiryDate) return null;
-    const expiry = new Date(domainExpiryDate);
-    const now = new Date();
-    const diffMs = expiry.getTime() - now.getTime();
-    if (diffMs <= 0) return 0;
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  };
+  useEffect(() => {
+    const q = query(collection(db, 'supported_domains'), orderBy('domain', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const domains = snapshot.docs.map(doc => ({
+        id: doc.id,
+        domain: doc.data().domain
+      })) as SupportedDomain[];
+      setSupportedDomains(domains);
+      if (domains.length > 0) {
+        setRecords(prev => prev.map(r => ({ ...r, domain: r.domain || domains[0].domain })));
+      }
+    });
 
-  const daysLeft = calculateDaysLeft();
+    const unsubForbidden = onSnapshot(collection(db, 'forbidden_subdomains'), (snapshot) => {
+      setForbiddenList(snapshot.docs.map(doc => doc.data().subdomain.toLowerCase()));
+    });
+
+    return () => {
+      unsubscribe();
+      unsubForbidden();
+    };
+  }, []);
+
+
 
   useEffect(() => {
     if (!user) return;
 
     const q = query(
       collection(db, 'dnsRequests'), 
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -100,24 +126,29 @@ export default function DnsRequestPage() {
         id: doc.id,
         ...doc.data()
       })) as DnsRequest[];
+      
+      // Sort on client side to avoid composite index requirement
+      docs.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis() || 0;
+        const timeB = b.createdAt?.toMillis() || 0;
+        return timeB - timeA;
+      });
+      
       setRequests(docs);
       setFetching(false);
       setError(null);
     }, (err: any) => {
       setFetching(false);
-      if (err.code === 'failed-precondition') {
-        setError('Hệ thống đang tải dữ liệu. Vui lòng quay lại sau vài phút.');
-      } else {
-        setError('Có lỗi xảy ra khi tải dữ liệu.');
-        handleFirestoreError(err, OperationType.GET, 'dnsRequests');
-      }
+      setError('Có lỗi xảy ra khi tải dữ liệu.');
+      handleFirestoreError(err, OperationType.GET, 'dnsRequests');
     });
 
     return () => unsubscribe();
   }, [user]);
 
   const handleAddRecordLine = () => {
-    setRecords([...records, { subdomain: '', type: 'A', value: '' }]);
+    const defaultDomain = supportedDomains.length > 0 ? supportedDomains[0].domain : CURR_HOST;
+    setRecords([...records, { subdomain: '', domain: defaultDomain, type: 'A', value: '' }]);
   };
 
   const handleRemoveRecordLine = (index: number) => {
@@ -137,35 +168,91 @@ export default function DnsRequestPage() {
     e.preventDefault();
     if (!user) return;
     
-    // Validate
+    // Check total limit (max 3 records)
+    const activeRequests = requests.filter(r => r.status !== 'rejected');
+    if (activeRequests.length + records.length > 3) {
+      toast.error(`Bạn chỉ được phép sở hữu tối đa 3 bản ghi DNS. Hiện bạn đã có ${activeRequests.length} bản ghi.`);
+      return;
+    }
+    
+    // Validate and check for duplicates/bad slugs
     for (const rec of records) {
-      if (!rec.subdomain || !rec.value) {
+      const sub = rec.subdomain.toLowerCase().trim();
+      if (!sub || !rec.value) {
         toast.error('Vui lòng điền đầy đủ Tên Subdomain và Giá trị cho tất cả các dòng.');
         return;
+      }
+      const cleanSub = sub.replace(/[^a-z0-9-.]/g, '');
+      if (cleanSub !== sub) {
+        toast.error(`Subdomain "${sub}" không hợp lệ, chỉ bao gồm chữ cái, số, dấu gạch ngang và dấu chấm.`);
+        return;
+      }
+      if (forbiddenList.includes(cleanSub)) {
+        toast.error(`Tiền tố "${cleanSub}" này bị cấm sử dụng!`);
+        return;
+      }
+
+      // Local uniqueness check (within the same request batch)
+      const isDuplicateInBatch = records.filter(r => r.subdomain.toLowerCase() === sub && r.domain === rec.domain).length > 1;
+      if (isDuplicateInBatch) {
+        toast.error(`Bạn không thể gửi trùng lặp "${sub}.${rec.domain}" trong cùng một lúc.`);
+        return;
+      }
+
+      // Check global uniqueness
+      try {
+        const qUnique = query(
+          collection(db, 'dnsRequests'),
+          where('subdomain', '==', sub),
+          where('domain', '==', rec.domain)
+        );
+        const uniqueSnap = await getDocs(qUnique);
+        if (!uniqueSnap.empty) {
+          toast.error(`Subdomain "${sub}.${rec.domain}" đã tồn tại trên hệ thống.`);
+          return;
+        }
+
+        // Also check if matches any approved subdomain in subdomainRequests to avoid overlaps
+        const qSubdomain = query(
+          collection(db, 'subdomainRequests'),
+          where('subdomain', '==', sub),
+          where('domain', '==', rec.domain)
+        );
+        const subSnap = await getDocs(qSubdomain);
+        if (!subSnap.empty) {
+          toast.error(`Subdomain "${sub}.${rec.domain}" đã được sử dụng cho trang cá nhân.`);
+          return;
+        }
+      } catch (err) {
+        console.error('Uniqueness check error:', err);
       }
     }
 
     setLoading(true);
     try {
       const batch = writeBatch(db);
-      records.forEach(rec => {
+      for (const rec of records) {
+        const sub = rec.subdomain.toLowerCase().replace(/[^a-z0-9-.]/g, '');
+        
         const newRef = doc(collection(db, 'dnsRequests'));
         batch.set(newRef, {
           userId: user.uid,
           userEmail: user.email,
-          subdomain: rec.subdomain.toLowerCase().replace(/[^a-z0-9-.]/g, ''),
+          subdomain: sub,
+          domain: rec.domain,
           type: rec.type,
           value: rec.value.trim(),
           status: 'pending',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-      });
+      }
 
       await batch.commit();
 
       toast.success('Gửi yêu cầu DNS thành công!');
-      setRecords([{ subdomain: '', type: 'CNAME', value: '' }]);
+      const defaultDomain = supportedDomains.length > 0 ? supportedDomains[0].domain : CURR_HOST;
+      setRecords([{ subdomain: '', domain: defaultDomain, type: 'CNAME', value: '' }]);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'dnsRequests');
     } finally {
@@ -196,217 +283,294 @@ export default function DnsRequestPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 md:py-16">
-      <div className="mb-12 md:mb-16">
+    <div className="max-w-7xl mx-auto px-4 py-12 md:py-20 space-y-16">
+      <OfflineGuard message="Tính năng Quản lý DNS yêu cầu kết nối Internet để đồng bộ với máy chủ hạ tầng.">
+        {/* Header Section */}
+        <div className="flex flex-col gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-600 rounded-full text-[10px] font-medium  tracking-normal w-fit border border-blue-500/10"
+        >
+          <Zap className="w-3.5 h-3.5" /> DNS Luồng cao
+        </motion.div>
         <motion.h1 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3"
+          className="text-4xl md:text-6xl font-medium text-slate-900 dark:text-white tracking-tight flex items-center gap-4  italic"
         >
-          <Server className="w-8 h-8 md:w-12 md:h-12 text-blue-600" />
-          Cấp Subdomain DNS Miễn Phí
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+            <Server className="w-8 h-8" />
+          </div>
+          QUẢN TRỊ BẢN GHI DNS
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-slate-500 dark:text-slate-400 text-sm md:text-xl max-w-2xl font-medium leading-relaxed"
+          className="text-slate-500 dark:text-slate-400 text-sm md:text-lg max-w-2xl font-medium leading-relaxed"
         >
-          Tạo và quản lý bản ghi DNS cho subdomain của riêng bạn. Hỗ trợ A, CNAME, TXT, thêm hàng loạt bản ghi dễ dàng.
+          Hệ thống Anycast DNS siêu tốc, hỗ trợ cấu hình bản ghi đa dạng và cập nhật tức thì trên toàn cầu.
         </motion.p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start mb-12">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 items-start">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="xl:col-span-2 glass-card p-6 md:p-10 rounded-[2.5rem] border-slate-200 dark:border-white/10 relative overflow-hidden shadow-2xl shadow-blue-500/5"
+          className="xl:col-span-2 bg-white dark:bg-black p-8 md:p-12 rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl shadow-blue-500/5 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-3xl -mr-20 -mt-20 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 blur-[100px] -mr-32 -mt-32 pointer-events-none" />
           
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tighter">Đăng ký bản ghi mới</h2>
-          <p className="text-slate-500 text-sm mb-8 font-bold">Thỏa sức tạo subdomain không giới hạn trên hệ sinh thái.</p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+            <div>
+              <h2 className="text-2xl font-medium text-slate-900 dark:text-white  tracking-tight">Khởi tạo bản ghi</h2>
+              <p className="text-slate-400 text-xs font-bold mt-1">Cấu hình Subdomain mới trên hạ tầng Bmass HD.</p>
+            </div>
+            <div className="px-4 py-2 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10">
+              <span className="text-[11px] font-medium text-slate-400  tracking-normal">
+                Đã dùng: <span className="text-blue-600">{requests.filter(r => r.status !== 'rejected').length}</span>/3
+              </span>
+            </div>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="space-y-6">
               {records.map((rec, idx) => (
-                <div key={idx} className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-white/10 relative">
+                <div key={idx} className="p-8 bg-slate-50/50 dark:bg-white/[0.02] rounded-2xl border border-slate-100 dark:border-white/5 relative group/row">
                   {records.length > 1 && (
                     <button 
                       type="button" 
                       onClick={() => handleRemoveRecordLine(idx)}
-                      className="absolute -right-2 -top-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 z-10 shadow-sm"
+                      className="absolute -right-3 -top-3 w-10 h-10 bg-white dark:bg-slate-900 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all z-10 shadow-lg border border-slate-100 dark:border-white/10"
                     >
-                      <XCircle className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="md:col-span-1 space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Tên Subdomain</label>
-                      <input 
-                        type="text" 
-                        value={rec.subdomain}
-                        onChange={(e) => handleRecordChange(idx, 'subdomain', e.target.value.toLowerCase().replace(/[^a-z0-9-.]/g, ''))}
-                        placeholder="test"
-                        className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl focus:border-blue-600 outline-none transition-all font-bold text-slate-900 dark:text-white text-sm"
-                        required
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Subdomain & Host</label>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-[2] min-w-0">
+                          <input 
+                            type="text" 
+                            value={rec.subdomain}
+                            onChange={(e) => handleRecordChange(idx, 'subdomain', e.target.value)}
+                            placeholder="vd: app"
+                            className="w-full px-5 py-5 text-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all font-medium text-slate-900 dark:text-white placeholder:text-slate-300"
+                            required
+                          />
+                        </div>
+                        <div className="relative flex-1 min-w-[150px] shrink-0">
+                          <select
+                            value={rec.domain}
+                            onChange={(e) => handleRecordChange(idx, 'domain', e.target.value)}
+                            className="w-full pl-5 pr-10 py-4 h-full bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:border-blue-600 outline-none transition-all font-medium text-xs  appearance-none cursor-pointer text-slate-900 dark:text-white text-ellipsis overflow-hidden"
+                          >
+                            <option value={CURR_HOST}>{CURR_HOST}</option>
+                            {supportedDomains.map(d => (
+                              d.domain !== CURR_HOST && <option key={d.id} value={d.domain}>{d.domain}</option>
+                            ))}
+                          </select>
+                          <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 rotate-90 text-slate-400 pointer-events-none" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="md:col-span-1 space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Loại</label>
-                      <select 
-                        value={rec.type}
-                        onChange={(e) => handleRecordChange(idx, 'type', e.target.value)}
-                        className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl focus:border-blue-600 outline-none transition-all font-black text-xs uppercase"
-                      >
-                        <option value="CNAME">CNAME</option>
-                        <option value="A">A</option>
-                        <option value="TXT">TXT</option>
-                        <option value="NS">NS</option>
-                        <option value="AAAA">AAAA</option>
-                      </select>
+
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Loại Bản Ghi</label>
+                      <div className="relative">
+                        <select 
+                          value={rec.type}
+                          onChange={(e) => handleRecordChange(idx, 'type', e.target.value)}
+                          className="w-full pl-5 pr-10 py-4 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:border-blue-600 outline-none transition-all font-medium text-xs  appearance-none cursor-pointer text-slate-900 dark:text-white"
+                        >
+                          <option value="CNAME">CNAME (Alias)</option>
+                          <option value="A">A (IPv4 Address)</option>
+                          <option value="AAAA">AAAA (IPv6 Address)</option>
+                          <option value="TXT">TXT (Text Record)</option>
+                          <option value="NS">NS (Name Server)</option>
+                        </select>
+                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 rotate-90 text-slate-400 pointer-events-none" />
+                      </div>
                     </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Giá trị (Target)</label>
-                      <input 
-                        type="text" 
-                        value={rec.value}
-                        onChange={(e) => handleRecordChange(idx, 'value', e.target.value)}
-                        placeholder="target.domain.com"
-                        className="w-full px-4 py-3 bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl focus:border-blue-600 outline-none transition-all font-bold text-sm text-slate-900 dark:text-white"
-                        required
-                      />
+
+                    <div className="md:col-span-2 space-y-3">
+                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Giá trị đích (Content)</label>
+                      <div className="relative">
+                        <Database className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                        <input 
+                          type="text" 
+                          value={rec.value}
+                          onChange={(e) => handleRecordChange(idx, 'value', e.target.value)}
+                          placeholder="vd: connect.github.io hoặc 1.2.3.4"
+                          className="w-full pl-12 pr-5 py-4 bg-white dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all font-bold text-slate-900 dark:text-white"
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-5 pt-6">
               <button 
                 type="button"
                 onClick={handleAddRecordLine}
-                className="px-6 py-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 rounded-2xl font-black text-xs hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center gap-2 transition-colors uppercase tracking-widest"
+                className="px-8 py-5 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 rounded-2xl font-medium text-[11px] hover:bg-slate-200 dark:hover:bg-white/10 flex items-center justify-center gap-3 transition-all  tracking-normal"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
                 Thêm bản ghi
               </button>
               <button 
                 type="submit"
                 disabled={loading}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                className="flex-1 py-5 bg-blue-600 text-white rounded-2xl font-medium  tracking-[0.2em] text-[11px] shadow-2xl shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ShieldCheck className="w-5 h-5" /> Gửi yêu cầu</>}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ShieldCheck className="w-5 h-5" /> Gửi yêu cầu cấu hình</>}
               </button>
             </div>
           </form>
         </motion.div>
 
-        <div className="hidden xl:flex flex-col gap-6">
-            {daysLeft !== null && daysLeft > 0 && (
-              <div className="p-6 bg-rose-500/5 border border-rose-500/20 rounded-[2rem] relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-2xl -mr-10 -mt-10 pointer-events-none" />
-                  <Clock className="w-8 h-8 text-rose-500 mb-4" />
-                  <h3 className="text-lg font-black mb-2 uppercase tracking-tighter text-rose-600 dark:text-rose-400">Thời hạn sử dụng</h3>
-                  <div className="flex items-center gap-2 mt-4">
-                    <span className="text-4xl font-black text-rose-600 dark:text-rose-400">{daysLeft}</span>
-                    <span className="text-sm font-bold text-rose-700/80 dark:text-rose-400/80 uppercase tracking-widest leading-tight">Ngày<br/>Còn lại</span>
-                  </div>
-                  <p className="text-rose-700/70 dark:text-rose-400/70 text-xs font-medium mt-4 leading-relaxed line-clamp-3">
-                    Subdomain của bạn sẽ có thể sử dụng được trong vòng {daysLeft} ngày tới kể từ hôm nay theo quy định của hệ thống.
-                  </p>
-              </div>
-            )}
-            <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-[2rem]">
-                <Zap className="w-8 h-8 text-emerald-500 mb-4" />
-                <h3 className="text-lg font-black mb-2 uppercase tracking-tighter text-emerald-600 dark:text-emerald-400">Kích hoạt tức thì</h3>
-                <p className="text-emerald-700/80 dark:text-emerald-400/80 text-sm font-medium leading-relaxed">Sau khi Admin phê duyệt, bản ghi DNS của bạn sẽ được cập nhật ngay lập tức trên hệ thống DNS Box.</p>
+        <div className="space-y-8">
+            <div className="p-8 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl shadow-xl shadow-black/[0.02]">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 text-emerald-500">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-medium mb-3  tracking-tight text-slate-900 dark:text-white italic">Tự động đồng bộ</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed">Cập nhật DNS toàn cầu chỉ trong vài giây ngay sau khi yêu cầu được duyệt.</p>
             </div>
-            <div className="p-6 bg-blue-500/5 border border-blue-500/10 rounded-[2rem]">
-                <ShieldCheck className="w-8 h-8 text-blue-500 mb-4" />
-                <h3 className="text-lg font-black mb-2 uppercase tracking-tighter text-blue-600 dark:text-blue-400">Bảo mật & Ổn định</h3>
-                <p className="text-blue-700/80 dark:text-blue-400/80 text-sm font-medium leading-relaxed">Hệ thống DNS phân tán, ngăn chặn hiệu quả các cuộc tấn công DDoS bảo vệ tên miền.</p>
+
+            <div className="p-8 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl shadow-xl shadow-black/[0.02]">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 text-blue-500">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-medium mb-3  tracking-tight text-slate-900 dark:text-white italic">Bảo mật đám mây</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed">Tích hợp sẵn lớp bảo mật ngăn chặn tấn công DDoS ở tầng DNS cho mọi bản ghi.</p>
             </div>
         </div>
       </div>
 
-      {/* Lịch sử yêu cầu */}
+      {/* Connection Section */}
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-[#0f1115] border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-6 shadow-sm overflow-hidden"
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="bg-white dark:bg-black border border-slate-200 dark:border-white/10 rounded-3xl p-10 md:p-14 shadow-2xl shadow-black/[0.02]"
       >
-        <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white px-2">Quản lý DNS Subdomain</h3>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+          <div>
+            <h3 className="text-3xl font-medium text-slate-900 dark:text-white tracking-tight  italic">Danh sách Đã Đăng ký</h3>
+            <p className="text-slate-400 text-sm font-bold mt-1">Theo dõi và quản lý các yêu cầu cấu hình DNS của bạn.</p>
+          </div>
+          <div className="flex gap-3">
+             <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 text-center min-w-[120px]">
+                <div className="text-2xl font-medium text-blue-600">{requests.filter(r => r.status === 'approved').length}</div>
+                <div className="text-[9px] font-medium text-slate-400  tracking-normal mt-1">Đã duyệt</div>
+             </div>
+             <div className="p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 text-center min-w-[120px]">
+                <div className="text-2xl font-medium text-amber-500">{requests.filter(r => r.status === 'pending').length}</div>
+                <div className="text-[9px] font-medium text-slate-400  tracking-normal mt-1">Chờ duyệt</div>
+             </div>
+          </div>
+        </div>
         
         {fetching ? (
-          <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
-        ) : error && requests.length === 0 ? (
-          <div className="py-8 text-center text-amber-500 bg-amber-500/10 rounded-2xl mx-2 font-medium">{error}</div>
+          <div className="py-24 flex flex-col items-center justify-center">
+             <div className="w-16 h-16 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin mb-6" />
+             <span className="text-[10px] font-medium text-slate-400  tracking-[0.3em]">Đang đồng bộ hạ tầng...</span>
+          </div>
         ) : requests.length === 0 ? (
-          <div className="py-12 text-center text-slate-500 font-medium">Bạn chưa đăng ký bản ghi DNS nào.</div>
+          <div className="py-24 text-center">
+            <div className="w-24 h-24 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-8">
+               <Database className="w-10 h-10 text-slate-200" />
+            </div>
+            <p className="text-slate-400 font-medium  text-xs tracking-normal">Không có dữ liệu bản ghi</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
+          <div className="overflow-x-auto -mx-10 md:-mx-14 no-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead className="bg-slate-50 dark:bg-white/5 border-y border-slate-100 dark:border-white/5 text-slate-500">
                 <tr>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Subdomain (Tên)</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Loại</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Giá trị</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Domain Gốc</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Trạng thái</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Thao tác</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em]">Bản ghi & Ngày tạo</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em]">Loại</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em]">Giá trị đích</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em]">Đường dẫn đích</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em]">Trạng thái</th>
+                  <th className="px-10 py-6 text-[10px] font-medium  tracking-[0.2em] text-right">Hành động</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                 {requests.map(req => (
-                  <tr key={req.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white">{req.subdomain}</span>
-                        <button onClick={() => copyToClipboard(req.subdomain)} className="text-slate-400 hover:text-blue-500 transition-colors" title="Copy">
-                          <Copy className="w-3.5 h-3.5" />
+                  <tr key={req.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-all group">
+                    <td className="px-10 py-8">
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-slate-900 dark:text-white tracking-tight text-lg  group-hover:text-blue-600 transition-colors">
+                          {req.subdomain}
+                        </span>
+                        <button onClick={() => copyToClipboard(req.subdomain)} className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-slate-400 hover:text-blue-600 transition-all opacity-100">
+                          <Copy className="w-4 h-4" />
                         </button>
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-1">
-                        {req.createdAt ? format(toSafeDate(req.createdAt.toMillis()), 'HH:mm dd/MM/yyyy') : 'Đang xử lý...'}
+                      <div className="text-[10px] text-slate-400 font-bold  tracking-normal mt-1.5 flex items-center gap-2">
+                        <Clock className="w-3 h-3" />
+                        {req.createdAt ? format(toSafeDate(req.createdAt.toMillis()), 'HH:mm - dd/MM/yyyy') : 'Đang xử lý...'}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-1 text-[10px] font-black bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 rounded-md uppercase">
+                    <td className="px-10 py-8">
+                      <span className="px-4 py-1.5 text-[10px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-500/20  tracking-tight">
                         {req.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 dark:text-slate-300 font-mono truncate max-w-[200px]" title={req.value}>
+                    <td className="px-10 py-8">
+                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-white/5 px-4 py-2 rounded-xl border border-slate-100 dark:border-white/10 w-fit group/val">
+                        <span className="text-slate-600 dark:text-slate-300 font-mono text-xs font-bold truncate max-w-[150px]">
                           {req.value}
                         </span>
-                        <button onClick={() => copyToClipboard(req.value)} className="text-slate-400 hover:text-blue-500 transition-colors" title="Copy">
+                        <button onClick={() => copyToClipboard(req.value)} className="text-slate-300 hover:text-blue-600 transition-colors">
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-slate-500">{CURR_HOST}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {req.status === 'pending' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 uppercase tracking-wider"><Clock className="w-3 h-3" /> Đang chờ</span>}
-                      {req.status === 'approved' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 uppercase tracking-wider"><CheckCircle2 className="w-3 h-3" /> Đã duyệt</span>}
-                      {req.status === 'rejected' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-full bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 uppercase tracking-wider"><XCircle className="w-3 h-3" /> Từ chối</span>}
-                      
-                      {req.adminNote && (
-                        <div className="text-[10px] text-slate-500 mt-2 bg-slate-100 dark:bg-white/5 p-2 rounded-lg italic">
-                          " {req.adminNote} "
+                    <td className="px-10 py-8">
+                        <div className="flex items-center gap-2">
+                           <span className="text-xs font-medium text-blue-600 dark:text-blue-400 tracking-tight lowercase truncate max-w-[200px] block">
+                             {req.subdomain}.{req.domain || CURR_HOST}
+                           </span>
+                           <button onClick={() => copyToClipboard(`${req.subdomain}.${req.domain || CURR_HOST}`)} className="p-1.5 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 transition-all opacity-100 shrink-0">
+                             <Copy className="w-3.5 h-3.5" />
+                           </button>
                         </div>
-                      )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-10 py-8">
+                      <div className="flex flex-col gap-2">
+                        {req.status === 'pending' && <span className="inline-flex w-fit items-center gap-2 px-4 py-1.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-600 border border-amber-100  tracking-normal"><Clock className="w-3.5 h-3.5" /> Chờ duyệt</span>}
+                        {req.status === 'approved' && <span className="inline-flex w-fit items-center gap-2 px-4 py-1.5 text-[10px] font-medium rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100  tracking-normal"><CheckCircle2 className="w-3.5 h-3.5" /> Hoạt động</span>}
+                        {req.status === 'rejected' && <span className="inline-flex w-fit items-center gap-2 px-4 py-1.5 text-[10px] font-medium rounded-full bg-red-50 text-red-600 border border-red-100  tracking-normal"><XCircle className="w-3.5 h-3.5" /> Từ chối</span>}
+                        
+                        {req.status === 'approved' && (req as any).expiresAt && (
+                          <div className="text-[10px] text-rose-500 font-bold  tracking-normal flex items-center gap-2 mt-1">
+                            <Clock className="w-3 h-3" />
+                            Hết hạn: {new Date((req as any).expiresAt).toLocaleDateString('vi-VN')}
+                          </div>
+                        )}
+                        {req.adminNote && (
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10 text-[10px] text-slate-500 font-bold max-w-[200px] leading-relaxed">
+                            <span className="text-blue-600 block mb-1  tracking-tight">Note:</span>
+                            "{req.adminNote}"
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-10 py-8 text-right">
                       <button 
                         onClick={() => handleDelete(req.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-4 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all opacity-100"
                         title="Xóa yêu cầu"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
                   </tr>
@@ -416,6 +580,7 @@ export default function DnsRequestPage() {
           </div>
         )}
       </motion.div>
+     </OfflineGuard>
     </div>
   );
 }

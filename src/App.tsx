@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
@@ -23,20 +23,23 @@ import ComingSoon from './pages/ComingSoon';
 import NotificationsPage from './pages/NotificationsPage';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
+import MoviesPage from './pages/MoviesPage';
+import MovieDetailPage from './pages/MovieDetailPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import ProductsPage from './pages/ProductsPage';
 import DomainRequestPage from './pages/DomainRequestPage';
-import NewsPage from './pages/NewsPage';
 import AirdropPage from './pages/AirdropPage';
 import BanksPage from './pages/BanksPage';
 import ExchangesPage from './pages/ExchangesPage';
 import BlockedPage from './pages/BlockedPage';
 import DnsRequestPage from './pages/DnsRequestPage';
 import NotFoundPage from './pages/NotFoundPage';
+import TasksPage from './pages/TasksPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { OfflineNotification } from './components/ui/OfflineNotification';
 
-const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: 'products' | 'utilities' | 'news' | 'banks' | 'exchanges' }) => {
+const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: 'products' | 'utilities' | 'banks' | 'exchanges' }) => {
   const { maintenanceTabs } = useAppStore();
   const { isAdmin } = useAuthStore();
   
@@ -47,6 +50,8 @@ const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: 'pr
   return <>{children}</>;
 };
 
+let ipCheckCache: boolean | null = null;
+
 const AccessGuard = ({ children }: { children: React.ReactNode }) => {
   const { userData } = useAuthStore();
   const [isIpBlocked, setIsIpBlocked] = useState<boolean | null>(null);
@@ -54,22 +59,30 @@ const AccessGuard = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const checkBanStatus = async () => {
-      try {
-        // Check if user account is banned
-        if (userData?.status === 'banned' || userData?.isBanned) {
-          setIsIpBlocked(true);
-          setChecking(false);
-          return;
-        }
+      // Check if user account is banned
+      if (userData?.status === 'banned' || userData?.isBanned) {
+        setIsIpBlocked(true);
+        setChecking(false);
+        return;
+      }
 
-        // Check if IP is blocked
+      // If already checked IP in this session, skip fetch
+      if (ipCheckCache !== null) {
+        setIsIpBlocked(ipCheckCache);
+        setChecking(false);
+        return;
+      }
+
+      try {
         const ipRes = await fetch('https://api64.ipify.org?format=json');
         const { ip } = await ipRes.json();
         
         const q = query(collection(db, 'blockedIps'), where('ip', '==', ip));
         const snap = await getDocs(q);
         
-        setIsIpBlocked(!snap.empty);
+        const blocked = !snap.empty;
+        ipCheckCache = blocked;
+        setIsIpBlocked(blocked);
       } catch (err) {
         console.error("Ban check failed", err);
         setIsIpBlocked(false);
@@ -105,19 +118,22 @@ const AuthActionRedirector = () => {
   return null;
 };
 
+const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuthStore();
+  const location = useLocation();
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+};
+
 export default function App() {
   const { setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setDomainExpiryDate } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs } = useAppStore();
 
   useEffect(() => {
-    // Theme initialization
-    const theme = localStorage.getItem('theme');
-    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
     // Offline status listening
     const handleOnline = () => setOnlineStatus(true);
     const handleOffline = () => setOnlineStatus(false);
@@ -132,29 +148,31 @@ export default function App() {
         if (settingsDoc.data().maintenanceTabs) {
           setMaintenanceTabs(settingsDoc.data().maintenanceTabs);
         }
-        if (settingsDoc.data().domainExpiryDate) {
-          setDomainExpiryDate(settingsDoc.data().domainExpiryDate);
-        } else {
-          setDomainExpiryDate(null);
-        }
       }
     }, (err) => {
       console.error("Could not fetch system settings", err);
     });
 
     // Auth listener
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeUser: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      
+      // Clear previous user data listener
+      if (unsubscribeUser) {
+        unsubscribeUser();
+        unsubscribeUser = null;
+      }
+
       if (firebaseUser) {
-        // Fetch user data from firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData);
-          } else {}
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
+        // Real-time user data listener
+        unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            setUserData(docSnap.data() as UserData);
+          }
+        }, (err) => {
+          console.error("Error listening to user data:", err);
+        });
       } else {
         setUserData(null);
       }
@@ -162,12 +180,13 @@ export default function App() {
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeAuth();
+      if (unsubscribeUser) unsubscribeUser();
       unsubscribeSystem();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setDomainExpiryDate]);
+  }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -180,8 +199,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <OfflineNotification />
       <AuthActionRedirector />
-      <Toaster position="top-right" toastOptions={{ className: 'dark:bg-slate-800 dark:text-white' }} />
+      <Toaster position="top-right" />
       <ConfirmModal />
       <AccessGuard>
         <ErrorBoundary>
@@ -197,17 +217,19 @@ export default function App() {
             {/* Main App Routes */}
             <Route path="/" element={<MainLayout />}>
               <Route index element={<Home />} />
-              <Route path="profile" element={<Profile />} />
+              <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="products" element={<TabGuard tabKey="products"><ProductsPage /></TabGuard>} />
-              <Route path="news" element={<TabGuard tabKey="news"><NewsPage /></TabGuard>} />
               <Route path="banks" element={<TabGuard tabKey="banks"><BanksPage /></TabGuard>} />
               <Route path="exchanges" element={<TabGuard tabKey="exchanges"><ExchangesPage /></TabGuard>} />
+              <Route path="movies" element={<MoviesPage />} />
+              <Route path="movies/:slug" element={<MovieDetailPage />} />
               <Route path="about" element={<AboutPage />} />
               <Route path="airdrop" element={<AirdropPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="tasks" element={<RequireAuth><TasksPage /></RequireAuth>} />
               <Route path="contact" element={<ContactPage />} />
-              <Route path="dns" element={<DnsRequestPage />} />
+              <Route path="dns" element={<RequireAuth><DnsRequestPage /></RequireAuth>} />
               
               {/* Admin Routes */}
               <Route path="admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" />} />

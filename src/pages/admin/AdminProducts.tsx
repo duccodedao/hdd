@@ -110,9 +110,9 @@ export default function AdminProducts() {
           <table className="w-full text-left text-sm text-slate-900 dark:text-white min-w-[600px]">
             <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
               <tr>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Sản phẩm</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Link dẫn</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-right">Thao tác</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Sản phẩm</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Link dẫn</th>
+                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">

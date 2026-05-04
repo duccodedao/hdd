@@ -106,7 +106,7 @@ export default function AuthActionPage() {
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
             {mode === 'resetPassword' ? <Lock className="w-8 h-8" /> : <Mail className="w-8 h-8" />}
           </div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white">
+          <h2 className="text-2xl font-medium text-slate-900 dark:text-white">
             {mode === 'resetPassword' ? 'Đặt lại mật khẩu' : 'Xác thực Email'}
           </h2>
         </div>

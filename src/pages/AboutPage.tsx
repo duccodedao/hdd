@@ -15,9 +15,9 @@ interface AboutConfig {
 const DEFAULT_ABOUT: AboutConfig = {
   introTitle: "Hệ Sinh Thái Personal Profile",
   introDesc: "Đây không chỉ là một website profile thông thường, mà là một nền tảng quản trị cá nhân All-in-One. Được xây dựng trên nền tảng công nghệ Web 5.0, hệ thống mang lại sự kết hợp hoàn hảo giữa tốc độ, bảo mật và trải nghiệm người dùng tinh tế.",
-  adminName: "Personal Admin System",
-  adminBio: "Xin chào, mình là người đứng sau dự án này. Với niềm đam mê công nghệ và thiết kế, mình đã dành thời gian để kiến tạo nên hệ sinh thái này nhằm mục đích quản lý, chia sẻ và tối ưu hóa workflow cá nhân. Mọi dòng code đều được chăm chút để đạt tới độ hoàn thiện cao nhất.",
-  adminPhoto: "https://graph.facebook.com/100028269784534/picture?type=large"
+  adminName: "Đội ngũ Chúng tôi",
+  adminBio: "Xin chào, Chúng tôi là những người đứng sau dự án này. Với niềm đam mê công nghệ và thiết kế, Chúng tôi đã dành thời gian để kiến tạo nên hệ sinh thái này nhằm mục đích quản lý, chia sẻ và tối ưu hóa workflow cá nhân. Mọi dòng code đều được chăm chút để đạt tới độ hoàn thiện cao nhất.",
+  adminPhoto: "https://tytpht.hdd.io.vn/img/bmassloadings.png"
 };
 
 export default function AboutPage() {
@@ -60,79 +60,81 @@ export default function AboutPage() {
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-3xl md:text-6xl font-black tracking-tighter text-slate-900 dark:text-white"
+            className="text-5xl md:text-8xl font-display font-medium tracking-tight text-slate-900 dark:text-white italic leading-[1.1]"
           >
-            {config.introTitle.split(' ').slice(0, -2).join(' ')} <span className="text-blue-600 italic">{config.introTitle.split(' ').slice(-2).join(' ')}</span>
+            {config.introTitle.split(' ').slice(0, -2).join(' ')} <span className="text-blue-600">{config.introTitle.split(' ').slice(-2).join(' ')}</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-sm md:text-lg text-slate-500 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed"
+            className="text-sm md:text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-bold opacity-70"
           >
             {config.introDesc}
           </motion.p>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
         {[
-          { icon: Zap, title: "Tốc độ", desc: "Tối ưu hóa performance, phản hồi tức thì với Real-time Database.", color: "text-amber-500" },
-          { icon: ShieldCheck, title: "Bảo mật", desc: "Hệ thống phân quyền đa lớp, bảo vệ dữ liệu tuyệt đối với Firebase Auth.", color: "text-emerald-500" },
-          { icon: Globe, title: "Sẵn sàng", desc: "Hoạt động mượt mà trên mọi thiết bị và nền tảng với chuẩn PWA.", color: "text-blue-500" }
+          { icon: Zap, title: "Tốc độ", desc: "Tối ưu hóa performance cực hạn, phản hồi tức thì với hệ thống Real-time hiện đại.", color: "text-amber-500", bg: "bg-amber-500/5" },
+          { icon: ShieldCheck, title: "Bảo mật", desc: "Phân quyền đa tầng, mã hóa đầu cuối đảm bảo an toàn dữ liệu tuyệt đối.", color: "text-emerald-500", bg: "bg-emerald-500/5" },
+          { icon: Globe, title: "Toàn cầu", desc: "Hệ sinh thái không giới hạn, kết nối đa nền tảng với độ ổn định 99.9%.", color: "text-blue-500", bg: "bg-blue-500/5" }
         ].map((item, idx) => (
           <motion.div 
             key={idx}
-            whileHover={{ y: -5 }}
-            className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm"
+            whileHover={{ y: -8 }}
+            className={`p-10 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm transition-all hover:shadow-2xl hover:shadow-black/[0.02] ${item.bg}`}
           >
-            <item.icon className={`w-8 h-8 md:w-10 md:h-10 ${item.color} mb-4 md:mb-6`} />
-            <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mb-2 md:mb-3 uppercase tracking-tighter">{item.title}</h3>
-            <p className="text-xs md:text-sm text-slate-500 leading-relaxed font-bold">{item.desc}</p>
+            <item.icon className={`w-12 h-12 ${item.color} mb-8`} />
+            <h3 className="text-xl md:text-2xl font-medium text-slate-900 dark:text-white mb-3  tracking-tight italic">{item.title}</h3>
+            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold  tracking-wide opacity-80">{item.desc}</p>
           </motion.div>
         ))}
       </div>
 
-      <section className="bg-slate-900 dark:bg-blue-600/10 rounded-[2.5rem] md:rounded-[3rem] p-6 lg:p-16 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-10 opacity-5 md:opacity-10">
-          <Cpu className="w-48 h-48 md:w-64 md:h-64" />
+      <section className="bg-slate-900 rounded-3xl p-10 lg:p-20 text-white relative overflow-hidden shadow-3xl">
+        <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
+          <Cpu className="w-64 h-64 md:w-96 md:h-96" />
         </div>
         
-        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+        <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           <div className="shrink-0">
-             <div className="w-32 h-32 md:w-48 md:h-48 rounded-full border-4 md:border-8 border-white/10 overflow-hidden shadow-2xl scale-110">
+             <div className="w-44 h-44 md:w-64 md:h-64 rounded-2xl border-8 border-white/5 bg-white/10 p-2 overflow-hidden shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-700">
                <img 
                 src={config.adminPhoto} 
-                alt="Admin" 
-                className="w-full h-full object-cover"
+                alt="Founder" 
+                className="w-full h-full object-contain"
                />
              </div>
           </div>
           
-          <div className="space-y-4 md:space-y-6 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase mb-2">
-              <User className="w-3 h-3" /> System Architect & Founder
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 bg-blue-500/20 px-5 py-2 rounded-2xl text-[10px] font-medium tracking-normal  border border-blue-500/20">
+              <User className="w-3.5 h-3.5" /> Sáng lập & Kiến trúc sư chính
             </div>
-            <h2 className="text-2xl md:text-5xl font-black tracking-tight">{config.adminName.split(' ').slice(0, -1).join(' ')} <span className="text-blue-400">{config.adminName.split(' ').slice(-1)}</span></h2>
-            <p className="text-sm md:text-lg text-slate-300 max-w-2xl leading-relaxed font-medium">
+            <h2 className="text-4xl md:text-8xl font-display font-medium tracking-tight italic leading-[1.1]">
+              {config.adminName.split(' ').slice(0, -1).join(' ')} <span className="text-blue-400">{config.adminName.split(' ').slice(-1)}</span>
+            </h2>
+            <p className="text-sm md:text-xl text-slate-300 max-w-2xl leading-relaxed font-bold opacity-80">
               {config.adminBio}
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-4 pt-2">
               <div className="bg-white/5 border border-white/10 px-4 py-2 md:px-5 md:py-3 rounded-2xl flex items-center gap-2 md:gap-3">
                  <Heart className="w-4 h-4 md:w-5 md:h-5 text-red-500 fill-red-500" />
-                 <span className="font-black text-[10px] md:text-sm uppercase tracking-widest">Sáng tạo</span>
+                 <span className="font-medium text-[10px] md:text-sm  tracking-normal">Sáng tạo</span>
               </div>
               <div className="bg-white/5 border border-white/10 px-4 py-2 md:px-5 md:py-3 rounded-2xl flex items-center gap-2 md:gap-3">
                  <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-400" />
-                 <span className="font-black text-[10px] md:text-sm uppercase tracking-widest">24/7 Monitoring</span>
+                 <span className="font-medium text-[10px] md:text-sm  tracking-normal">Giám sát 24/7</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <footer className="text-center text-slate-500 text-sm">
-        Built with <span className="text-red-500">♥</span> by Admin System • © 2026
+      <footer className="text-center text-slate-400 text-xs font-bold  tracking-normal">
+        Hệ sinh thái BmassID Ecosystem
       </footer>
     </div>
   );

@@ -29,22 +29,36 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-20 pt-4 px-4 lg:px-8">
-      <div className="flex flex-col gap-1 md:gap-2">
-        <motion.h1 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3"
+      <div className="flex flex-col gap-3 md:gap-4 mb-12">
+        <motion.div
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="flex items-center gap-4"
         >
-          <ShoppingBag className="w-8 h-8 md:w-10 md:h-10 text-orange-500" />
-          Sản phẩm
-        </motion.h1>
+          <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-orange-500 flex items-center justify-center text-white shadow-2xl shadow-orange-500/20">
+            <ShoppingBag className="w-6 h-6 md:w-8 md:h-8" />
+          </div>
+          <div>
+            <h1 className="text-3xl md:text-5xl font-medium text-slate-900 dark:text-white tracking-tight  italic leading-none">
+              Sản phẩm
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[10px] font-medium  tracking-[0.2em] text-orange-600 bg-orange-50 dark:bg-orange-500/10 px-3 py-1 rounded-lg">
+                Ưu đãi độc quyền
+              </span>
+              <span className="text-[10px] font-medium  tracking-[0.2em] text-slate-400">
+                Cửa hàng cao cấp
+              </span>
+            </div>
+          </div>
+        </motion.div>
         <motion.p 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="text-slate-500 text-sm md:text-lg"
+          className="text-slate-500 text-sm md:text-lg font-medium max-w-2xl leading-relaxed"
         >
-          Mua sắm và khám phá các sản phẩm nổi bật dành cho cộng đồng
+          Mua sắm và khám phá những sản phẩm công nghệ, phụ kiện và ưu đãi độc quyền dành riêng cho cộng đồng BMASS.
         </motion.p>
       </div>
 

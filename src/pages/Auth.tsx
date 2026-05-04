@@ -12,7 +12,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Loader2, X, Sparkles, User, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, X, Sparkles, User, ArrowRight, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -43,6 +43,8 @@ export default function Auth() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Generic loading for Google
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -140,6 +142,7 @@ export default function Auth() {
         role: registerEmail === 'sonlyhongduc@gmail.com' ? 'superadmin' : 'user',
         status: 'active',
         createdAt: Date.now(),
+        joinedAt: Date.now(),
         lastLoginAt: Date.now()
       });
       await checkAndSaveLocation(userCred.user.uid);
@@ -177,6 +180,7 @@ export default function Auth() {
           role: userCred.user.email === 'sonlyhongduc@gmail.com' ? 'superadmin' : 'user',
           status: 'active',
           createdAt: Date.now(),
+          joinedAt: Date.now(),
           lastLoginAt: Date.now()
         });
       } else {
@@ -211,17 +215,31 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans overflow-hidden relative">
-      {/* Background Decorative blobs */}
-      <div className="absolute top-[10%] left-[10%] w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[10%] right-[10%] w-[500px] h-[500px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center bg-[#fcfdfe] dark:bg-[#050608] text-slate-900 dark:text-white font-sans overflow-hidden relative selection:bg-blue-100 dark:selection:bg-blue-900/30">
+      {/* Immersive Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/[0.03] dark:bg-blue-500/[0.02] blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/[0.03] dark:bg-indigo-500/[0.02] blur-[120px] rounded-full animate-pulse [animation-delay:2s]" />
+      </div>
 
-      <Link to="/" className="fixed top-4 md:top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 md:gap-2 hover:opacity-80 transition-all z-50 group">
-        <div className="w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-2xl border border-slate-100 dark:border-white/10 group-hover:scale-110 transition-transform">
-          <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-8 h-8 md:w-10 md:h-10 drop-shadow-sm" />
-        </div>
-        <span className="font-black text-sm md:text-xl tracking-tighter uppercase bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">Hệ Sinh Thái</span>
-      </Link>
+      {/* Floating Logo Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed top-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 group"
+      >
+        <Link to="/" className="flex flex-col items-center gap-3">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-2xl border border-slate-100/50 dark:border-white/5 group-hover:scale-105 transition-all duration-500">
+            <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-10 h-10 md:w-12 md:h-12 drop-shadow-2xl" />
+          </div>
+          <div className="text-center">
+            <h1 className="font-medium text-xl md:text-2xl tracking-tight  italic bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 leading-none">
+              BMass HD
+            </h1>
+            <p className="text-[9px] font-medium  tracking-[0.3em] text-slate-400 mt-1">Hệ sinh thái</p>
+          </div>
+        </Link>
+      </motion.div>
 
       {/* Forgot Password Modal */}
       <AnimatePresence>
@@ -232,47 +250,47 @@ export default function Auth() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowForgotModal(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-100 dark:border-slate-800"
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white dark:bg-black rounded-2xl p-10 shadow-full border border-slate-200/50 dark:border-white/10"
             >
               <button 
                 onClick={() => setShowForgotModal(false)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                className="absolute top-8 right-8 p-3 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all"
                >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="mb-6">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 flex items-center justify-center mb-4">
-                  <Lock className="w-6 h-6" />
+              <div className="mb-10">
+                <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-6 shadow-xl shadow-blue-600/20">
+                  <Lock className="w-7 h-7" />
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight">Quên mật khẩu?</h2>
-                <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Nhập email liên kết với tài khoản của bạn để nhận liên kết đặt lại mật khẩu.</p>
+                <h2 className="text-3xl font-medium tracking-tight  italic text-slate-900 dark:text-white mb-2">QUÊN MẬT KHẨU?</h2>
+                <p className="text-slate-500 font-bold text-[11px]  tracking-normal leading-relaxed">Khôi phục tài khoản hệ thống</p>
               </div>
 
-              <form onSubmit={handleForgotPassword} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-1.5 ml-1">Email</label>
+              <form onSubmit={handleForgotPassword} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Email liên kết</label>
                   <input 
                     type="email" 
                     required
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all font-bold"
                     placeholder="name@example.com"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={forgotLoading}
-                  className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+                  className="w-full py-5 bg-blue-600 text-white rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-2xl shadow-blue-600/20"
                 >
-                  {forgotLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Gửi liên kết đặt lại'}
+                  {forgotLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'GỬI LIÊN KẾT KHÔI PHỤC'}
                 </button>
               </form>
             </motion.div>
@@ -280,215 +298,228 @@ export default function Auth() {
         )}
       </AnimatePresence>
 
-      {/* Main Content Area - Stacked Cards */}
-      <div className="relative w-full max-w-md h-[600px] md:h-[680px] perspective-[1200px] mt-24 md:mt-10 px-4 md:px-0">
-        
-        {/* Register Card */}
-        <motion.div
-           layout
-           animate={{
-              zIndex: activeCard === 'register' ? 10 : 1,
-              scale: activeCard === 'register' ? 1 : 0.9,
-              y: activeCard === 'register' ? 0 : 50,
-              rotate: activeCard === 'register' ? 0 : 4,
-              opacity: activeCard === 'register' ? 1 : 0.6,
-              filter: activeCard === 'register' ? 'blur(0px)' : 'blur(2px)',
-           }}
-           transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-           className={`absolute inset-x-4 md:inset-0 h-fit flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] ${activeCard !== 'register' ? 'cursor-pointer hover:opacity-80' : ''}`}
-           onClick={() => activeCard !== 'register' && setActiveCard('register')}
-        >
-          {activeCard !== 'register' && <div className="absolute inset-0 z-20 rounded-[2.5rem]" />}
+      <div className="flex-1 max-w-lg w-full relative z-10 px-6 mt-32 md:mt-16">
+        <div className="relative w-full min-h-[600px]">
           
-          <div className="mb-6 md:mb-8 font-sans">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tighter mb-1 text-blue-600 dark:text-blue-400">Tạo tài khoản.</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-widest leading-tight">Gia nhập cộng đồng bmassHD.</p>
+          {/* Action Selector */}
+          <div className="flex justify-center mb-10 p-1.5 bg-white/50 dark:bg-white/5 backdrop-blur-xl rounded-2xl border border-slate-200/50 dark:border-white/10 shadow-sm max-w-xs mx-auto">
+            <button 
+              onClick={() => setActiveCard('login')}
+              className={`flex-1 py-3 px-6 rounded-2xl text-[10px] font-medium  tracking-normal transition-all ${activeCard === 'login' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Đăng nhập
+            </button>
+            <button 
+              onClick={() => setActiveCard('register')}
+              className={`flex-1 py-3 px-6 rounded-2xl text-[10px] font-medium  tracking-normal transition-all ${activeCard === 'register' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Đăng ký
+            </button>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-1">
-               <label className="text-[10px] md:text-sm font-black uppercase tracking-widest ml-1 text-slate-500">Họ và tên</label>
-               <input 
-                 type="text" 
-                 value={registerName}
-                 onChange={(e) => setRegisterName(e.target.value)}
-                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 md:py-3.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                 placeholder="Nguyễn Văn A"
-                 required
-               />
-            </div>
+          <AnimatePresence mode="wait">
+            {activeCard === 'login' ? (
+              <motion.div
+                key="login"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="bg-white/80 dark:bg-black/80 backdrop-blur-3xl rounded-2xl p-8 md:p-12 border border-slate-200 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)]"
+              >
+                <div className="mb-10 text-center md:text-left">
+                  <h1 className="text-4xl md:text-5xl font-medium tracking-tight  italic leading-none mb-3">
+                    Chào Mừng.
+                  </h1>
+                  <p className="text-slate-500 font-bold text-[11px]  tracking-[0.2em] opacity-60">Đăng nhập vào tài khoản định danh của bạn</p>
+                </div>
 
-            <div className="space-y-1">
-               <label className="text-[10px] md:text-sm font-black uppercase tracking-widest ml-1 text-slate-500">Email</label>
-               <input 
-                 type="email" 
-                 value={registerEmail}
-                 onChange={(e) => setRegisterEmail(e.target.value)}
-                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 md:py-3.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                 placeholder="name@example.com"
-                 required
-               />
-            </div>
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Email truy cập</label>
+                    <div className="relative">
+                      <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input 
+                        type="email" 
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="w-full bg-slate-50/50 dark:bg-black/40 border border-slate-200/60 dark:border-white/10 rounded-2xl pl-14 pr-6 py-4.5 focus:border-blue-600 outline-none transition-all font-bold text-sm"
+                        placeholder="example@gmail.com"
+                        required
+                      />
+                    </div>
+                  </div>
 
-            <div className="space-y-1">
-               <label className="text-[10px] md:text-sm font-black uppercase tracking-widest ml-1 text-slate-500">Mật khẩu</label>
-               <input 
-                 type="password" 
-                 value={registerPassword}
-                 onChange={(e) => setRegisterPassword(e.target.value)}
-                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 md:py-3.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                 placeholder="Tối thiểu 6 ký tự"
-                 required
-                 minLength={6}
-               />
-            </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center ml-1">
+                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400">Mật khẩu bảo mật</label>
+                      <button type="button" onClick={() => setShowForgotModal(true)} className="text-[9px] font-medium text-blue-600  tracking-normal hover:underline">Quên mật khẩu?</button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input 
+                        type={showLoginPassword ? "text" : "password"} 
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full bg-slate-50/50 dark:bg-black/40 border border-slate-200/60 dark:border-white/10 rounded-2xl pl-14 pr-16 py-4.5 focus:border-blue-600 outline-none transition-all font-bold text-sm"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="pt-2">
-               <button 
-                 type="submit" 
-                 disabled={registerLoading || googleLoading}
-                 className="w-full bg-blue-600 text-white font-black py-3 md:py-4 rounded-xl hover:bg-blue-700 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 text-xs md:text-sm uppercase tracking-widest"
-               >
-                 {registerLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Đăng ký ngay'}
-               </button>
-            </div>
-          </form>
+                  <div className="flex items-center gap-3 ml-2 group cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
+                    <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${rememberMe ? 'bg-blue-600 border-blue-600' : 'border-slate-200 dark:border-white/10 bg-transparent group-hover:border-blue-600'}`}>
+                      {rememberMe && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="text-[10px] font-medium  tracking-normal text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Duy trì đăng nhập</span>
+                  </div>
 
-          <div className="my-4 md:my-6 flex items-center gap-4">
-             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800"></div>
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Hoặc</span>
-             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800"></div>
-          </div>
-
-          <button 
-            type="button"
-            onClick={(e) => { e.preventDefault(); handleGoogleAuth(); }}
-            disabled={registerLoading || googleLoading}
-            className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-black py-3 md:py-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 active:scale-[0.99] transition-all text-xs md:text-sm"
-          >
-            {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />}
-            TIẾP TỤC VỚI GOOGLE
-          </button>
-
-          <div className="mt-6 md:mt-8 text-center text-xs text-slate-500 dark:text-slate-400">
-             Đã có tài khoản?{' '}
-             <button type="button" onClick={() => setActiveCard('login')} className="font-black text-slate-900 dark:text-white hover:underline relative z-30 uppercase tracking-tighter">
-               Đăng nhập
-             </button>
-          </div>
-        </motion.div>
-
-        {/* Login Card */}
-        <motion.div
-           layout
-           animate={{
-              zIndex: activeCard === 'login' ? 10 : 1,
-              scale: activeCard === 'login' ? 1 : 0.9,
-              y: activeCard === 'login' ? 0 : -50,
-              rotate: activeCard === 'login' ? 0 : -4,
-              opacity: activeCard === 'login' ? 1 : 0.6,
-              filter: activeCard === 'login' ? 'blur(0px)' : 'blur(2px)',
-           }}
-           transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-           className={`absolute inset-x-4 md:inset-0 h-fit flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] ${activeCard !== 'login' ? 'cursor-pointer hover:opacity-80' : ''}`}
-           onClick={() => activeCard !== 'login' && setActiveCard('login')}
-        >
-          {activeCard !== 'login' && <div className="absolute inset-0 z-20 rounded-[2.5rem]" />}
-
-          <div className="mb-6 md:mb-8 font-sans">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tighter mb-1">Đăng nhập.</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-widest leading-tight">Chào mừng trở lại bmassHD.</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-               <label className="text-[10px] md:text-sm font-black uppercase tracking-widest ml-1 text-slate-500">Email</label>
-               <input 
-                 type="email" 
-                 value={loginEmail}
-                 onChange={(e) => setLoginEmail(e.target.value)}
-                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 md:py-3.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                 placeholder="name@example.com"
-                 required
-               />
-            </div>
-
-            <div className="space-y-1">
-               <div className="flex justify-between items-center ml-1">
-                  <label className="text-[10px] md:text-sm font-black uppercase tracking-widest text-slate-500">Mật khẩu</label>
                   <button 
-                    type="button" 
-                    onClick={() => setShowForgotModal(true)}
-                    className="text-[10px] md:text-xs font-black text-blue-600 hover:text-blue-700 transition-colors relative z-30 uppercase tracking-tighter"
+                    type="submit" 
+                    disabled={loginLoading || googleLoading}
+                    className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3 group"
                   >
-                    Quên mật khẩu?
+                    {loginLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        Đăng Nhập <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
                   </button>
-               </div>
-               <input 
-                 type="password" 
-                 value={loginPassword}
-                 onChange={(e) => setLoginPassword(e.target.value)}
-                 className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 md:py-3.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                 placeholder="••••••••"
-                 required
-               />
-            </div>
+                </form>
 
-            <div className="flex items-center justify-between ml-1 py-1">
-               <label className="flex items-center gap-2 cursor-pointer group">
-                 <div className="relative flex items-center">
-                   <input 
-                     type="checkbox" 
-                     checked={rememberMe}
-                     onChange={(e) => setRememberMe(e.target.checked)}
-                     className="peer sr-only"
-                   />
-                   <div className="w-5 h-5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
-                   <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity left-[3px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                   </svg>
-                 </div>
-                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Ghi nhớ mật khẩu</span>
-               </label>
-            </div>
+                <div className="mt-8 flex items-center gap-4">
+                  <div className="flex-1 h-px bg-slate-100 dark:bg-white/5" />
+                  <span className="text-[9px] font-medium text-slate-300  tracking-[0.3em]">TÙY CHỌN XÁC THỰC</span>
+                  <div className="flex-1 h-px bg-slate-100 dark:bg-white/5" />
+                </div>
 
-            <div className="pt-2">
-               <button 
-                 type="submit" 
-                 disabled={loginLoading || googleLoading}
-                 className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold py-3.5 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 dark:shadow-none"
-               >
-                 {loginLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Đăng nhập'}
-               </button>
-            </div>
-          </form>
+                <button 
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  disabled={loginLoading || googleLoading}
+                  className="w-full mt-8 flex items-center justify-center gap-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/10 py-5 rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all group"
+                >
+                  {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <>
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
+                      <span className="text-[10px] font-medium  tracking-[0.2em] text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Đăng nhập với Nhà cung cấp danh tính</span>
+                    </>
+                  )}
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="register"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-white/80 dark:bg-black/80 backdrop-blur-3xl rounded-2xl p-8 md:p-12 border border-slate-200 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)]"
+              >
+                <div className="mb-10 text-center md:text-left">
+                  <h1 className="text-4xl md:text-5xl font-medium tracking-tight  italic leading-none mb-3 text-blue-600 dark:text-blue-400">
+                    Gia Nhập.
+                  </h1>
+                  <p className="text-slate-500 font-bold text-[11px]  tracking-[0.2em] opacity-60">Tạo định danh truy cập hợp nhất của bạn</p>
+                </div>
 
-          <div className="my-4 md:my-6 flex items-center gap-4">
-             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800"></div>
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Hoặc</span>
-             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800"></div>
-          </div>
+                <form onSubmit={handleRegister} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Họ và tên đầy đủ</label> 
+                    <div className="relative">
+                      <User className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input 
+                        type="text" 
+                        value={registerName}
+                        onChange={(e) => setRegisterName(e.target.value)}
+                        className="w-full bg-slate-50/50 dark:bg-black/40 border border-slate-200/60 dark:border-white/10 rounded-2xl pl-14 pr-6 py-4.5 focus:border-blue-600 outline-none transition-all font-bold text-sm"
+                        placeholder="Nguyễn Văn A"
+                        required
+                      />
+                    </div>
+                  </div>
 
-          <button 
-            type="button"
-            onClick={(e) => { e.preventDefault(); handleGoogleAuth(); }}
-            disabled={loginLoading || googleLoading}
-            className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-black py-3 md:py-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 active:scale-[0.99] transition-all text-xs md:text-sm"
-          >
-            {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />}
-            TIẾP TỤC VỚI GOOGLE
-          </button>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Email ưu tiên</label>
+                    <div className="relative">
+                      <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input 
+                        type="email" 
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        className="w-full bg-slate-50/50 dark:bg-black/40 border border-slate-200/60 dark:border-white/10 rounded-2xl pl-14 pr-6 py-4.5 focus:border-blue-600 outline-none transition-all font-bold text-sm"
+                        placeholder="example@gmail.com"
+                        required
+                      />
+                    </div>
+                  </div>
 
-          <div className="mt-6 md:mt-8 text-center text-xs text-slate-500 dark:text-slate-400 pb-2">
-             Chưa có tài khoản?{' '}
-             <button type="button" onClick={() => setActiveCard('register')} className="font-black text-slate-900 dark:text-white hover:underline relative z-30 uppercase tracking-tighter">
-               Đăng ký ngay
-             </button>
-          </div>
-        </motion.div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Tạo mật khẩu bảo mật</label>
+                    <div className="relative">
+                      <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input 
+                        type={showRegisterPassword ? "text" : "password"} 
+                        value={registerPassword}
+                        onChange={(e) => setRegisterPassword(e.target.value)}
+                        className="w-full bg-slate-50/50 dark:bg-black/40 border border-slate-200/60 dark:border-white/10 rounded-2xl pl-14 pr-16 py-4.5 focus:border-blue-600 outline-none transition-all font-bold text-sm"
+                        placeholder="••••••••"
+                        required
+                        minLength={6}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
+                      >
+                        {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
 
+                  <button 
+                    type="submit" 
+                    disabled={registerLoading || googleLoading}
+                    className="w-full py-5 bg-blue-600 text-white rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-blue-600/30 flex items-center justify-center gap-3 group"
+                  >
+                    {registerLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        Xác Nhận Đăng Ký <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <div className="mt-8 flex items-center gap-4">
+                  <div className="flex-1 h-px bg-slate-100 dark:bg-white/5" />
+                  <span className="text-[9px] font-medium text-slate-300  tracking-[0.3em]">LỐI VÀO MẠNG XÃ HỘI</span>
+                  <div className="flex-1 h-px bg-slate-100 dark:bg-white/5" />
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  disabled={registerLoading || googleLoading}
+                  className="w-full mt-8 flex items-center justify-center gap-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-white/10 py-5 rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all group"
+                >
+                  {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <>
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
+                      <span className="text-[10px] font-medium  tracking-[0.2em] text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Tiếp tục với tài khoản Google</span>
+                    </>
+                  )}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-      
     </div>
   );
 }

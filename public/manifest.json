@@ -1,12 +1,12 @@
 {
-  "name": "Admin Pro Ecosystem",
-  "short_name": "AdminPro",
+  "name": "Chúng tôi - BmassID Ecosystem",
+  "short_name": "Chúng tôi",
   "description": "Hệ sinh thái công cụ, tiện ích, và dịch vụ dành riêng cho cộng đồng. Tham gia ngay để khám phá và quản lý các tiện ích một cách hiệu quả.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#020617",
-  "theme_color": "#4f46e5",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
   "icons": [
     {
       "src": "https://tytpht.hdd.io.vn/img/bmassloadings.png",
