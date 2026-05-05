@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Github, Facebook, MessageCircle, Send, Globe, MapPin, Zap, ExternalLink, X, Loader2 } from 'lucide-react';
+import { Mail, Github, Facebook, MessageCircle, Send, Globe, MapPin, Zap, ExternalLink, X, Loader2, Phone, Hash, Sparkles, ArrowRight } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import toast from 'react-hot-toast';
+import { cn } from '../lib/utils';
 
 export default function ContactPage() {
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -19,7 +20,7 @@ export default function ContactPage() {
           setSocialConfig(snap.data());
         }
       } catch (e) {
-        console.error("Lỗi khi tải thông tin", e);
+        console.error("Config fetch failed", e);
       }
     };
     fetchConfig();
@@ -27,7 +28,7 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) return toast.error('Vui lòng điền đủ thông tin');
+    if (!formData.name || !formData.email || !formData.message) return toast.error('Hãy điền đầy đủ các thông tin.');
     
     setIsSending(true);
     try {
@@ -36,11 +37,11 @@ export default function ContactPage() {
         createdAt: serverTimestamp(),
         status: 'new'
       });
-      toast.success('Yêu cầu đã được gửi thành công!');
+      toast.success('Thông điệp đã được gửi đi.');
       setShowRequestModal(false);
       setFormData({ name: '', email: '', message: '' });
     } catch (err) {
-      toast.error('Gửi yêu cầu thất bại.');
+      toast.error('Gửi tin nhắn thất bại.');
     } finally {
       setIsSending(false);
     }
@@ -48,138 +49,74 @@ export default function ContactPage() {
 
   const contacts = [
     { 
-      name: 'Email Support', 
+      name: 'Thư điện tử', 
       value: socialConfig.email || 'sonlyhongduc@gmail.com', 
       icon: Mail, 
       url: `mailto:${socialConfig.email || 'sonlyhongduc@gmail.com'}`, 
-      color: 'bg-rose-500',
-      desc: 'Hỗ trợ kỹ thuật 24/7'
+      color: 'text-indigo-500',
+      desc: 'Hỗ trợ kỹ thuật & quản trị'
     },
     { 
-      name: 'Facebook Page', 
-      value: 'Chúng tôi', 
+      name: 'Mạng xã hội', 
+      value: 'Bmass Profile', 
       icon: Facebook, 
       url: socialConfig.facebook || 'https://facebook.com/sonlyhongduc', 
-      color: 'bg-blue-600',
-      desc: 'Cập nhật tin tức mới nhất'
+      color: 'text-blue-600',
+      desc: 'Cập nhật tin tức & cộng đồng'
     },
     { 
-      name: 'GitHub Repo', 
+      name: 'Mã nguồn', 
       value: '@duclsh', 
       icon: Github, 
       url: socialConfig.github || 'https://github.com/duclsh', 
-      color: 'bg-slate-900',
-      desc: 'Mã nguồn & Đóng góp'
+      color: 'text-slate-900 dark:text-white',
+      desc: 'Kho lưu trữ & kiến trúc'
     },
     { 
-      name: 'Zalo Connect', 
-      value: socialConfig.zalo || '09xxxxxxxxx', 
+      name: 'Tin nhắn nhanh', 
+      value: 'Zalo Connect', 
       icon: MessageCircle, 
       url: socialConfig.zalo?.startsWith('http') ? socialConfig.zalo : '#', 
-      color: 'bg-sky-500',
-      desc: 'Liên hệ nhanh qua tin nhắn'
+      color: 'text-sky-500',
+      desc: 'Kênh liên lạc khẩn cấp'
     }
   ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12 pb-20 pt-4">
-      <AnimatePresence>
-        {showRequestModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowRequestModal(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl p-8 shadow-2xl"
-            >
-              <button 
-                onClick={() => setShowRequestModal(false)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-2xl font-medium text-slate-900 dark:text-white mb-6">Gửi tin nhắn cho Chúng tôi</h2>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tên của bạn</label>
-                  <input 
-                    type="text" 
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nguyễn Văn A"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Email liên hệ</label>
-                  <input 
-                    type="email" 
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nội dung</label>
-                  <textarea 
-                    rows={4}
-                    value={formData.message}
-                    onChange={(e) => setFormData({...formData, message: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    placeholder="Tôi muốn hỗ trợ về..."
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  disabled={isSending}
-                  className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                >
-                  {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Gửi ngay'}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <div className="text-center space-y-3 md:space-y-4 max-w-2xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-6 py-24 space-y-32">
+      
+      {/* Immersive Header */}
+      <section className="text-center space-y-8 max-w-3xl mx-auto">
         <motion.div
-// ... rest of the file stays same
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-medium  tracking-normal"
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
         >
-          <Zap className="w-3.5 h-3.5" /> Liên hệ
+          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+          <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Đã thiết lập kết nối</span>
         </motion.div>
-        <motion.h1 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-3xl lg:text-6xl font-medium tracking-tight text-slate-900 dark:text-white"
-        >
-          Kết nối với <span className="text-blue-600 italic">Chúng tôi</span>
-        </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-sm md:text-lg text-slate-500 dark:text-slate-400 leading-relaxed font-bold"
-        >
-          Chúng tôi luôn sẵn sàng lắng nghe mọi thắc mắc từ bạn. 
-          Hãy kết nối qua các kênh dưới đây!
-        </motion.p>
-      </div>
+        
+        <div className="space-y-4">
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-6xl md:text-8xl font-display font-medium tracking-tight italic leading-none text-gradient"
+          >
+            Kết nối khoảng <br className="hidden md:block" /><span className="text-blue-500">cách.</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-lg text-slate-500 font-medium leading-relaxed"
+          >
+            Khởi tạo liên kết với hệ thống hạ tầng cốt lõi của chúng tôi. Chúng tôi luôn sẵn sàng lắng nghe bạn.
+          </motion.p>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
+      {/* Contact Grid */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {contacts.map((contact, idx) => (
           <motion.a 
             key={idx}
@@ -189,59 +126,151 @@ export default function ContactPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 + idx * 0.05 }}
-            className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-6 rounded-2xl hover:shadow-2xl hover:shadow-blue-500/10 transition-all flex flex-col h-full items-center text-center overflow-hidden"
+            className="group glass p-10 rounded-[2.5rem] border border-slate-200 dark:border-white/5 hover:border-blue-500/20 transition-all duration-700 flex flex-col h-full items-center text-center shadow-2xl shadow-blue-500/[0.02]"
           >
-            <div className={`w-14 h-14 md:w-16 md:h-16 rounded-2xl ${contact.color} text-white flex items-center justify-center mb-6 shadow-lg shadow-black/5 group-hover:scale-110 transition-transform`}>
-              <contact.icon className="w-7 h-7 md:w-8 md:h-8" />
+            <div className={cn(
+              "w-20 h-20 rounded-[2rem] glass p-5 flex items-center justify-center mb-8 shadow-2xl transition-transform duration-700 group-hover:scale-110",
+              contact.color
+            )}>
+              <contact.icon className="w-full h-full object-contain" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2  tracking-tight">{contact.name}</h3>
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 px-2">{contact.desc}</p>
-            <div className="mt-auto pt-4 border-t border-slate-100 dark:border-white/5 w-full">
-               <span className="text-[10px] md:text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:underline  tracking-normal">{contact.value}</span>
+            <h3 className="text-xl font-display font-medium text-slate-900 dark:text-white mb-2 italic tracking-tight">{contact.name}</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6 leading-relaxed">
+              {contact.desc}
+            </p>
+            <div className="mt-auto pt-6 border-t border-slate-100 dark:border-white/5 w-full">
+               <span className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em] group-hover:underline">
+                 {contact.value}
+               </span>
             </div>
           </motion.a>
         ))}
-      </div>
+      </section>
 
-      <div className="px-4 pb-20">
+      {/* CTA Section */}
+      <section>
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="relative bg-slate-900 dark:bg-blue-600 rounded-2xl md:rounded-2xl p-8 lg:p-16 overflow-hidden"
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="relative bg-slate-900 dark:bg-white rounded-[3rem] p-12 lg:p-24 overflow-hidden border border-white/5"
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
-          <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-white opacity-5 rounded-full blur-3xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent pointer-events-none" />
           
-          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12">
-            <div className="space-y-4 md:space-y-6 text-center lg:text-left flex-1">
-              <h2 className="text-2xl lg:text-5xl font-medium text-white leading-tight  tracking-tight">Gửi yêu cầu trực tiếp</h2>
-              <p className="text-sm md:text-lg text-slate-300 max-w-xl line-clamp-2 md:line-clamp-none font-medium">Bạn có ý tưởng hay hoặc cần hỗ trợ chuyên sâu? Đừng ngần ngại gửi tin nhắn trực tiếp.</p>
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 md:gap-6">
-                <div className="flex items-center gap-2 text-white">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                    <MapPin className="w-4 h-4" />
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-16">
+            <div className="space-y-8 text-center lg:text-left flex-1">
+              <h2 className="text-4xl lg:text-7xl font-display font-medium text-white dark:text-black italic tracking-tight leading-none">
+                Gửi phản hồi.
+              </h2>
+              <p className="text-xl text-slate-400 dark:text-slate-500 font-medium max-w-xl">
+                Bạn có ý tưởng hoặc yêu cầu kỹ thuật? Hãy gửi thông điệp trực tiếp để chúng tôi hỗ trợ.
+              </p>
+              
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-blue-500" />
                   </div>
-                  <span className="text-xs font-medium  tracking-normal">Vietnam</span>
+                  <span className="text-[10px] font-bold text-white dark:text-black uppercase tracking-widest">Trái Đất / Việt Nam</span>
                 </div>
-                <div className="flex items-center gap-2 text-white">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                    <Globe className="w-4 h-4" />
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center">
+                    <Globe className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <span className="text-xs font-medium  tracking-normal">Toàn cầu</span>
+                  <span className="text-[10px] font-bold text-white dark:text-black uppercase tracking-widest">Toàn cầu</span>
                 </div>
               </div>
             </div>
             
             <button 
               onClick={() => setShowRequestModal(true)}
-              className="w-full lg:w-auto shrink-0 bg-white text-slate-900 px-10 py-5 rounded-3xl font-medium  tracking-normal text-xs md:text-sm hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3"
+              className="w-full lg:w-auto px-12 h-20 bg-blue-500 text-white rounded-[1.5rem] font-bold tracking-[0.2em] uppercase hover:scale-105 active:scale-95 transition-all shadow-[0_20px_50px_rgba(59,130,246,0.3)] flex items-center justify-center gap-4 group"
             >
-               <Send className="w-4 h-4 fill-slate-900" /> Nhắn ngay
+               Gửi ngay <Send className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
             </button>
           </div>
         </motion.div>
-      </div>
+      </section>
+
+      {/* Dispatch Modal */}
+      <AnimatePresence>
+        {showRequestModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRequestModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl glass p-10 md:p-14 rounded-[3rem] border border-white/10 shadow-full"
+            >
+              <button 
+                onClick={() => setShowRequestModal(false)}
+                className="absolute top-10 right-10 p-3 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className="mb-12 space-y-4">
+                <h2 className="text-3xl font-display font-medium text-slate-900 dark:text-white italic tracking-tight text-gradient">Gửi thông điệp.</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kênh truyền thông mã hóa</p>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Họ và tên</label>
+                    <input 
+                      type="text" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full h-14 px-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
+                      placeholder="Nhập tên của bạn"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Địa chỉ Email</label>
+                    <input 
+                      type="email" 
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      className="w-full h-14 px-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
+                      placeholder="email@vi_du.com"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nội dung</label>
+                  <textarea 
+                    rows={5}
+                    value={formData.message}
+                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                    className="w-full p-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm resize-none"
+                    placeholder="Mô tả ý tưởng hoặc yêu cầu của bạn..."
+                    required
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isSending}
+                  className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group disabled:opacity-50"
+                >
+                  {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                    <>Bắt đầu gửi <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></>
+                  )}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

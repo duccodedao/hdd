@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,7 +8,7 @@
   --color-primary-600: #09090b;
   --color-primary-700: #000000;
   
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", var(--font-sans);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
@@ -23,38 +23,49 @@
 
 @layer base {
   html {
-    font-size: 16px;
     @apply scroll-smooth;
   }
   body {
-    @apply antialiased selection:bg-blue-100 selection:text-blue-900 text-slate-800 bg-[#fafafa] dark:bg-[#0a0a0b] dark:text-slate-200 font-sans;
+    @apply antialiased selection:bg-blue-500/10 selection:text-blue-600 text-slate-900 bg-[#fafafa] dark:bg-[#0a0a0b] dark:text-slate-100 font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    line-height: 1.6; /* Fix font clipping for Vietnamese accents */
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    @apply font-display tracking-tight leading-normal italic; /* Using leading-normal instead of none to avoid clipping */
   }
 }
 
-/* Professional SaaS Gradients & Effects */
-.glass {
-  @apply bg-white/70 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200/50 dark:border-white/5;
-}
-.glass-card {
-  @apply bg-white/80 dark:bg-white/5 backdrop-blur-2xl border border-slate-200/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)];
-}
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-xl bg-white/70 dark:bg-black/80 border border-slate-200/50 dark:border-white/5;
+  }
+  
+  .glass-card {
+    @apply bg-white dark:bg-white/[0.03] backdrop-blur-2xl border border-slate-200/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.01)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)];
+  }
 
-/* Professional rhythm sizing */
-.section-padding {
-  @apply py-20 md:py-32;
-}
+  .premium-card {
+    @apply bg-white dark:bg-zinc-900/50 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500;
+  }
 
-.container-width {
-  @apply max-w-7xl mx-auto px-6 md:px-12;
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-slate-950 via-slate-700 to-slate-500 dark:from-white dark:via-white/90 dark:to-white/40;
+    padding-bottom: 0.15em; /* Prevent clipping of descenders */
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -63,7 +74,9 @@
   @apply bg-slate-200 dark:bg-slate-800 rounded-full hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors;
 }
 
-/* Smooth page transitions for motion/react */
-.motion-safe-transition {
-  @apply transition-all duration-300 ease-in-out;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200/50 dark:bg-white/10 rounded-full;
 }

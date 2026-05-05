@@ -1,6 +1,6 @@
 {
   "name": "Sơn Lý Hồng Đức",
-  "description": "Hihi",
+  "description": "Bảng điều khiển định danh và hệ sinh thái quản trị bảo mật nâng cao.",
   "requestFramePermissions": [
     "camera",
     "notifications",

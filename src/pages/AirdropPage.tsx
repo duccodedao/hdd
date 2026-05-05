@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Gift, ArrowRight } from 'lucide-react';
+import { Gift, ArrowRight, Sparkles } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { OfflineGuard } from '../components/OfflineGuard';
+import { cn } from '../lib/utils';
 
 import NoData from '../components/ui/NoData';
 
@@ -14,34 +15,43 @@ const AirdropCard = ({ airdrop, index }: { airdrop: any, index: number }) => {
   return (
     <motion.div
       key={airdrop.id}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
+      transition={{ delay: index * 0.1, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+      className="group glass p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/5 hover:border-pink-500/20 transition-all duration-700 flex flex-col h-full shadow-2xl shadow-pink-500/[0.02]"
     >
-      <div className="flex items-start gap-4 mb-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+      <div className="flex items-center gap-6 mb-8">
+        <div className="w-20 h-20 rounded-[1.5rem] glass p-4 flex items-center justify-center overflow-hidden shrink-0 shadow-xl ring-1 ring-white/10 group-hover:scale-105 transition-transform duration-700">
           {airdrop.logoUrl ? (
             <img src={airdrop.logoUrl} alt={airdrop.title} className="w-full h-full object-cover" />
           ) : (
-            <Gift className="w-8 h-8 text-slate-400" />
+            <Gift className="w-8 h-8 text-pink-500/50" />
           )}
         </div>
-        <div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight mb-1 group-hover:text-pink-500 transition-colors">{airdrop.title}</h3>
+        <div className="space-y-1">
+          <h3 className="text-xl font-display font-medium text-slate-900 dark:text-white leading-tight italic group-hover:text-pink-500 transition-colors line-clamp-2">
+            {airdrop.title}
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest px-2 py-0.5 glass border border-white/5 rounded-md">V_PROTCOL</span>
+            <div className="w-1 h-1 bg-pink-500 rounded-full animate-pulse" />
+          </div>
         </div>
       </div>
       
-      <div className="flex-1 mb-6">
-        <p className={`text-slate-600 dark:text-slate-400 text-sm leading-relaxed ${!showMore && isLong ? 'line-clamp-3' : ''}`}>
+      <div className="flex-1 mb-10">
+        <p className={cn(
+          "text-sm text-slate-500 font-medium leading-relaxed",
+          !showMore && isLong ? 'line-clamp-3' : ''
+        )}>
           {airdrop.description}
         </p>
         {isLong && (
           <button 
             onClick={() => setShowMore(!showMore)}
-            className="mt-2 text-[10px] font-medium text-pink-500  tracking-normal hover:underline"
+            className="mt-4 text-[10px] font-bold text-pink-500 uppercase tracking-widest hover:underline"
           >
-            {showMore ? 'Thu gọn' : 'Xem thêm'}
+            {showMore ? 'Thu gọn' : 'Xem chi tiết'}
           </button>
         )}
       </div>
@@ -50,10 +60,10 @@ const AirdropCard = ({ airdrop, index }: { airdrop: any, index: number }) => {
         href={airdrop.projectUrl} 
         target="_blank" 
         rel="noreferrer"
-        className="w-full py-3 px-4 bg-slate-50 dark:bg-white/5 hover:bg-pink-600 hover:text-white text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 group/btn"
+        className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-3 transition-all duration-500 hover:scale-[1.02] active:scale-95 shadow-xl shadow-pink-500/10 group/btn"
       >
         Tham gia ngay
-        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
       </a>
     </motion.div>
   );
@@ -71,41 +81,52 @@ export default function AirdropPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-20 pt-4 px-4 lg:px-8">
-      <OfflineGuard message="Danh sách Airdrop cần kết nối mạng để đồng bộ trạng thái các dự án mới nhất.">
-        <div className="flex flex-col gap-1 md:gap-2">
-        <motion.h1 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-3xl md:text-5xl font-display font-medium text-slate-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3 italic"
-        >
-          <Gift className="w-8 h-8 md:w-10 md:h-10 text-pink-500" />
-          Dự án Airdrop
-        </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-slate-500 text-sm md:text-lg"
-        >
-          Tham gia các chương trình Airdrop từ các đối tác bmassHD
-        </motion.p>
-      </div>
+    <div className="max-w-7xl mx-auto px-6 py-24 space-y-24">
+      <OfflineGuard message="Cần kết nối mạng để đồng bộ hóa các chương trình tặng thưởng.">
+        <header className="space-y-8 max-w-3xl">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+            <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Giao thức phần thưởng</span>
+          </motion.div>
+          <div className="space-y-4">
+            <motion.h1 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-6xl md:text-8xl font-display font-medium tracking-tight italic leading-none text-gradient"
+            >
+              Hệ thống <span className="text-pink-500">Airdrop.</span>
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-xl text-slate-500 font-medium leading-relaxed"
+            >
+              Tham gia các chương trình tặng thưởng tiềm năng được tinh tuyển bởi hệ sinh thái BMass.
+            </motion.p>
+          </div>
+        </header>
       
-      {airdrops.length === 0 ? (
-        <NoData 
-          message="Sắp có sự kiện mới" 
-          description="Đội ngũ bmassHD đang chọn lọc các dự án Airdrop tiềm năng nhất để gửi tới bạn."
-          icon={Gift}
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {airdrops.map((airdrop, index) => (
-            <AirdropCard key={airdrop.id} airdrop={airdrop} index={index} />
-          ))}
-        </div>
-      )}
-     </OfflineGuard>
+        {airdrops.length === 0 ? (
+          <div className="pt-12">
+            <NoData 
+              message="Đang chờ dữ liệu" 
+              description="Hệ thống đang sàng lọc các dự án tặng thưởng tiềm năng nhất. Hãy quay lại sau."
+              icon={Gift}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {airdrops.map((airdrop, index) => (
+              <AirdropCard key={airdrop.id} airdrop={airdrop} index={index} />
+            ))}
+          </div>
+        )}
+      </OfflineGuard>
     </div>
   );
 }

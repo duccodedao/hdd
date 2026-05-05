@@ -37,13 +37,34 @@ import NotFoundPage from './pages/NotFoundPage';
 import TasksPage from './pages/TasksPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineNotification } from './components/ui/OfflineNotification';
+import LocationGuard from './components/guards/LocationGuard';
 
-const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: 'products' | 'utilities' | 'banks' | 'exchanges' }) => {
+const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: string }) => {
   const { maintenanceTabs } = useAppStore();
   const { isAdmin } = useAuthStore();
   
   if (maintenanceTabs[tabKey] && !isAdmin) {
     return <MaintenancePage />;
+  }
+  
+  return <>{children}</>;
+};
+
+const DeviceGuard = ({ children }: { children: React.ReactNode }) => {
+  const { maintenanceDevices } = useAppStore();
+  const { isAdmin } = useAuthStore();
+  
+  const getDeviceType = () => {
+    const ua = navigator.userAgent;
+    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return 'tablet';
+    if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return 'mobile';
+    return 'pc';
+  };
+
+  const device = getDeviceType();
+  
+  if (maintenanceDevices[device] && !isAdmin) {
+    return <MaintenancePage message={`Hệ thống đang bảo trì cho thiết bị ${device.toUpperCase()}.`} />;
   }
   
   return <>{children}</>;
@@ -143,9 +164,13 @@ export default function App() {
     // Real-time system settings listener
     const unsubscribeSystem = onSnapshot(doc(db, 'settings', 'system'), (settingsDoc) => {
       if (settingsDoc.exists()) {
-        setMaintenanceMode(settingsDoc.data().maintenanceMode || false);
-        if (settingsDoc.data().maintenanceTabs) {
-          setMaintenanceTabs(settingsDoc.data().maintenanceTabs);
+        const data = settingsDoc.data();
+        setMaintenanceMode(data.maintenanceMode || false);
+        if (data.maintenanceTabs) {
+          setMaintenanceTabs(data.maintenanceTabs);
+        }
+        if (data.maintenanceDevices) {
+          setMaintenanceDevices(data.maintenanceDevices);
         }
       }
     }, (err) => {
@@ -214,21 +239,21 @@ export default function App() {
             <Route path="/auth/action" element={<AuthActionPage />} />
 
             {/* Main App Routes */}
-              <Route path="/" element={<MainLayout />}>
-                <Route index element={<AboutPage />} />
-                <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
+            <Route path="/" element={<DeviceGuard><LocationGuard><MainLayout /></LocationGuard></DeviceGuard>}>
+              <Route index element={<AboutPage />} />
+              <Route path="profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
               <Route path="utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="products" element={<TabGuard tabKey="products"><ProductsPage /></TabGuard>} />
               <Route path="banks" element={<TabGuard tabKey="banks"><BanksPage /></TabGuard>} />
               <Route path="exchanges" element={<TabGuard tabKey="exchanges"><ExchangesPage /></TabGuard>} />
-              <Route path="movies" element={<MoviesPage />} />
-              <Route path="movies/:slug" element={<MovieDetailPage />} />
+              <Route path="movies" element={<TabGuard tabKey="movies"><MoviesPage /></TabGuard>} />
+              <Route path="movies/:slug" element={<TabGuard tabKey="movies"><MovieDetailPage /></TabGuard>} />
               <Route path="about" element={<AboutPage />} />
-              <Route path="airdrop" element={<AirdropPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="tasks" element={<RequireAuth><TasksPage /></RequireAuth>} />
+              <Route path="airdrop" element={<TabGuard tabKey="airdrop"><AirdropPage /></TabGuard>} />
+              <Route path="notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+              <Route path="tasks" element={<RequireAuth><TabGuard tabKey="tasks"><TasksPage /></TabGuard></RequireAuth>} />
               <Route path="contact" element={<ContactPage />} />
-              <Route path="dns" element={<RequireAuth><DnsRequestPage /></RequireAuth>} />
+              <Route path="dns" element={<RequireAuth><TabGuard tabKey="dns"><DnsRequestPage /></TabGuard></RequireAuth>} />
               
               {/* Admin Routes */}
               <Route path="admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" />} />

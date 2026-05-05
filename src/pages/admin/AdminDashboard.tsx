@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -24,7 +24,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 
 export default function AdminDashboard() {
   const { isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices } = useAppStore();
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
     });
   };
 
-  const toggleTabMaintenance = async (tabKey: keyof typeof maintenanceTabs) => {
+  const toggleTabMaintenance = async (tabKey: string) => {
     const newTabs = {
       ...maintenanceTabs,
       [tabKey]: !maintenanceTabs[tabKey]
@@ -251,6 +251,20 @@ export default function AdminDashboard() {
       toast.success(`Đã cập nhật trạng thái bảo trì cho tính năng.`);
     } catch (e) {
       toast.error('Lỗi cập nhật cấu hình tab.');
+    }
+  };
+
+  const toggleDeviceMaintenance = async (deviceKey: keyof typeof maintenanceDevices) => {
+    const newDevices = {
+      ...maintenanceDevices,
+      [deviceKey]: !maintenanceDevices[deviceKey]
+    };
+    setMaintenanceDevices(newDevices);
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { maintenanceDevices: newDevices }, { merge: true });
+      toast.success(`Đã cập nhật trạng thái bảo trì cho thiết bị ${deviceKey.toUpperCase()}.`);
+    } catch (e) {
+      toast.error('Lỗi cập nhật cấu hình thiết bị.');
     }
   };
 
@@ -743,14 +757,25 @@ export default function AdminDashboard() {
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-500 min-w-[180px]">
                         <div className="text-[11px] leading-relaxed">
-                          <div>IP: {(u as any).lastIpAddress || 'Auto'}</div>
-                          <div className="text-slate-400">
-                            {typeof (u as any).lastLocation === 'object' && (u as any).lastLocation !== null 
-                              ? `${(u as any).lastLocation.latitude}, ${(u as any).lastLocation.longitude}`
-                              : ((u as any).lastLocation || 'Vietnam')}
+                          <div className="flex items-center gap-1.5 text-blue-500 font-bold mb-0.5">
+                            <Globe className="w-3 h-3" />
+                            <span>{(u as any).lastIpAddress || 'Hidden'}</span>
                           </div>
+                          <div className="flex items-center gap-1.5 text-slate-400 font-mono">
+                            <MapPin className="w-3 h-3" />
+                            {u.location ? (
+                              <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
+                            ) : (
+                              <span>Bản đồ (Trống)</span>
+                            )}
+                          </div>
+                          {u.location?.address && (
+                             <div className="text-[10px] text-slate-500 mt-1 truncate max-w-[160px] italic">
+                               {u.location.address}
+                             </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -838,86 +863,70 @@ export default function AdminDashboard() {
 
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+              <AppWindow className="w-6 h-6 text-indigo-500" />
+              Bảo trì theo thiết bị
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: 'pc', label: 'Máy tính (PC/Laptop)', icon: Server },
+                { key: 'mobile', label: 'Điện thoại (Mobile)', icon: Phone },
+                { key: 'tablet', label: 'Máy tính bảng (Tablet)', icon: AppWindow }
+              ].map((dev) => (
+                <div key={dev.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-900/10 dark:bg-white/10 flex items-center justify-center">
+                      <dev.icon className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">{dev.label}</h4>
+                  </div>
+                  <button 
+                    onClick={() => toggleDeviceMaintenance(dev.key as any)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceDevices[dev.key as keyof typeof maintenanceDevices] ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceDevices[dev.key as keyof typeof maintenanceDevices] ? 'translate-x-6' : 'translate-x-1'}`}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
               <Settings className="w-6 h-6 text-blue-500" />
               Bảo trì từng tính năng
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
-                    <Box className="w-5 h-5" />
+              {[
+                { key: 'profile', label: 'Hồ sơ Cá nhân', icon: UserCircle, page: 'Profile.tsx' },
+                { key: 'tasks', label: 'Quản lý Công việc', icon: CheckSquare, page: 'TasksPage.tsx' },
+                { key: 'products', label: 'Cửa hàng Sản phẩm', icon: Box, page: 'ProductsPage.tsx' },
+                { key: 'utilities', label: 'Tiện ích Web', icon: Wrench, page: 'UtilitiesPage.tsx' },
+                { key: 'banks', label: 'Cổng Ngân hàng', icon: Landmark, page: 'BanksPage.tsx' },
+                { key: 'exchanges', label: 'Sàn Giao dịch', icon: LineChart, page: 'ExchangesPage.tsx' },
+                { key: 'movies', label: 'Phim ảnh (Cinema)', icon: Play, page: 'MoviesPage.tsx' },
+                { key: 'news', label: 'Tin tức & Trending', icon: Newspaper, page: 'NewsPage.tsx' },
+                { key: 'airdrop', label: 'Sự kiện Phần thưởng', icon: Gift, page: 'AirdropPage.tsx' },
+                { key: 'dns', label: 'Máy chủ DNS', icon: Globe, page: 'DnsRequestPage.tsx' },
+              ].map((tab) => (
+                <div key={tab.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                      <tab.icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm">{tab.label}</h4>
+                      <p className="text-[10px] text-slate-500 italic">{tab.page}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">Cửa hàng Sản phẩm</h4>
-                    <p className="text-[10px] text-slate-500">Bảo trì ProductsPage</p>
-                  </div>
+                  <button 
+                    onClick={() => toggleTabMaintenance(tab.key)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs[tab.key] ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs[tab.key] ? 'translate-x-6' : 'translate-x-1'}`}/>
+                  </button>
                 </div>
-                <button 
-                  onClick={() => toggleTabMaintenance('products')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs.products ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs.products ? 'translate-x-6' : 'translate-x-1'}`}/>
-                </button>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-500 flex items-center justify-center">
-                    <Wrench className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">Tiện ích Web</h4>
-                    <p className="text-[10px] text-slate-500">Bảo trì UtilitiesPage</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => toggleTabMaintenance('utilities')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs.utilities ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs.utilities ? 'translate-x-6' : 'translate-x-1'}`}/>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-500 flex items-center justify-center">
-                    <Landmark className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">Ngân hàng</h4>
-                    <p className="text-[10px] text-slate-500">Bảo trì BanksPage</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => toggleTabMaintenance('banks')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs.banks ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs.banks ? 'translate-x-6' : 'translate-x-1'}`}/>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
-                    <LineChart className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">Sàn giao dịch</h4>
-                    <p className="text-[10px] text-slate-500">Bảo trì ExchangesPage</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => toggleTabMaintenance('exchanges')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs.exchanges ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs.exchanges ? 'translate-x-6' : 'translate-x-1'}`}/>
-                </button>
-              </div>
-
-
-
+              ))}
             </div>
             
             <p className="text-xs text-slate-500 mt-6">

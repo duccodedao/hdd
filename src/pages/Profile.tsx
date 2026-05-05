@@ -5,11 +5,10 @@ import { updateProfile, sendPasswordResetEmail, sendEmailVerification, signOut }
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
 import toast from 'react-hot-toast';
-import { Camera, Mic, User, Mail, Shield, CheckCircle2, ChevronRight, KeyRound, Clock, Activity, AlertTriangle, Loader2, MapPin, BellRing, Smartphone, ExternalLink, Globe, Copy, Zap, Send, Trash2, LogOut } from 'lucide-react';
-import { toSafeDate } from '../lib/utils';
+import { Camera, User, Globe, Shield, CheckCircle2, ChevronRight, KeyRound, Activity, AlertTriangle, Loader2, BellRing, Smartphone, ExternalLink, LogOut, Sparkles, Clock, ArrowRight } from 'lucide-react';
+import { toSafeDate, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { FirebaseError } from 'firebase/app';
 import { useConfirmStore } from '../store/confirmStore';
 import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
@@ -306,17 +305,18 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 md:py-20 space-y-12">
+    <div className="max-w-7xl mx-auto px-6 py-16 space-y-20 selection:bg-blue-500/10">
       
-      {/* Header Profile Summary */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+      {/* Premium Profile Header */}
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-black rounded-2xl p-8 md:p-12 border border-slate-200 dark:border-white/10 shadow-2xl shadow-black/[0.02] flex items-center flex-col md:flex-row gap-10 relative overflow-hidden"
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative group lg:p-16 p-8 glass-card border border-slate-200 dark:border-white/5 overflow-hidden flex flex-col lg:flex-row items-center gap-12"
       >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/5 blur-[120px] -mr-64 -mt-64 pointer-events-none group-hover:scale-110 transition-transform duration-1000" />
         
-        <div className="relative group mx-auto sm:mx-0">
+        <div className="relative shrink-0">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -324,324 +324,314 @@ export default function Profile() {
             className="hidden" 
             accept="image/*"
           />
-          <div 
-            className={`w-32 h-32 md:w-44 md:h-44 rounded-2xl overflow-hidden border-4 border-white dark:border-slate-800 shadow-2xl bg-slate-50 dark:bg-slate-900 relative group/avatar cursor-pointer ${uploading ? 'opacity-50' : ''}`}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={cn(
+              "w-40 h-40 md:w-56 md:h-56 rounded-[2.5rem] overflow-hidden border-8 border-white/5 dark:border-white/5 shadow-2xl bg-slate-50 dark:bg-white/[0.02] relative cursor-pointer ring-1 ring-slate-200 dark:ring-white/10",
+              uploading && "opacity-50"
+            )}
             onClick={handleAvatarClick}
           >
             {userData?.photoURL ? (
-              <img src={userData.photoURL} alt="Avatar" className="w-full h-full object-cover transition-transform duration-700 group-hover/avatar:scale-110" />
+              <img src={userData.photoURL} alt="Avatar" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-5xl font-medium text-slate-300 italic group-hover/avatar:scale-110 transition-transform">
-                {userData?.displayName?.charAt(0).toUpperCase() || 'U'}
+              <div className="w-full h-full flex items-center justify-center text-6xl font-display font-medium text-slate-300 dark:text-slate-700 italic">
+                {userData?.displayName?.charAt(0) || 'U'}
               </div>
             )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera className="w-8 h-8 text-white" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+              <Camera className="w-10 h-10 text-white" />
             </div>
             {uploading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                <Loader2 className="w-10 h-10 text-white animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md">
+                <Loader2 className="w-12 h-12 text-white animate-spin" />
               </div>
             )}
-          </div>
+          </motion.div>
         </div>
 
-        <div className="text-center md:text-left space-y-4 relative z-10 flex-1">
-          <div className="space-y-1">
-            <h1 className="text-4xl md:text-6xl font-medium text-slate-900 dark:text-white tracking-tight  italic leading-none">
-              {userData?.displayName || 'Thành viên'}
+        <div className="flex-1 text-center lg:text-left space-y-8 min-w-0">
+          <div className="space-y-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Đăng ký {userData?.role || 'Thành viên'}</span>
+            </motion.div>
+            <h1 className="text-5xl md:text-8xl font-display font-medium tracking-tight italic leading-[0.9] text-gradient">
+              {userData?.displayName || 'Khách'}
             </h1>
-            <p className="text-blue-600 font-medium italic flex items-center justify-center md:justify-start gap-2 tracking-tight opacity-70">
-               {user?.email}
+            <p className="text-lg md:text-xl font-medium text-slate-500 italic max-w-2xl">
+              Xác thực tại <span className="text-blue-500/80">{user?.email}</span>
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-            <span className="px-5 py-2 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 text-[10px] font-medium  tracking-[0.2em] text-slate-500 shadow-sm">
-              {userData?.role?.toUpperCase() || 'THÀNH VIÊN'}
-            </span>
-            {user?.emailVerified ? (
-              <span className="px-5 py-2 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-medium  tracking-[0.2em] flex items-center gap-2 shadow-sm">
-                <CheckCircle2 className="w-3.5 h-3.5" /> ĐÃ XÁC MINH
-              </span>
-            ) : (
-              <button 
-                onClick={handleVerifyEmail}
-                disabled={verifyCooldown > 0}
-                className="px-5 py-2 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-medium  tracking-[0.2em] flex items-center gap-2 hover:bg-amber-500/20 shadow-sm transition-all disabled:opacity-50"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" /> CHƯA XÁC MINH
-              </button>
-            )}
-            {userData?.role === 'superadmin' && (
-              <span className="px-5 py-2 rounded-2xl bg-blue-600 text-white text-[10px] font-medium  tracking-[0.2em] shadow-lg shadow-blue-500/30">
-                QUYỀN TỐI CAO
-              </span>
-            )}
-          </div>
-          
-          <div className="pt-4 flex flex-wrap justify-center md:justify-start gap-2">
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
              <button
                onClick={handleLogout}
-               className="text-[10px] font-medium  tracking-[0.1em] px-4 py-2.5 bg-rose-500 text-white rounded-2xl transition-all shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 flex items-center gap-2"
+               className="h-14 px-8 glass-card bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl transition-all duration-500 font-bold text-[10px] tracking-widest uppercase flex items-center gap-3 border border-rose-500/20"
              >
-               <LogOut className="w-3.5 h-3.5" /> Đăng xuất
+               <LogOut className="w-4 h-4" /> Đăng xuất
              </button>
-             {['Bảo mật', 'Cá nhân'].map((item) => (
-               <a 
-                 key={item}
-                 href={`https://myaccount.google.com/${item === 'Bảo mật' ? 'security' : 'personal'}`} 
-                 target="_blank" 
-                 rel="noreferrer" 
-                 className="text-[10px] font-medium  tracking-[0.1em] px-4 py-2.5 bg-slate-50 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 rounded-2xl border border-slate-200 dark:border-white/10 transition-all text-slate-600 dark:text-slate-400 shadow-sm hover:shadow-md"
-                >
-                  {item} <ExternalLink className="w-3 h-3 inline-block ml-1 opacity-40" />
-                </a>
-             ))}
+             
+             {!user?.emailVerified && (
+               <button 
+                 onClick={handleVerifyEmail}
+                 disabled={verifyCooldown > 0}
+                 className="h-14 px-8 glass rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold tracking-widest uppercase flex items-center gap-3 hover:bg-amber-500/20 shadow-xl shadow-amber-500/5 transition-all"
+               >
+                 <AlertTriangle className="w-4 h-4" /> Bảo mật tài khoản
+               </button>
+             )}
           </div>
         </div>
-      </motion.div>
+      </motion.section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
         
-        {/* Main Content Area */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="flex gap-4 p-2 bg-white dark:bg-white/5 rounded-2xl w-full border border-slate-100 dark:border-white/10 shadow-sm overflow-x-auto no-scrollbar">
+        <div className="lg:col-span-2 space-y-12">
+          {/* Navigation Tabs */}
+          <nav className="flex gap-2 p-2 glass rounded-[1.5rem] border border-white/5">
             {[
-              { id: 'profile', label: 'Tài khoản', icon: User },
-              { id: 'social', label: 'Mạng xã hội', icon: Globe },
-              { id: 'system', label: 'Hệ thống', icon: Shield },
+              { id: 'profile', label: 'Thông tin', icon: User },
+              { id: 'social', label: 'Hệ sinh thái', icon: Globe },
+              { id: 'system', label: 'Quyền hạn', icon: Shield },
             ].map((tab) => (
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)} 
-                className={`flex-1 flex items-center justify-center gap-3 px-8 py-3.5 rounded-2xl text-[11px] font-medium  tracking-normal transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'}`}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-3 h-14 rounded-xl text-[11px] font-bold tracking-widest uppercase transition-all duration-500",
+                  activeTab === tab.id 
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-black shadow-2xl" 
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5"
+                )}
               >
                 <tab.icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span>{tab.label}</span>
               </button>
             ))}
-          </div>
+          </nav>
 
           <AnimatePresence mode="wait">
-            {activeTab === 'profile' && (
-              <motion.div 
-                key="profile"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-black rounded-2xl p-10 md:p-12 border border-slate-200 dark:border-white/10 shadow-2xl shadow-black/[0.01]"
-              >
-                <h2 className="text-2xl font-medium text-slate-900 dark:text-white mb-10 flex items-center gap-4  tracking-tight italic">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-600">
-                    <User className="w-5 h-5" />
-                  </div>
-                  Thông tin cơ bản
-                </h2>
-                <form onSubmit={handleUpdateProfile} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Tên hiển thị</label>
-                      <input 
-                        type="text" 
-                        value={displayName}
-                        onChange={e => setDisplayName(e.target.value)}
-                        className="w-full px-5 py-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all font-medium text-slate-900 dark:text-white"
-                      />
+            <motion.div 
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="glass p-10 md:p-14 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-2xl shadow-blue-500/5"
+            >
+              {activeTab === 'profile' && (
+                <div className="space-y-12">
+                  <header>
+                    <h2 className="text-3xl font-display font-medium text-slate-900 dark:text-white mb-2 italic tracking-tight">Thuộc tính cốt lõi</h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Thông tin danh mục chính</p>
+                  </header>
+
+                  <form onSubmit={handleUpdateProfile} className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tên hiển thị</label>
+                        <input 
+                          type="text" 
+                          value={displayName}
+                          onChange={e => setDisplayName(e.target.value)}
+                          className="w-full h-14 px-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold text-sm italic"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email đăng ký</label>
+                        <input 
+                          type="email" 
+                          value={userData?.email || ''}
+                          disabled
+                          className="w-full h-14 px-6 bg-slate-100 dark:bg-white/[0.01] border border-slate-200 dark:border-white/[0.02] rounded-2xl text-slate-400 cursor-not-allowed font-semibold text-sm opacity-60"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Email (Chỉ đọc)</label>
-                      <input 
-                        type="email" 
-                        value={userData?.email || ''}
-                        disabled
-                        className="w-full px-5 py-4 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-2xl text-slate-400 cursor-not-allowed font-bold"
-                      />
-                    </div>
-                  </div>
+                      <div className="space-y-6">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cấu hình bảo mật vĩ mô</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {[
+                            { id: 'system', label: 'Hệ thống', desc: 'Thông báo cốt lõi', icon: BellRing },
+                            { id: 'security', label: 'Bảo mật', desc: 'Nhật ký truy cập', icon: Shield },
+                            { id: 'location', label: 'Vị trí', desc: 'Chia sẻ tọa độ', icon: Globe }
+                          ].map(item => (
+                            <label key={item.id} className="flex flex-col items-center text-center gap-4 p-6 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer group hover:border-slate-300 dark:hover:border-white/20 transition-all">
+                              <div className={cn(
+                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                                (notifPerms as any)[item.id] ? "bg-blue-500 text-white shadow-xl shadow-blue-500/20" : "bg-white dark:bg-white/[0.03] text-slate-300 dark:text-slate-600"
+                              )}>
+                                 <item.icon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">{item.label}</p>
+                                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">{item.desc}</p>
+                              </div>
+                              <input 
+                                type="checkbox" 
+                                checked={(notifPerms as any)[item.id]} 
+                                onChange={(e) => setNotifPerms({...notifPerms, [item.id]: e.target.checked})} 
+                                className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-white/10 text-blue-500 focus:ring-0 transition-all cursor-pointer"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
 
-                  <div className="pt-4">
-                    <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1 block mb-6">Tùy chọn nhận thông báo</label>
+                    <div className="pt-6">
+                      <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="h-16 px-12 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase hover:scale-105 active:scale-95 transition-all shadow-2xl disabled:opacity-50"
+                      >
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Đồng bộ thông tin'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {activeTab === 'social' && (
+                <div className="space-y-12">
+                  <header>
+                    <h2 className="text-3xl font-display font-medium text-slate-900 dark:text-white mb-2 italic tracking-tight">Liên kết hệ sinh thái</h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Các nút nền tảng toàn cầu</p>
+                  </header>
+                  <form onSubmit={handleUpdateSocialLinks} className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      {[
+                        { id: 'google', label: 'Tài khoản Google' },
+                        { id: 'facebook', label: 'Mạng xã hội' },
+                        { id: 'github', label: 'Kho lưu trữ' },
+                        { id: 'twitter', label: 'Giao thức X' },
+                      ].map(provider => (
+                        <div key={provider.id} className="space-y-3">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">{provider.label}</label>
+                          <input 
+                            type="text" 
+                            value={(socialLinks as any)[provider.id]}
+                            onChange={e => setSocialLinks({...socialLinks, [provider.id]: e.target.value})}
+                            className="w-full h-14 px-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold text-sm italic"
+                            placeholder="Địa chỉ liên kết..."
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="pt-6">
+                      <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="h-16 px-12 bg-indigo-600 text-white rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-600/20"
+                      >
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Cập nhật liên kết'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {activeTab === 'system' && (
+                <div className="space-y-16">
+                  <div className="space-y-10">
+                    <header>
+                      <h2 className="text-3xl font-display font-medium text-slate-900 dark:text-white mb-2 italic tracking-tight">Quyền truy cập</h2>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quyền phần cứng & API</p>
+                    </header>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {[
-                        { id: 'system', label: 'Cập nhật hệ thống', desc: 'Tin tức & Thông báo' },
-                        { id: 'security', label: 'Cảnh báo bảo mật', desc: 'Thông báo Đăng nhập & Xác thực' }
-                      ].map(item => (
-                        <label key={item.id} className="flex items-center gap-5 p-6 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 cursor-pointer group hover:bg-white dark:hover:bg-white/10 transition-all hover:shadow-lg hover:shadow-black/[0.02]">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${(notifPerms as any)[item.id] ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-slate-900 text-slate-300'}`}>
-                             <BellRing className="w-5 h-5" />
+                        { id: 'camera', label: 'Điều khiển Vision', desc: 'Hình ảnh bảo mật' },
+                        { id: 'microphone', label: 'Cổng âm thanh', desc: 'Đồng bộ giọng nói' },
+                        { id: 'geolocation', label: 'Vị trí địa lý', desc: 'Vị trí mạng' },
+                        { id: 'notifications', label: 'Giao thức Push', desc: 'Truyền trực tiếp' }
+                      ].map(perm => (
+                        <div key={perm.id} className="flex flex-col p-8 glass-card border border-slate-100 dark:border-white/5 rounded-[1.5rem] group hover:border-blue-500/30 transition-all">
+                          <div className="flex items-center justify-between mb-6">
+                             <div className="w-14 h-14 rounded-2xl bg-white dark:bg-white/[0.05] flex items-center justify-center shadow-sm group-hover:scale-110 transition-all">
+                                <CheckCircle2 className={cn(
+                                  "w-6 h-6",
+                                  (permissions as any)[perm.id] === 'granted' ? "text-blue-500" : "text-slate-200 dark:text-slate-700"
+                                )} />
+                             </div>
+                             <button 
+                               onClick={() => handleRequestPermission(perm.id as any)}
+                               className={cn(
+                                 "w-14 h-7 rounded-full relative transition-all duration-700",
+                                 (permissions as any)[perm.id] === 'granted' ? "bg-blue-500" : "bg-slate-200 dark:bg-white/10"
+                               )}
+                             >
+                               <div className={cn(
+                                 "absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500",
+                                 (permissions as any)[perm.id] === 'granted' ? "left-8" : "left-1"
+                               )} />
+                             </button>
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-slate-900 dark:text-white  tracking-tight">{item.label}</p>
-                            <p className="text-[10px] text-slate-400 font-bold  tracking-normal">{item.desc}</p>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{perm.label}</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-60">{perm.desc}</p>
                           </div>
-                          <input 
-                            type="checkbox" 
-                            checked={(notifPerms as any)[item.id]} 
-                            onChange={(e) => setNotifPerms({...notifPerms, [item.id]: e.target.checked})} 
-                            className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-white/10 text-blue-600 focus:ring-0 transition-all cursor-pointer"
-                          />
-                        </label>
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="pt-6">
-                    <button 
-                      type="submit" 
-                      disabled={loading}
-                      className="w-full sm:w-auto px-10 py-5 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-black/10 disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Lưu Thay Đổi'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-
-            {activeTab === 'social' && (
-              <motion.div 
-                key="social"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-black rounded-2xl p-10 md:p-12 border border-slate-200 dark:border-white/10 shadow-2xl shadow-black/[0.01]"
-              >
-                <h2 className="text-2xl font-medium text-slate-900 dark:text-white mb-10 flex items-center gap-4  tracking-tight italic">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 flex items-center justify-center text-indigo-600">
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  Liên kết mạng xã hội
-                </h2>
-                <form onSubmit={handleUpdateSocialLinks} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {[
-                      { id: 'google', label: 'Google Profile' },
-                      { id: 'facebook', label: 'Facebook' },
-                      { id: 'playGames', label: 'Play Games' },
-                      { id: 'github', label: 'GitHub' },
-                      { id: 'twitter', label: 'Twitter (X)' },
-                    ].map(provider => (
-                      <div key={provider.id} className="space-y-3">
-                        <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">{provider.label}</label>
-                        <input 
-                          type="text" 
-                          value={(socialLinks as any)[provider.id]}
-                          onChange={e => setSocialLinks({...socialLinks, [provider.id]: e.target.value})}
-                          className="w-full px-5 py-4 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl focus:border-blue-600 outline-none transition-all font-bold text-slate-900 dark:text-white placeholder:text-slate-300"
-                          placeholder={`Link ${provider.label}...`}
-                        />
+                  <div className="p-12 glass rounded-[2.5rem] bg-blue-500 dark:bg-white text-white dark:text-black shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 dark:bg-blue-500/10 blur-[100px] -mr-32 -mt-32 pointer-events-none group-hover:scale-150 transition-all duration-1000" />
+                    <div className="relative z-10 space-y-8">
+                      <Smartphone className="w-16 h-16 opacity-30" />
+                      <div className="space-y-4">
+                        <h2 className="text-4xl font-display font-medium tracking-tight italic leading-none">Phím tắt PWA</h2>
+                        <p className="font-bold text-sm max-w-sm leading-relaxed opacity-80">
+                          Cài đặt ứng dụng trực tiếp vào màn hình chính để có trải nghiệm tốt nhất.
+                        </p>
+                        <button 
+                          onClick={handleAddToHomeScreen}
+                          className="h-16 px-10 bg-white dark:bg-black text-blue-500 dark:text-white rounded-2xl font-bold text-[10px] tracking-widest uppercase hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4"
+                        >
+                          Cài đặt ngay <ArrowRight className="w-4 h-4" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                  
-                  <div className="pt-6">
-                    <button 
-                      type="submit" 
-                      disabled={loading}
-                      className="w-full sm:w-auto px-10 py-5 bg-indigo-600 text-white rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-indigo-600/20"
-                    >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Lưu Liên Kết'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-
-            {activeTab === 'system' && (
-              <motion.div 
-                key="system"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="space-y-10"
-              >
-                <div className="bg-white dark:bg-black rounded-2xl p-10 md:p-12 border border-slate-200 dark:border-white/10 shadow-2xl shadow-black/[0.01]">
-                  <h2 className="text-2xl font-medium text-slate-900 dark:text-white mb-10 flex items-center gap-4  tracking-tight italic">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600/10 flex items-center justify-center text-emerald-600">
-                      <Shield className="w-5 h-5" />
-                    </div>
-                    Quyền hệ thống
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { id: 'camera', label: 'Camera', desc: 'Nhận diện khuôn mặt & Quét' },
-                      { id: 'microphone', label: 'Microphone', desc: 'Xác thực giọng nói' },
-                      { id: 'geolocation', label: 'Vị trí', desc: 'Xác thực khu vực' },
-                      { id: 'notifications', label: 'Thông báo', desc: 'Thông báo tức thì' }
-                    ].map(perm => (
-                      <div key={perm.id} className="flex flex-col p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 group hover:bg-white dark:hover:bg-white/10 transition-all hover:shadow-lg hover:shadow-black/[0.02]">
-                        <div className="flex items-center justify-between mb-4">
-                           <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm group-hover:scale-110 transition-all">
-                              <CheckCircle2 className={`w-5 h-5 ${(permissions as any)[perm.id] === 'granted' ? 'text-emerald-500' : 'text-slate-300'}`} />
-                           </div>
-                           <button 
-                             onClick={() => handleRequestPermission(perm.id as any)}
-                             className={`w-14 h-7 rounded-full relative transition-all duration-500 shadow-inner ${(permissions as any)[perm.id] === 'granted' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-slate-200 dark:bg-white/10'}`}
-                           >
-                             <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-500 ease-in-out ${(permissions as any)[perm.id] === 'granted' ? 'left-8' : 'left-1'}`} />
-                           </button>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900 dark:text-white  tracking-tight italic">{perm.label}</p>
-                          <p className="text-[10px] text-slate-400 font-bold  tracking-normal mt-1 opacity-60">{perm.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-10 md:p-14 bg-blue-600 rounded-3xl text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] -mr-32 -mt-32 pointer-events-none group-hover:scale-150 transition-all duration-1000" />
-                  <div className="relative z-10 space-y-6">
-                    <Smartphone className="w-14 h-14 opacity-20" />
-                    <div>
-                      <h2 className="text-3xl font-medium  tracking-tight italic leading-none mb-4">
-                        LỐI TẮT PWA
-                      </h2>
-                      <p className="text-blue-100 font-bold text-sm max-w-md leading-relaxed opacity-80 mb-10">
-                        Cài đặt ứng dụng trực tiếp vào màn hình chính để trải nghiệm mượt mà hơn.
-                      </p>
-                      <button 
-                        onClick={handleAddToHomeScreen}
-                        className="px-10 py-5 bg-white text-blue-600 rounded-2xl font-medium  tracking-normal text-[11px] hover:scale-[1.05] active:scale-95 transition-all shadow-2xl flex items-center gap-3"
-                      >
-                        Cài Đặt Ngay <ChevronRight className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
+              )}
+            </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Sidebar Info Panels */}
-        <div className="space-y-8">
-          <div className="bg-white dark:bg-black rounded-2xl p-8 border border-slate-200 dark:border-white/10 shadow-xl shadow-black/[0.01]">
-            <h3 className="font-medium text-slate-900 dark:text-white mb-8 flex items-center gap-3  tracking-tight text-xl italic">
-              <Shield className="w-6 h-6 text-indigo-500" />
-              Bảo mật tài khoản
-            </h3>
+        {/* Sidebar Intelligence */}
+        <aside className="space-y-12">
+          <section className="glass p-10 rounded-[2rem] border border-slate-200 dark:border-white/5 space-y-10 shadow-xl shadow-blue-500/5">
+            <header className="space-y-1">
+              <h3 className="text-xl font-display font-medium text-slate-900 dark:text-white italic tracking-tight flex items-center gap-3">
+                <Shield className="w-5 h-5 text-blue-500" /> Bảo mật
+              </h3>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest pl-8">Thao tác mã hóa</p>
+            </header>
             
             <div className="space-y-4">
               <button 
                 onClick={handleChangePassword} 
                 disabled={passwordCooldown > 0}
-                className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-white/5 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all group border border-slate-100 dark:border-white/10 hover:shadow-lg hover:shadow-black/[0.02]"
+                className="w-full flex items-center justify-between p-6 glass-card rounded-[1.5rem] hover:scale-[1.02] active:scale-[0.98] transition-all group border border-slate-200 dark:border-white/5"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center shadow-inner">
-                    <KeyRound className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center ring-1 ring-orange-500/20">
+                    <KeyRound className="w-5 h-5" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-slate-900 dark:text-white  tracking-normal text-[10px]">MẬT KHẨU</p>
-                    <p className="text-slate-400 text-[10px] font-bold  italic">Cập nhật truy cập</p>
+                    <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase mb-1 leading-none">Khóa bảo mật</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-none italic">Đổi mật khẩu</p>
                   </div>
                 </div>
                 {passwordCooldown > 0 ? (
-                  <span className="text-xs font-medium text-orange-500">{passwordCooldown}s</span>
+                  <span className="text-[10px] font-bold text-orange-500 tabular-nums">{passwordCooldown}S</span>
                 ) : (
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
                 )}
@@ -650,69 +640,77 @@ export default function Profile() {
               <button 
                 onClick={handleVerifyEmail} 
                 disabled={verifyCooldown > 0 || user?.emailVerified}
-                className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-white/5 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all group border border-slate-100 dark:border-white/10 hover:shadow-lg hover:shadow-black/[0.02]"
+                className="w-full flex items-center justify-between p-6 glass-card rounded-[1.5rem] hover:scale-[1.02] active:scale-[0.98] transition-all group border border-slate-200 dark:border-white/5"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shadow-inner">
-                    <CheckCircle2 className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center ring-1 ring-emerald-500/20">
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-slate-900 dark:text-white  tracking-normal text-[10px]">XÁC MINH ID</p>
-                    <p className="text-slate-400 text-[10px] font-bold  italic">Định danh toàn cầu</p>
+                    <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase mb-1 leading-none">Xác thực</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-none italic">Xác minh ID</p>
                   </div>
                 </div>
                 {user?.emailVerified ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 ) : verifyCooldown > 0 ? (
-                  <span className="text-xs font-medium text-amber-500">{verifyCooldown}s</span>
+                  <span className="text-[10px] font-bold text-amber-500 tabular-nums">{verifyCooldown}S</span>
                 ) : (
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 transition-transform" />
                 )}
               </button>
             </div>
-          </div>
+          </section>
 
-          <div className="bg-slate-900 rounded-2xl p-10 text-white shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 blur-[80px] -mr-12 -mt-12 pointer-events-none transition-transform duration-700 group-hover:scale-150" />
-            <h3 className="font-medium text-white/40  tracking-normal text-[10px] mb-8">Phân tích hệ thống</h3>
-            <div className="space-y-6">
-              <div>
-                <p className="text-[10px] font-medium text-white/30  tracking-[0.2em] mb-2 leading-none">GIA NHẬP ECOSYSTEM</p>
-                <p className="text-2xl font-medium tracking-tight italic">
-                  {userData?.createdAt ? toSafeDate(userData.createdAt).toLocaleDateString('vi-VN') : 'Unknown'}
+          <section className="bg-slate-900 dark:bg-white rounded-[2.5rem] p-10 text-white dark:text-black shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 blur-[80px] -mr-16 -mt-16 pointer-events-none group-hover:scale-150 transition-transform duration-1000" />
+            <div className="space-y-10 relative z-10">
+              <header className="space-y-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40">Phân tích hệ thống</p>
+                <div className="flex items-baseline gap-2">
+                   <h4 className="text-3xl font-display font-medium italic">Phiên hoạt động</h4>
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+              </header>
+              <div className="space-y-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-40 leading-none">Ngày tham gia</p>
+                <p className="text-xl font-bold tracking-tight italic tabular-nums">
+                  {userData?.createdAt ? toSafeDate(userData.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : 'KHÔNG XÁC ĐỊNH'}
                 </p>
               </div>
-              <div className="pt-6 border-t border-white/5 text-[11px] font-bold text-slate-400">
-                <span className="text-emerald-400 mr-2">●</span> Trạng thái: Hoạt động
-              </div>
             </div>
-          </div>
+          </section>
           
-          <div className="bg-white dark:bg-black rounded-2xl p-8 border border-slate-200 dark:border-white/10 shadow-xl shadow-black/[0.01]">
-            <h3 className="font-medium text-slate-900 dark:text-white mb-8 flex items-center gap-3  tracking-tight text-xl italic">
-              <Activity className="w-6 h-6 text-blue-500" />
-              Nhật ký gần đây
-            </h3>
+          <section className="glass p-10 rounded-[2.5rem] border border-slate-200 dark:border-white/5 space-y-10 shadow-xl shadow-blue-500/5">
+            <header className="space-y-1">
+              <h3 className="text-xl font-display font-medium text-slate-900 dark:text-white italic tracking-tight flex items-center gap-3">
+                <Activity className="w-5 h-5 text-blue-500" /> Luồng sự kiện
+              </h3>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest pl-8">Hoạt động tuần tự</p>
+            </header>
             
-            <div className="space-y-6">
+            <div className="space-y-8 max-h-[500px] overflow-y-auto pr-4 scrollbar-hide">
               {activities.length > 0 ? (
                 activities.map((log) => (
-                  <div key={log.id} className="relative pl-6 border-l-2 border-slate-100 dark:border-white/5 group/log space-y-1">
-                    <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-slate-200 dark:bg-white/10 transition-colors group-hover/log:bg-blue-600" />
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight group-hover/log:translate-x-1 transition-transform">{log.description}</p>
-                    <p className="text-[9px] text-slate-400 font-medium  tracking-normal">
-                      {log.timestamp ? format(toSafeDate(log.timestamp), 'HH:mm', { locale: vi }) : 'ĐANG ĐỒNG BỘ'}
+                  <div key={log.id} className="relative pl-8 border-l border-slate-100 dark:border-white/5 group/log space-y-2">
+                    <div className="absolute -left-[4.5px] top-1 w-2 h-2 rounded-full bg-slate-200 dark:bg-white/10 group-hover/log:bg-blue-500 transition-colors" />
+                    <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight group-hover/log:translate-x-1 transition-transform uppercase tracking-wider">{log.description}</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] tabular-nums">
+                      {log.timestamp ? format(toSafeDate(log.timestamp), 'HH:mm | MMM dd', { locale: vi }) : 'ĐANG ĐỒNG BỘ...'}
                     </p>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-12 text-slate-400 text-xs font-medium  tracking-normal">
-                   Không có sự kiện gần đây
+                <div className="text-center py-12 space-y-4">
+                   <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-white/5 mx-auto flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-slate-300 dark:text-slate-700" />
+                   </div>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Danh sách trống</p>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          </section>
+        </aside>
 
       </div>
     </div>

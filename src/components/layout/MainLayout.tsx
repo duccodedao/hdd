@@ -3,20 +3,20 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
+import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar } = useAppStore();
   const { user } = useAuthStore();
   const location = useLocation();
 
   useEffect(() => {
+    if (!user) return;
     const askForPermissions = async () => {
-      if (!user) return;
-      
       const hasAsked = localStorage.getItem('perm_initial_asked');
       if (hasAsked) return;
-
       setTimeout(async () => {
         try {
           if ('Notification' in window && Notification.permission === 'default') {
@@ -24,20 +24,20 @@ export default function MainLayout() {
           }
           localStorage.setItem('perm_initial_asked', 'true');
         } catch (e) {
-          console.error("Initial permission request failed", e);
+          console.error(e);
         }
       }, 5000);
     };
-
     askForPermissions();
   }, [user]);
 
   return (
-    <div className="flex h-screen bg-[#fcfdfe] dark:bg-[#050608] overflow-hidden relative font-sans">
+    <div className="flex h-screen bg-[#fafafa] dark:bg-[#0a0a0b] overflow-hidden relative font-sans selection:bg-blue-500/10">
       
-      {/* Immersive Background */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden bg-[#fafafa] dark:bg-[#050608]">
-        <div className="absolute top-0 w-full h-[50vh] bg-gradient-to-b from-slate-100/50 to-transparent dark:from-slate-900/20 dark:to-transparent" />
+      {/* Immersive Background Atmosphere */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/5 dark:bg-blue-500/10 blur-[120px] rounded-full animate-blob" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px] rounded-full animate-blob" style={{ animationDelay: '5s' }} />
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -48,25 +48,28 @@ export default function MainLayout() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={toggleSidebar}
-            className="fixed inset-0 bg-slate-900/10 backdrop-blur-md z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
-      <Sidebar className={`fixed inset-y-0 left-0 z-50 transform lg:transform-none lg:static transition-transform duration-500 w-[280px] ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`} />
+      <Sidebar className={cn(
+        "fixed inset-y-0 left-0 z-50 transform lg:static lg:translate-x-0 transition-transform duration-700 ease-[0.22, 1, 0.36, 1] w-[260px]",
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      )} />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10">
         <Topbar />
         
-        <main className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-6 lg:p-8 no-scrollbar">
-          <AnimatePresence>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto no-scrollbar">
+          <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 5 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="max-w-[1700px] mx-auto min-h-full w-full"
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="min-h-full"
             >
               <Outlet />
             </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Search, Filter, ChevronLeft, ChevronRight, Loader2, Star, Clock, Globe } from 'lucide-react';
+import { Play, Search, Filter, ChevronLeft, ChevronRight, Loader2, Star, Clock, Globe, ArrowRight, Sparkles, Library, Film, Zap, Tv } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { OfflineGuard } from '../components/OfflineGuard';
 
@@ -17,27 +17,13 @@ interface MovieItem {
   lang: string;
 }
 
-interface MovieResponse {
-  status: boolean;
-  items: MovieItem[];
-  pagination?: {
-    totalItems: number;
-    totalItemsPerPage: number;
-    currentPage: number;
-    totalPages: number;
-  };
-}
-
 const CATEGORIES = [
-  { id: 'phim-moi', name: 'Mới cập nhật', icon: <Clock className="w-4 h-4" /> },
-  { id: 'phim-bo', name: 'Phim Bộ', icon: <Filter className="w-4 h-4" /> },
-  { id: 'phim-le', name: 'Phim Lẻ', icon: <Filter className="w-4 h-4" /> },
-  { id: 'phim-chieu-rap', name: 'Phim Chiếu Rạp', icon: <Play className="w-4 h-4" /> },
-  { id: 'hoat-hinh', name: 'Hoạt Hình', icon: <Filter className="w-4 h-4" /> },
-  { id: 'tv-shows', name: 'TV Shows', icon: <Filter className="w-4 h-4" /> },
-  { id: 'phim-vietsub', name: 'Vietsub', icon: <Globe className="w-4 h-4" /> },
-  { id: 'phim-thuyet-minh', name: 'Thuyết Minh', icon: <Globe className="w-4 h-4" /> },
-  { id: 'phim-long-tieng', name: 'Lồng Tiếng', icon: <Globe className="w-4 h-4" /> },
+  { id: 'phim-moi', name: 'Mới cập nhật', icon: <Sparkles className="w-3.5 h-3.5" /> },
+  { id: 'phim-chieu-rap', name: 'Phim chiếu rạp', icon: <Play className="w-3.5 h-3.5" /> },
+  { id: 'phim-bo', name: 'Phim bộ', icon: <Library className="w-3.5 h-3.5" /> },
+  { id: 'phim-le', name: 'Phim lẻ', icon: <Film className="w-3.5 h-3.5" /> },
+  { id: 'hoat-hinh', name: 'Hoạt hình', icon: <Zap className="w-3.5 h-3.5" /> },
+  { id: 'tv-shows', name: 'TV Shows', icon: <Tv className="w-3.5 h-3.5" /> },
 ];
 
 export default function MoviesPage() {
@@ -57,15 +43,6 @@ export default function MoviesPage() {
 
   useEffect(() => {
     const fetchFilters = async () => {
-      const cachedGenres = sessionStorage.getItem('movies_genres');
-      const cachedCountries = sessionStorage.getItem('movies_countries');
-
-      if (cachedGenres && cachedCountries) {
-        setGenres(JSON.parse(cachedGenres));
-        setCountries(JSON.parse(cachedCountries));
-        return;
-      }
-
       try {
         const [genRes, countRes] = await Promise.all([
           fetch('https://phimapi.com/the-loai'),
@@ -74,11 +51,7 @@ export default function MoviesPage() {
         const [genData, countData] = await Promise.all([genRes.json(), countRes.json()]);
         setGenres(genData);
         setCountries(countData);
-        sessionStorage.setItem('movies_genres', JSON.stringify(genData));
-        sessionStorage.setItem('movies_countries', JSON.stringify(countData));
-      } catch (err) {
-        console.error("Fetch filters error:", err);
-      }
+      } catch (err) {}
     };
     fetchFilters();
   }, []);
@@ -87,39 +60,23 @@ export default function MoviesPage() {
     setLoading(true);
     try {
       let url = '';
-      if (search) {
-        url = `https://phimapi.com/v1/api/tim-kiem?keyword=${search}&page=${p}&limit=20`;
-      } else if (genre) {
-        url = `https://phimapi.com/v1/api/the-loai/${genre}?page=${p}&limit=20&country=${country}`;
-      } else if (country) {
-        url = `https://phimapi.com/v1/api/quoc-gia/${country}?page=${p}&limit=20`;
-      } else if (cat === 'phim-moi') {
-        url = `https://phimapi.com/danh-sach/phim-moi-cap-nhat?page=${p}`;
-      } else {
-        url = `https://phimapi.com/v1/api/danh-sach/${cat}?page=${p}&limit=20`;
-      }
+      if (search) url = `https://phimapi.com/v1/api/tim-kiem?keyword=${search}&page=${p}&limit=20`;
+      else if (genre) url = `https://phimapi.com/v1/api/the-loai/${genre}?page=${p}&limit=20&country=${country}`;
+      else if (country) url = `https://phimapi.com/v1/api/quoc-gia/${country}?page=${p}&limit=20`;
+      else if (cat === 'phim-moi') url = `https://phimapi.com/danh-sach/phim-moi-cap-nhat?page=${p}`;
+      else url = `https://phimapi.com/v1/api/danh-sach/${cat}?page=${p}&limit=20`;
 
       const res = await fetch(url);
       const data = await res.json();
       
       if (data.status === true || data.status === 'success') {
-        const movieItems = data.items || data.data?.items || [];
-        setMovies(movieItems);
-        
-        if (data.data?.params?.domain_cdn) {
-          setCdnDomain(data.data.params.domain_cdn.replace(/\/$/, ''));
-        }
-
-        if (data.pagination) {
-          setTotalPages(data.pagination.totalPages);
-        } else if (data.data?.params?.pagination) {
-          setTotalPages(data.data.params.pagination.totalPages);
-        } else if (cat === 'phim-moi') {
-          setTotalPages(100); 
-        }
+        setMovies(data.items || data.data?.items || []);
+        if (data.data?.params?.domain_cdn) setCdnDomain(data.data.params.domain_cdn.replace(/\/$/, ''));
+        if (data.pagination) setTotalPages(data.pagination.totalPages);
+        else if (data.data?.params?.pagination) setTotalPages(data.data.params.pagination.totalPages);
+        else if (cat === 'phim-moi') setTotalPages(100);
       }
     } catch (error) {
-      console.error("Fetch movies error:", error);
     } finally {
       setLoading(false);
     }
@@ -132,22 +89,8 @@ export default function MoviesPage() {
 
   const getImageUrl = (path: string) => {
     if (!path) return 'https://phimimg.com/upload/vod/20260428-1/d563a77898b12886e0cc5eea272f1745.jpg';
-    let fullUrl = '';
-    
-    if (path.startsWith('http')) {
-      fullUrl = path;
-    } else {
-      // Logic cho API V1 (Thường không có domain và upload/vod)
-      const cleanCdn = cdnDomain.replace(/\/$/, '') || 'https://phimimg.com';
-      const cleanPath = path.startsWith('/') ? path : `/${path}`;
-      
-      if (!path.includes('upload/vod')) {
-        fullUrl = `${cleanCdn}/upload/vod${cleanPath}`;
-      } else {
-        fullUrl = `${cleanCdn}${cleanPath}`;
-      }
-    }
-    
+    let fullUrl = path.startsWith('http') ? path : `${cdnDomain.replace(/\/$/, '')}/${path.startsWith('/') ? path.slice(1) : path}`;
+    if (!path.includes('upload/vod') && !path.startsWith('http')) fullUrl = `${cdnDomain.replace(/\/$/, '')}/upload/vod/${path.startsWith('/') ? path.slice(1) : path}`;
     return `https://phimapi.com/image.php?url=${encodeURIComponent(fullUrl)}`;
   };
 
@@ -159,190 +102,164 @@ export default function MoviesPage() {
     fetchMovies(1, activeCategory, searchKey);
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    setPage(newPage);
-    fetchMovies(newPage, activeCategory, searchKey);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 md:py-20">
-      <OfflineGuard message="Trình xem phim yêu cầu kết nối Internet để truyền tải dữ liệu video tốc độ cao.">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
-          <div className="space-y-4">
+    <div className="max-w-7xl mx-auto px-6 py-16 space-y-24">
+      <OfflineGuard message="Truyền phát trực tuyến cần có kết nối mạng ổn định.">
+        
+        {/* Cinematic Header */}
+        <header className="relative flex flex-col md:flex-row md:items-end justify-between gap-12">
+          <div className="space-y-6">
             <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 rounded-full text-[10px] font-bold tracking-widest uppercase"
+               initial={{ opacity: 0, x: -20 }}
+               animate={{ opacity: 1, x: 0 }}
+               className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
             >
-              <Play className="w-3.5 h-3.5" /> Bmass Cinema
+              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Điện ảnh cao cấp</span>
             </motion.div>
-            <h1 className="text-5xl md:text-8xl font-display font-medium tracking-tight italic leading-none text-slate-900 dark:text-white">
-              Phim <span className="text-indigo-600">Trực Tuyến</span>
+            <h1 className="text-6xl md:text-9xl font-display font-medium tracking-tight italic leading-none text-gradient">
+              BMass <span className="text-blue-500">Cinema</span>
             </h1>
+            <p className="max-w-xl text-lg text-slate-500 font-medium leading-relaxed">
+              Trải nghiệm nền tảng phim trực tuyến chất lượng cao với giao diện tối giản và hiệu suất tối đa.
+            </p>
           </div>
 
-          <div className="w-full md:w-96">
-            <form onSubmit={handleSearch} className="relative group">
-              <input 
-                type="text"
-                placeholder="Tìm tên phim..."
-                value={searchKey}
-                onChange={(e) => setSearchKey(e.target.value)}
-                className="w-full h-14 pl-14 pr-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:border-indigo-600 outline-none transition-all font-bold text-sm shadow-sm group-hover:shadow-md"
-              />
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-              {searchKey && (
-                <button 
-                  type="button" 
-                  onClick={() => { setSearchKey(''); setIsSearching(false); fetchMovies(1, activeCategory, ''); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600"
-                >
-                  XÓA
-                </button>
-              )}
-            </form>
+          <div className="w-full md:w-[400px]">
+             <form onSubmit={handleSearch} className="relative group">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <input 
+                  type="text"
+                  placeholder="Tìm kiếm phim của bạn..."
+                  value={searchKey}
+                  onChange={(e) => setSearchKey(e.target.value)}
+                  className="w-full h-14 pl-14 pr-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold text-sm"
+                />
+             </form>
           </div>
-        </div>
+        </header>
 
-        {/* Categories Bar */}
-        <div className="flex flex-col gap-6 mb-12">
-          <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide">
+        {/* Filter Navigation */}
+        <section className="space-y-8">
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
             {CATEGORIES.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => { setActiveCategory(cat.id); setActiveGenre(''); setActiveCountry(''); setIsSearching(false); setSearchKey(''); }}
-                className={`flex items-center gap-3 px-6 py-3.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                className={cn(
+                  "flex items-center gap-3 px-6 py-3.5 rounded-2xl text-[11px] font-bold tracking-widest uppercase transition-all duration-500 border whitespace-nowrap",
                   activeCategory === cat.id && !isSearching && !activeGenre && !activeCountry
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-600/20 scale-105' 
-                  : 'bg-white dark:bg-white/5 text-slate-500 border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/10'
-                }`}
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white shadow-xl shadow-blue-500/10 scale-[1.02]"
+                    : "bg-white dark:bg-white/[0.03] text-slate-500 border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20"
+                )}
               >
-                {cat.icon}
                 {cat.name}
               </button>
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-4">
-             <div className="flex-1 min-w-[200px]">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-2">Thể loại</label>
-                <select 
-                  value={activeGenre}
-                  onChange={(e) => { setActiveGenre(e.target.value); setActiveCategory(''); }}
-                  className="w-full h-12 px-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl outline-none text-xs font-bold transition-all focus:border-indigo-600"
-                >
-                  <option value="">Tất cả thể loại</option>
-                  {genres.map(g => (
-                    <option key={g.slug} value={g.slug}>{g.name}</option>
-                  ))}
-                </select>
-             </div>
-             <div className="flex-1 min-w-[200px]">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 pl-2">Quốc gia</label>
-                <select 
-                  value={activeCountry}
-                  onChange={(e) => setActiveCountry(e.target.value)}
-                  className="w-full h-12 px-4 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl outline-none text-xs font-bold transition-all focus:border-indigo-600"
-                >
-                  <option value="">Tất cả quốc gia</option>
-                  {countries.map(c => (
-                    <option key={c.slug} value={c.slug}>{c.name}</option>
-                  ))}
-                </select>
-             </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <select 
+              value={activeGenre}
+              onChange={(e) => { setActiveGenre(e.target.value); setActiveCategory(''); }}
+              className="px-5 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-widest outline-none focus:ring-2 focus:ring-blue-500/10 transition-all cursor-pointer"
+            >
+              <option value="">Tất cả thể loại</option>
+              {genres.map(g => <option key={g.slug} value={g.slug}>{g.name}</option>)}
+            </select>
+            <select 
+              value={activeCountry}
+              onChange={(e) => { setActiveCountry(e.target.value); setActiveCategory(''); }}
+              className="px-5 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-widest outline-none focus:ring-2 focus:ring-blue-500/10 transition-all cursor-pointer"
+            >
+              <option value="">Tất cả quốc gia</option>
+              {countries.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+            </select>
           </div>
-        </div>
+        </section>
 
         {/* Results Grid */}
-        {loading ? (
-          <div className="py-32 flex flex-col items-center justify-center">
-            <Loader2 className="w-16 h-16 text-indigo-600 animate-spin mb-6" />
-            <span className="text-[10px] font-medium text-slate-400 tracking-[0.3em] uppercase">Đang tải phim...</span>
-          </div>
-        ) : movies.length === 0 ? (
-          <div className="py-32 text-center">
-            <p className="text-slate-400 font-medium italic">Không tìm thấy phim nào phù hợp.</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 md:gap-8">
-              {movies.map((movie, idx) => (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  key={movie._id || idx}
-                  onClick={() => navigate(`/movies/${movie.slug}`)}
-                  className="group cursor-pointer"
-                >
-                  <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-4 shadow-lg group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-500">
-                    <img 
-                      src={getImageUrl(movie.poster_url)} 
-                      alt={movie.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://phimimg.com/upload/vod/20260428-1/d563a77898b12886e0cc5eea272f1745.jpg'; // fallback
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
-                       <button className="w-12 h-12 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-xl translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                          <Play className="w-6 h-6 fill-current" />
-                       </button>
-                    </div>
-                    {movie.episode_current && (
-                      <div className="absolute top-4 left-4 px-3 py-1 bg-indigo-600 text-white rounded-lg text-[9px] font-bold tracking-normal shadow-lg">
-                        {movie.episode_current}
+        <section className="min-h-[400px]">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center pt-32 space-y-6">
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+                <Loader2 className="w-10 h-10 text-blue-500/50" />
+              </motion.div>
+              <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-slate-400">Đang khởi tạo dữ liệu...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-8 gap-y-12">
+              <AnimatePresence>
+                {movies.map((movie, idx) => (
+                  <motion.div
+                    key={movie._id}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => navigate(`/movies/${movie.slug}`)}
+                    className="group cursor-pointer"
+                  >
+                    <div className="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden mb-6 shadow-2xl group-hover:shadow-blue-500/20 transition-all duration-700">
+                      <img 
+                        src={getImageUrl(movie.poster_url)} 
+                        alt={movie.name}
+                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 grayscale group-hover:grayscale-0"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 flex items-center justify-center">
+                         <div className="w-14 h-14 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center scale-75 group-hover:scale-100 transition-transform duration-700">
+                            <Play className="w-6 h-6 text-white fill-white" />
+                         </div>
                       </div>
-                    )}
-                    <div className="absolute top-4 right-4 flex flex-col gap-1.5">
-                      {movie.quality && (
-                        <div className="px-2 py-0.5 bg-black/50 backdrop-blur-md text-white rounded-md text-[8px] font-heavy tracking-normal border border-white/10 uppercase">
-                          {movie.quality}
+                      {movie.episode_current && (
+                        <div className="absolute top-4 left-4 px-3 py-1 glass rounded-lg text-[9px] font-bold border border-white/20 text-white">
+                          {movie.episode_current}
                         </div>
                       )}
                     </div>
-                  </div>
-                  <h3 className="font-display font-medium text-base text-slate-900 dark:text-white tracking-tight leading-tight mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1 italic">
-                    {movie.name}
-                  </h3>
-                  <p className="text-[10px] font-bold text-slate-400 tracking-normal line-clamp-1 opacity-60">
-                    {movie.origin_name} • {movie.year}
-                  </p>
-                </motion.div>
-              ))}
+                    <div className="space-y-1">
+                      <h3 className="text-base font-display font-medium text-slate-900 dark:text-white leading-tight italic line-clamp-1 group-hover:text-blue-500 transition-colors">
+                        {movie.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>{movie.year}</span>
+                        <div className="w-1 h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
+                        <span>CHẤT LƯỢNG HD</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
+          )}
+        </section>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-24 flex items-center justify-center gap-4">
-                <button
-                  onClick={() => handlePageChange(page - 1)}
-                  disabled={page === 1}
-                  className="w-12 h-12 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-all hover:shadow-lg"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-                <div className="flex items-center gap-4 px-8 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">Trang {page}</span>
-                  <div className="w-px h-4 bg-slate-200 dark:bg-white/10" />
-                  <span className="text-[10px] font-medium text-slate-400">{totalPages} trang</span>
-                </div>
-                <button
-                  onClick={() => handlePageChange(page + 1)}
-                  disabled={page === totalPages}
-                  className="w-12 h-12 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-all hover:shadow-lg"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </div>
-            )}
-          </>
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <footer className="flex items-center justify-center gap-12 pt-12">
+            <button 
+              disabled={page === 1}
+              onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="p-4 glass rounded-full hover:scale-110 active:scale-95 disabled:opacity-30 transition-all"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <div className="flex flex-col items-center">
+              <span className="text-lg font-display italic text-slate-900 dark:text-white leading-none mb-1">{page} / {totalPages}</span>
+              <span className="text-[8px] font-bold tracking-widest uppercase text-slate-400">SỐ TRANG TIẾP THEO</span>
+            </div>
+            <button 
+              disabled={page === totalPages}
+              onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="p-4 glass rounded-full hover:scale-110 active:scale-95 disabled:opacity-30 transition-all"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </footer>
         )}
       </OfflineGuard>
     </div>
   );
 }
+
+import { cn } from '../lib/utils';

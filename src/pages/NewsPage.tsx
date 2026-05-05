@@ -93,7 +93,7 @@ export default function NewsPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-full text-xs font-medium  tracking-normal"
           >
-            <TrendingUp className="w-3.5 h-3.5" /> Breaking News
+            <TrendingUp className="w-3.5 h-3.5" /> Tin nóng
           </motion.div>
           <h1 className="text-3xl lg:text-5xl font-medium tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
             <Newspaper className="w-10 h-10 text-rose-600" />
@@ -153,7 +153,7 @@ export default function NewsPage() {
                 />
                 <div className="absolute top-4 left-4">
                   <span className="bg-rose-600 text-white text-[10px] font-medium  tracking-normal px-3 py-1.5 rounded-xl shadow-lg">
-                    HOT NEWS
+                    TIN HOT
                   </span>
                 </div>
               </div>
