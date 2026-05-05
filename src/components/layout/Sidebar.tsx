@@ -30,7 +30,7 @@ const navGroups = [
     ]
   },
   {
-    title: 'Truyền thông',
+    title: 'Giải trí',
     items: [
       { name: 'Phim ảnh', path: '/movies', icon: Play },
     ]

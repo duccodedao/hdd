@@ -96,6 +96,25 @@ export default function AboutPage() {
           ))}
         </section>
 
+        {/* Partners Section */}
+        <section className="py-12 border-t border-white/[0.05]">
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-12 text-center">Đối tác & Công nghệ</h3>
+          
+          <div className="flex flex-wrap justify-center items-center gap-16">
+             <div className="flex flex-col items-center gap-3">
+               <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png" className="h-10 object-contain invert" alt="GitHub" />
+             </div>
+             <div className="flex flex-col items-center gap-3">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/37/Firebase_Logo.svg" className="h-10 object-contain invert" alt="Firebase" />
+             </div>
+          </div>
+          
+          <div className="text-sm text-slate-600 font-medium tracking-wider uppercase text-center mt-12 space-y-1">
+            <p>Powered by GitHub • Firebase</p>
+            <p>Operate by Sơn Lý Hồng Đức</p>
+          </div>
+        </section>
+
         {/* Founder Footer */}
         <section className="pt-20 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-start gap-12">
           <div className="flex items-start gap-6 max-w-2xl">

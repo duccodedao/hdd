@@ -12,10 +12,11 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Loader2, X, Sparkles, User, ArrowRight, Eye, EyeOff, CheckCircle2, ShieldCheck, Fingerprint } from 'lucide-react';
+import { Mail, Lock, X, Sparkles, User, ArrowRight, Eye, EyeOff, CheckCircle2, ShieldCheck, Fingerprint } from 'lucide-react';
 import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import MiniLoading from '../components/ui/MiniLoading';
 
 export default function Auth() {
   const location = useLocation();
@@ -276,7 +277,7 @@ export default function Auth() {
                     disabled={loginLoading}
                     className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
-                    {loginLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Đăng nhập hệ thống'}
+                    {loginLoading ? <MiniLoading className="w-5 h-5 mx-auto" logoClass="bg-blue-600" /> : 'Đăng nhập hệ thống'}
                   </button>
                 </form>
               ) : (
@@ -327,7 +328,7 @@ export default function Auth() {
                     disabled={registerLoading}
                     className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
-                    {registerLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Bắt đầu ngay'}
+                    {registerLoading ? <MiniLoading className="w-5 h-5 mx-auto" logoClass="bg-blue-600" /> : 'Bắt đầu ngay'}
                   </button>
                 </form>
               )}
@@ -402,7 +403,7 @@ export default function Auth() {
                   disabled={forgotLoading}
                   className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                 >
-                  {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Gửi yêu cầu'}
+                  {forgotLoading ? <MiniLoading className="w-4 h-4 mx-auto" logoClass="bg-blue-600" /> : 'Gửi yêu cầu'}
                 </button>
               </form>
             </motion.div>

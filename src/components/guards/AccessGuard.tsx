@@ -32,6 +32,7 @@ export const AccessGuard = ({ children }: AccessGuardProps) => {
 
       try {
         const ipRes = await fetch('https://api64.ipify.org?format=json');
+        if (!ipRes.ok) throw new Error(`IP check failed! status: ${ipRes.status}`);
         const { ip } = await ipRes.json();
         
         const q = query(collection(db, 'blockedIps'), where('ip', '==', ip));
@@ -41,8 +42,13 @@ export const AccessGuard = ({ children }: AccessGuardProps) => {
         ipCheckCache = blocked;
         setIsIpBlocked(blocked);
       } catch (err) {
-        console.error("Ban check failed", err);
-        setIsIpBlocked(false);
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+           console.warn("IP check network error, skipping block check");
+        } else {
+           console.error("Ban check failed:", err);
+        }
+        // If ban check fails, don't block by default, let user proceed or handle error
+        setIsIpBlocked(false); 
       } finally {
         setChecking(false);
       }

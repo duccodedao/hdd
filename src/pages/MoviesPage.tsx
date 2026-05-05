@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Search, Filter, ChevronLeft, ChevronRight, Loader2, Star, Clock, Globe, ArrowRight, Sparkles, Library, Film, Zap, Tv, Lock } from 'lucide-react';
+import { Play, Search, Filter, ChevronLeft, ChevronRight, Star, Clock, Globe, ArrowRight, Sparkles, Library, Film, Zap, Tv, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { OfflineGuard } from '../components/OfflineGuard';
 import { cn } from '../lib/utils';
+import MiniLoading from '../components/ui/MiniLoading';
+import DisclaimerModal from '../components/ui/DisclaimerModal';
 
 interface MovieItem {
   _id: string;
@@ -55,6 +57,8 @@ export default function MoviesPage() {
 
   const [activeCategory, setActiveCategory] = useState('phim-moi');
   const [movies, setMovies] = useState<MovieItem[]>([]);
+  const [randomPoster, setRandomPoster] = useState('');
+  const [sectionedMovies, setSectionedMovies] = useState<Record<string, MovieItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -92,16 +96,23 @@ export default function MoviesPage() {
       else url = `https://phimapi.com/v1/api/danh-sach/${cat}?page=${p}&limit=20`;
 
       const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       
       if (data.status === true || data.status === 'success') {
-        setMovies(data.items || data.data?.items || []);
+        const items = data.items || data.data?.items || [];
+        setMovies(items);
+        if (items.length > 0) {
+            const randomMovie = items[Math.floor(Math.random() * items.length)];
+            setRandomPoster(getImageUrl(randomMovie.poster_url));
+        }
         if (data.data?.params?.domain_cdn) setCdnDomain(data.data.params.domain_cdn.replace(/\/$/, ''));
         if (data.pagination) setTotalPages(data.pagination.totalPages);
         else if (data.data?.params?.pagination) setTotalPages(data.data.params.pagination.totalPages);
         else if (cat === 'phim-moi') setTotalPages(100);
       }
     } catch (error) {
+      console.error("Fetch movies error:", error);
     } finally {
       setLoading(false);
     }
@@ -135,99 +146,124 @@ export default function MoviesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
+      <DisclaimerModal />
       <OfflineGuard message="Truyền phát trực tuyến cần có kết nối mạng ổn định.">
         
-        {/* Header */}
-        <header className="flex flex-col gap-6 mb-16">
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-5xl md:text-7xl font-display font-medium text-white tracking-tighter uppercase"
-          >
-            Điện ảnh & Phim
-          </motion.h1>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <p className="text-slate-400 text-lg md:text-xl font-medium max-w-xl leading-relaxed">
-              Khám phá thế giới điện ảnh đa ngôn ngữ, chất lượng cao nhất dành cho bạn.
-            </p>
-            <form onSubmit={handleSearch} className="relative w-full md:w-96">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-               <input 
-                 type="text"
-                 placeholder="Tìm kiếm phim..."
-                 value={searchKey}
-                 onChange={(e) => setSearchKey(e.target.value)}
-                 className="w-full h-12 pl-11 pr-4 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-indigo-500 transition-all font-medium text-sm text-white"
-               />
-            </form>
-          </div>
+        {/* Search and Filters */}
+        <header className="relative flex flex-col gap-6 mb-12 py-12 px-6 -mx-6">
+            {randomPoster && (
+                <div className="absolute inset-0 z-0">
+                     <img src={randomPoster} className="w-full h-full object-cover opacity-20" alt="Poster" />
+                     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0a0b]/80 to-[#0a0a0b]" />
+                </div>
+            )}
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                <h1 className="text-4xl md:text-5xl font-display font-medium text-white tracking-tighter uppercase">
+                  BmassFilm
+                </h1>
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                    <form onSubmit={handleSearch} className="relative w-full sm:w-72">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                       <input 
+                         type="text"
+                         placeholder="Tìm phim..."
+                         value={searchKey}
+                         onChange={(e) => setSearchKey(e.target.value)}
+                         className="w-full h-10 pl-11 pr-4 bg-white/5 border border-white/10 rounded-full outline-none focus:border-indigo-500 transition-all font-medium text-sm text-white"
+                       />
+                    </form>
+                    
+                    <select
+                      value={activeGenre}
+                      onChange={(e) => { setActiveGenre(e.target.value); setActiveCategory(''); }}
+                      className="h-10 px-4 rounded-full text-[10px] font-bold tracking-widest uppercase bg-transparent text-slate-500 border border-white/10 hover:border-white/30 outline-none focus:border-white transition-all whitespace-nowrap w-full sm:w-auto"
+                    >
+                      <option value="">Thể loại</option>
+                      {genres.map(genre => (
+                        <option key={genre.slug} value={genre.slug}>{genre.name}</option>
+                      ))}
+                    </select>
+                </div>
+            </div>
+            
+            {/* Categories scrollable */}
+            <div className="relative z-10 flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+                <button
+                    onClick={() => { setActiveCategory('phim-moi'); setActiveGenre(''); setIsSearching(false); setSearchKey(''); }}
+                    className={cn(
+                        "flex items-center gap-2 h-10 px-6 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap border",
+                        activeCategory === 'phim-moi'
+                          ? "bg-white text-black border-white" 
+                          : "bg-transparent text-slate-500 border-white/10 hover:border-white/30"
+                    )}
+                >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Mới cập nhật</span>
+                </button>
+              {CATEGORIES.filter(c => c.id !== 'phim-moi').map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => { setActiveCategory(cat.id); setActiveGenre(''); setIsSearching(false); setSearchKey(''); }}
+                  className={cn(
+                    "flex items-center gap-2 h-10 px-6 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap border",
+                    activeCategory === cat.id 
+                      ? "bg-white text-black border-white" 
+                      : "bg-transparent text-slate-500 border-white/10 hover:border-white/30"
+                  )}
+                >
+                  {cat.icon}
+                  <span>{cat.name}</span>
+                </button>
+              ))}
+            </div>
         </header>
-
-        {/* Categories */}
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar mb-12">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => { setActiveCategory(cat.id); setActiveGenre(''); setActiveCountry(''); setIsSearching(false); setSearchKey(''); }}
-              className={cn(
-                "flex items-center gap-2 h-10 px-6 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap border",
-                activeCategory === cat.id 
-                  ? "bg-white text-black border-white" 
-                  : "bg-transparent text-slate-500 border-white/10 hover:border-white/30"
-              )}
-            >
-              {cat.icon}
-              <span>{cat.name}</span>
-            </button>
-          ))}
-        </div>
 
         {/* Results Grid */}
         <section>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
-              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+              <MiniLoading className="w-8 h-8" />
               <span className="text-[10px] font-bold tracking-widest uppercase text-slate-500">Đang tải dữ liệu...</span>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              <AnimatePresence>
-                {movies.map((movie, idx) => (
-                  <motion.div
-                    key={movie._id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(idx * 0.05, 0.5) }}
-                    onClick={() => navigate(`/movies/${movie.slug}`)}
-                    className="group cursor-pointer space-y-4"
-                  >
-                    <div className="relative aspect-[2/3] rounded-2xl overflow-hidden bg-slate-900 border border-white/5 shadow-lg shadow-black/20">
-                      <img 
-                        src={getImageUrl(movie.poster_url)} 
-                        alt={movie.name}
-                        className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute top-3 left-3 px-2 py-1 bg-white/10 backdrop-blur-md rounded-lg text-[9px] font-bold tracking-widest uppercase border border-white/10 text-white">
-                        {movie.episode_current}
+                <AnimatePresence>
+                  {movies.map((movie, idx) => (
+                    <motion.div
+                      key={movie._id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(idx * 0.05, 0.5) }}
+                      onClick={() => navigate(`/movies/${movie.slug}`)}
+                      className="group cursor-pointer space-y-4"
+                    >
+                      <div className="relative aspect-[2/3] rounded-2xl overflow-hidden bg-slate-900 border border-white/5 shadow-lg shadow-black/20">
+                        <img 
+                          src={getImageUrl(movie.poster_url)} 
+                          alt={movie.name}
+                          className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <div className="absolute top-3 left-3 px-2 py-1 bg-white/10 backdrop-blur-md rounded-lg text-[9px] font-bold tracking-widest uppercase border border-white/10 text-white">
+                          {movie.episode_current}
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider leading-tight line-clamp-1 group-hover:text-indigo-400 transition-colors">
-                        {movie.name}
-                      </h3>
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                        <span>{movie.year}</span>
-                        <span className="w-1 h-1 bg-slate-800 rounded-full" />
-                        <span>HD</span>
-                        <span className="w-1 h-1 bg-slate-800 rounded-full" />
-                        <span>{movie.lang}</span>
+                      
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider leading-tight line-clamp-1 group-hover:text-indigo-400 transition-colors">
+                          {movie.name}
+                        </h3>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          <span>{movie.year}</span>
+                          <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                          <span>HD</span>
+                          <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                          <span>{movie.lang}</span>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
             </div>
           )}
         </section>

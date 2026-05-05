@@ -47,16 +47,16 @@ export default function AdminDashboard() {
     utilities: 0
   });
   const [aboutConfig, setAboutConfig] = useState({
-    introTitle: '',
-    introDesc: '',
-    adminName: '',
-    adminBio: '',
-    adminPhoto: '',
-    facebook: '',
-    github: '',
-    zalo: '',
-    youtube: '',
-    email: ''
+    introTitle: 'BmassFilm - Thế giới điện ảnh trong tầm tay',
+    introDesc: 'Trải nghiệm những bộ phim chất lượng cao, cập nhật liên tục với BmassFilm. Đa dạng thể loại, tốc độ tải nhanh, giao diện thân thiện cho mọi thiết bị, mang đến trải nghiệm giải trí hoàn hảo nhất.',
+    adminName: 'BmassHD',
+    adminBio: 'Là một người đam mê công nghệ và phát triển các nền tảng số. Tôi tập trung vào xây dựng web/app đa nền tảng, tích hợp API, sử dụng Firebase và các công nghệ hiện đại để tạo ra những sản phẩm tối ưu, tiện ích và thân thiện với người dùng.',
+    adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    facebook: 'https://facebook.com/your-username',
+    github: 'https://github.com/your-username',
+    zalo: '0123456789',
+    youtube: 'https://youtube.com/@your-channel',
+    email: 'contact@bmassfilm.com'
   });
   const [githubConfig, setGithubConfig] = useState({
     username: '',
@@ -469,9 +469,11 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
               <Info className="w-6 h-6 text-blue-500" /> Cấu hình trang Giới thiệu (About)
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               {/* Left: Thông tin chung */}
                <div className="space-y-4">
-                  <h4 className="font-bold text-sm  text-slate-500">Thông tin chung website</h4>
+                  <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Thông tin chung website</h4>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Tiêu đề Intro</label>
                     <input 
@@ -479,13 +481,12 @@ export default function AdminDashboard() {
                       value={aboutConfig.introTitle}
                       onChange={(e) => setAboutConfig({...aboutConfig, introTitle: e.target.value})}
                       className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                      placeholder="Hệ Sinh Thái Personal Profile"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Mô tả intro</label>
                     <textarea 
-                      rows={4}
+                      rows={6}
                       value={aboutConfig.introDesc}
                       onChange={(e) => setAboutConfig({...aboutConfig, introDesc: e.target.value})}
                       className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white resize-none"
@@ -493,8 +494,9 @@ export default function AdminDashboard() {
                   </div>
                </div>
 
+               {/* Right: Thông tin Chúng tôi */}
                <div className="space-y-4">
-                  <h4 className="font-bold text-sm  text-slate-500">Thông tin Chúng tôi</h4>
+                  <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Thông tin Chúng tôi</h4>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Tên Chúng tôi / Title</label>
                     <input 
@@ -523,53 +525,55 @@ export default function AdminDashboard() {
                     />
                   </div>
                </div>
-               
-               <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 space-y-4 shadow-sm w-full">
-                  <h4 className="font-bold text-sm  text-slate-500">Mạng xã hội & Liên hệ (Contact Page)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold mb-1 ml-1">Facebook URL</label>
-                      <input 
-                        type="url" 
-                        value={aboutConfig.facebook}
-                        onChange={(e) => setAboutConfig({...aboutConfig, facebook: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold mb-1 ml-1">GitHub URL</label>
-                      <input 
-                        type="url" 
-                        value={aboutConfig.github}
-                        onChange={(e) => setAboutConfig({...aboutConfig, github: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold mb-1 ml-1">Zalo Phone/URL</label>
-                      <input 
-                        type="text" 
-                        value={aboutConfig.zalo}
-                        onChange={(e) => setAboutConfig({...aboutConfig, zalo: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold mb-1 ml-1">Email</label>
-                      <input 
-                        type="email" 
-                        value={aboutConfig.email}
-                        onChange={(e) => setAboutConfig({...aboutConfig, email: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                      />
-                    </div>
-                  </div>
-               </div>
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5">
+
+            {/* Bottom: Mạng xã hội */}
+            <div className="mt-8 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
+                <h4 className="font-bold text-sm text-slate-500 mb-4 uppercase tracking-wider">Mạng xã hội & Liên hệ (Contact Page)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Facebook URL</label>
+                    <input 
+                      type="url" 
+                      value={aboutConfig.facebook}
+                      onChange={(e) => setAboutConfig({...aboutConfig, facebook: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">GitHub URL</label>
+                    <input 
+                      type="url" 
+                      value={aboutConfig.github}
+                      onChange={(e) => setAboutConfig({...aboutConfig, github: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Zalo Phone/URL</label>
+                    <input 
+                      type="text" 
+                      value={aboutConfig.zalo}
+                      onChange={(e) => setAboutConfig({...aboutConfig, zalo: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Email</label>
+                    <input 
+                      type="email" 
+                      value={aboutConfig.email}
+                      onChange={(e) => setAboutConfig({...aboutConfig, email: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                    />
+                  </div>
+                </div>
+            </div>
+
+            <div className="mt-8 flex justify-end">
                <button 
                 onClick={saveAboutConfig}
-                className="bg-blue-600 text-white px-10 py-3 rounded-xl font-bold hover:bg-blue-700 transition"
+                className="bg-blue-600 text-white px-10 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg active:scale-95"
                >
                  Lưu thay đổi
                </button>
