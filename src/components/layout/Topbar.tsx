@@ -72,109 +72,94 @@ export default function Topbar() {
   }, []);
 
   const getWeatherIcon = (code: number) => {
-    if (code === 0 || code === 1) return <Sun className="w-3.5 h-3.5 text-amber-500" />;
-    if (code >= 2 && code <= 4) return <Cloud className="w-3.5 h-3.5 text-slate-400" />;
-    if (code >= 51 && code <= 67) return <CloudRain className="w-3.5 h-3.5 text-blue-500" />;
-    return <Sun className="w-3.5 h-3.5 text-amber-500" />;
+    if (code === 0 || code === 1) return <Sun className="w-3.5 h-3.5 text-amber-400" />;
+    if (code >= 2 && code <= 4) return <Cloud className="w-3.5 h-3.5 text-white/50" />;
+    if (code >= 51 && code <= 67) return <CloudRain className="w-3.5 h-3.5 text-blue-400" />;
+    return <Sun className="w-3.5 h-3.5 text-amber-400" />;
   };
 
   return (
-    <header className="h-20 flex-shrink-0 bg-white/50 dark:bg-black/20 backdrop-blur-md z-30 flex items-center justify-between px-6 lg:px-12 border-b border-slate-100 dark:border-white/[0.05]">
+    <header className="h-16 flex-shrink-0 z-30 flex items-center justify-between px-6 lg:px-12 border-b border-white/5 bg-[#0c0c12]">
       <div className="flex items-center gap-8">
         <button 
           onClick={toggleSidebar}
-          className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+          className="lg:hidden p-2 text-slate-500 hover:text-white transition-all"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-slate-900 dark:text-white leading-none mb-1 tabular-nums">
+            <span className="text-sm font-medium text-white tabular-nums tracking-wide">
               {time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })}
             </span>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-              {time.toLocaleDateString('vi-VN', { weekday: 'short', month: 'short', day: 'numeric' })}
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right">
+              {time.toLocaleDateString('vi-VN', { weekday: 'short' })}
             </span>
           </div>
 
-          <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />
-
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col">
-               <div className="flex items-center gap-1.5 mb-1">
-                 <MapPin className="w-3 h-3 text-red-500" />
-                 <span className="text-[10px] font-bold text-slate-900 dark:text-white truncate max-w-[120px]">
-                   {locationName || 'Đang định vị...'}
-                 </span>
+          <div className="flex items-center gap-4 text-slate-500">
+             <MapPin className="w-3.5 h-3.5" />
+             <span className="text-xs font-medium truncate max-w-[150px]">
+               {locationName || 'Đang định vị...'}
+             </span>
+             {weather && (
+               <div className="flex items-center gap-2 pl-4 border-l border-white/5">
+                 {getWeatherIcon(weather.code)}
+                 <span className="text-xs font-medium tabular-nums">{weather.temp}°C</span>
                </div>
-               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">VỊ TRÍ</span>
-            </div>
-
-            {weather && (
-              <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-50 dark:bg-white/5 rounded-full border border-slate-100 dark:border-white/5">
-                {getWeatherIcon(weather.code)}
-                <span className="text-[10px] font-bold text-slate-900 dark:text-white tabular-nums">{weather.temp}°C</span>
-              </div>
-            )}
+             )}
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-6">
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
           <input 
             type="text" 
-            placeholder="Tìm kiếm thông minh..." 
-            className="w-48 lg:w-64 pl-10 pr-4 py-2 bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.05] rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+            placeholder="Command..." 
+            className="w-48 lg:w-64 h-9 pl-10 pr-4 bg-white/5 border border-white/5 rounded-lg text-xs font-medium outline-none focus:border-indigo-500 transition-all text-white placeholder:text-slate-600"
           />
         </div>
 
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={toggleDarkMode}
-            className="p-2.5 rounded-xl text-slate-500 hover:text-blue-500 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
-          >
-            {darkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
-          </button>
+        <button
+          onClick={() => navigate('/notifications')}
+          className="relative p-2 text-slate-500 hover:text-white transition-all"
+        >
+          <Bell className="w-4.5 h-4.5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+          )}
+        </button>
 
-          <button
-            onClick={() => navigate('/notifications')}
-            className="p-2.5 rounded-xl text-slate-500 hover:text-blue-500 hover:bg-slate-50 dark:hover:bg-white/5 transition-all relative"
-          >
-            <Bell className="w-4.5 h-4.5" />
-            <AnimatePresence>
-              {unreadCount > 0 && (
-                <motion.span 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#0a0a0b]" 
-                />
-              )}
-            </AnimatePresence>
-          </button>
-        </div>
+        <div className="h-4 w-px bg-white/5 hidden sm:block" />
 
-        <div className="h-8 w-px bg-slate-200 dark:bg-white/10 hidden sm:block" />
+        <button 
+          onClick={toggleDarkMode}
+          className="p-2 text-slate-500 hover:text-white transition-all outline-none"
+        >
+          {darkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+        </button>
+
+        <div className="h-4 w-px bg-white/5 hidden sm:block" />
 
         <button 
           onClick={() => navigate('/profile')}
-          className="flex items-center gap-3 group"
+          className="flex items-center gap-3"
         >
-          <div className="w-10 h-10 rounded-xl overflow-hidden ring-2 ring-slate-100 dark:ring-white/[0.05] group-hover:ring-blue-500/50 transition-all duration-500">
+          <div className="text-right hidden lg:block">
+            <p className="text-xs font-medium text-white leading-none">{userData?.displayName || 'Guest'}</p>
+            <p className="text-[9px] font-bold text-slate-500 mt-1 uppercase tracking-widest">{userData?.role || 'MEMBER'}</p>
+          </div>
+          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white/5 border border-white/10">
             {userData?.photoURL ? (
               <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-white/5 text-xs font-bold text-slate-500 italic">
-                {userData?.displayName?.charAt(0) || 'U'}
+              <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500">
+                {userData?.displayName?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
-          </div>
-          <div className="text-left hidden lg:block">
-            <p className="text-xs font-bold text-slate-900 dark:text-white leading-none italic">{userData?.displayName || 'Khách'}</p>
-            <p className="text-[9px] font-bold text-blue-500 mt-1 uppercase tracking-widest">{userData?.role || 'THÀNH VIÊN'}</p>
           </div>
         </button>
       </div>

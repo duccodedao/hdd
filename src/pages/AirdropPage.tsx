@@ -14,34 +14,27 @@ const AirdropCard = ({ airdrop, index }: { airdrop: any, index: number }) => {
 
   return (
     <motion.div
-      key={airdrop.id}
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-      className="group glass p-8 rounded-[2.5rem] border border-slate-200 dark:border-white/5 hover:border-pink-500/20 transition-all duration-700 flex flex-col h-full shadow-2xl shadow-pink-500/[0.02]"
+      transition={{ delay: index * 0.1 }}
+      className="glass-card p-8 flex flex-col h-full hover:bg-white/[0.05] transition-all"
     >
       <div className="flex items-center gap-6 mb-8">
-        <div className="w-20 h-20 rounded-[1.5rem] glass p-4 flex items-center justify-center overflow-hidden shrink-0 shadow-xl ring-1 ring-white/10 group-hover:scale-105 transition-transform duration-700">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
           {airdrop.logoUrl ? (
             <img src={airdrop.logoUrl} alt={airdrop.title} className="w-full h-full object-cover" />
           ) : (
-            <Gift className="w-8 h-8 text-pink-500/50" />
+            <Gift className="w-6 h-6 text-slate-500" />
           )}
         </div>
-        <div className="space-y-1">
-          <h3 className="text-xl font-display font-medium text-slate-900 dark:text-white leading-tight italic group-hover:text-pink-500 transition-colors line-clamp-2">
-            {airdrop.title}
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest px-2 py-0.5 glass border border-white/5 rounded-md">V_PROTCOL</span>
-            <div className="w-1 h-1 bg-pink-500 rounded-full animate-pulse" />
-          </div>
-        </div>
+        <h3 className="text-xl font-medium text-white tracking-tight leading-tight uppercase line-clamp-2">
+          {airdrop.title}
+        </h3>
       </div>
       
-      <div className="flex-1 mb-10">
+      <div className="flex-1 space-y-4">
         <p className={cn(
-          "text-sm text-slate-500 font-medium leading-relaxed",
+          "text-sm text-slate-400 leading-relaxed",
           !showMore && isLong ? 'line-clamp-3' : ''
         )}>
           {airdrop.description}
@@ -49,9 +42,9 @@ const AirdropCard = ({ airdrop, index }: { airdrop: any, index: number }) => {
         {isLong && (
           <button 
             onClick={() => setShowMore(!showMore)}
-            className="mt-4 text-[10px] font-bold text-pink-500 uppercase tracking-widest hover:underline"
+            className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors"
           >
-            {showMore ? 'Thu gọn' : 'Xem chi tiết'}
+            {showMore ? 'Thu gọn' : 'Chi tiết'}
           </button>
         )}
       </div>
@@ -60,10 +53,9 @@ const AirdropCard = ({ airdrop, index }: { airdrop: any, index: number }) => {
         href={airdrop.projectUrl} 
         target="_blank" 
         rel="noreferrer"
-        className="w-full h-14 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-3 transition-all duration-500 hover:scale-[1.02] active:scale-95 shadow-xl shadow-pink-500/10 group/btn"
+        className="mt-10 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2"
       >
-        Tham gia ngay
-        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
+        Tham gia ngay <ArrowRight className="w-4 h-4" />
       </a>
     </motion.div>
   );
@@ -81,52 +73,37 @@ export default function AirdropPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-24 space-y-24">
+    <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
+      <div className="relative z-10">
       <OfflineGuard message="Cần kết nối mạng để đồng bộ hóa các chương trình tặng thưởng.">
-        <header className="space-y-8 max-w-3xl">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
+        <header className="flex flex-col gap-6 mb-16">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-5xl md:text-7xl font-display font-medium text-white tracking-tighter uppercase"
           >
-            <Sparkles className="w-3.5 h-3.5 text-pink-500" />
-            <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Giao thức phần thưởng</span>
-          </motion.div>
-          <div className="space-y-4">
-            <motion.h1 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="text-6xl md:text-8xl font-display font-medium tracking-tight italic leading-none text-gradient"
-            >
-              Hệ thống <span className="text-pink-500">Airdrop.</span>
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-xl text-slate-500 font-medium leading-relaxed"
-            >
-              Tham gia các chương trình tặng thưởng tiềm năng được tinh tuyển bởi hệ sinh thái BMass.
-            </motion.p>
-          </div>
+            Hệ thống phần thưởng
+          </motion.h1>
+          <p className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
+            Cổng tương tác chuyên biệt. Khai thác sức mạnh mạng lưới và gia tăng giá trị tài sản thông qua những cơ chế tặng thưởng được xác thực.
+          </p>
         </header>
       
         {airdrops.length === 0 ? (
-          <div className="pt-12">
-            <NoData 
-              message="Đang chờ dữ liệu" 
-              description="Hệ thống đang sàng lọc các dự án tặng thưởng tiềm năng nhất. Hãy quay lại sau."
-              icon={Gift}
-            />
-          </div>
+          <NoData 
+            message="Chúng tôi đang săn tìm các phần thưởng hấp dẫn nhất dành cho bạn." 
+            description="Vui lòng quay lại sau ít phút."
+            icon={Gift}
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {airdrops.map((airdrop, index) => (
               <AirdropCard key={airdrop.id} airdrop={airdrop} index={index} />
             ))}
           </div>
         )}
       </OfflineGuard>
+      </div>
     </div>
   );
 }

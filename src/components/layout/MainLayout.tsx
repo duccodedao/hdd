@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import NoticeBanner from './NoticeBanner';
 
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar } = useAppStore();
@@ -32,14 +33,8 @@ export default function MainLayout() {
   }, [user]);
 
   return (
-    <div className="flex h-screen bg-[#fafafa] dark:bg-[#0a0a0b] overflow-hidden relative font-sans selection:bg-blue-500/10">
+    <div className="flex h-screen overflow-hidden relative font-sans bg-[#0c0c12]">
       
-      {/* Immersive Background Atmosphere */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/5 dark:bg-blue-500/10 blur-[120px] rounded-full animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px] rounded-full animate-blob" style={{ animationDelay: '5s' }} />
-      </div>
-
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -48,33 +43,37 @@ export default function MainLayout() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={toggleSidebar}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
       <Sidebar className={cn(
-        "fixed inset-y-0 left-0 z-50 transform lg:static lg:translate-x-0 transition-transform duration-700 ease-[0.22, 1, 0.36, 1] w-[260px]",
+        "fixed inset-y-0 left-0 z-50 transform lg:static lg:translate-x-0 transition-all duration-500 w-72 h-screen border-r border-white/5",
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )} />
 
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10">
-        <Topbar />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10 h-screen">
+        <NoticeBanner />
         
-        <main className="flex-1 overflow-x-hidden overflow-y-auto no-scrollbar">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="min-h-full"
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
-        </main>
+        <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
+          <Topbar />
+          
+          <main className="flex-1 overflow-x-hidden overflow-y-auto relative z-0 custom-scrollbar">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-full"
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
     </div>
   );

@@ -27,131 +27,25 @@ import MovieDetailPage from './pages/MovieDetailPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import ProductsPage from './pages/ProductsPage';
-import DomainRequestPage from './pages/DomainRequestPage';
 import AirdropPage from './pages/AirdropPage';
 import BanksPage from './pages/BanksPage';
 import ExchangesPage from './pages/ExchangesPage';
 import BlockedPage from './pages/BlockedPage';
-import DnsRequestPage from './pages/DnsRequestPage';
 import NotFoundPage from './pages/NotFoundPage';
 import TasksPage from './pages/TasksPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineNotification } from './components/ui/OfflineNotification';
 import LocationGuard from './components/guards/LocationGuard';
 
-const TabGuard = ({ children, tabKey }: { children: React.ReactNode, tabKey: string }) => {
-  const { maintenanceTabs } = useAppStore();
-  const { isAdmin } = useAuthStore();
-  
-  if (maintenanceTabs[tabKey] && !isAdmin) {
-    return <MaintenancePage />;
-  }
-  
-  return <>{children}</>;
-};
-
-const DeviceGuard = ({ children }: { children: React.ReactNode }) => {
-  const { maintenanceDevices } = useAppStore();
-  const { isAdmin } = useAuthStore();
-  
-  const getDeviceType = () => {
-    const ua = navigator.userAgent;
-    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return 'tablet';
-    if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return 'mobile';
-    return 'pc';
-  };
-
-  const device = getDeviceType();
-  
-  if (maintenanceDevices[device] && !isAdmin) {
-    return <MaintenancePage message={`Hệ thống đang bảo trì cho thiết bị ${device.toUpperCase()}.`} />;
-  }
-  
-  return <>{children}</>;
-};
-
-let ipCheckCache: boolean | null = null;
-
-const AccessGuard = ({ children }: { children: React.ReactNode }) => {
-  const { userData } = useAuthStore();
-  const [isIpBlocked, setIsIpBlocked] = useState<boolean | null>(null);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    const checkBanStatus = async () => {
-      // Check if user account is banned
-      if (userData?.status === 'banned' || userData?.isBanned) {
-        setIsIpBlocked(true);
-        setChecking(false);
-        return;
-      }
-
-      // If already checked IP in this session, skip fetch
-      if (ipCheckCache !== null) {
-        setIsIpBlocked(ipCheckCache);
-        setChecking(false);
-        return;
-      }
-
-      try {
-        const ipRes = await fetch('https://api64.ipify.org?format=json');
-        const { ip } = await ipRes.json();
-        
-        const q = query(collection(db, 'blockedIps'), where('ip', '==', ip));
-        const snap = await getDocs(q);
-        
-        const blocked = !snap.empty;
-        ipCheckCache = blocked;
-        setIsIpBlocked(blocked);
-      } catch (err) {
-        console.error("Ban check failed", err);
-        setIsIpBlocked(false);
-      } finally {
-        setChecking(false);
-      }
-    };
-
-    checkBanStatus();
-  }, [userData]);
-
-  if (checking) return <LoadingScreen />;
-  if (isIpBlocked) return <BlockedPage />;
-
-  return <>{children}</>;
-};
-
-const AuthActionRedirector = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const mode = searchParams.get('mode');
-  const oobCode = searchParams.get('oobCode');
-
-  useEffect(() => {
-    if (mode && oobCode && window.location.pathname !== '/auth/action') {
-      navigate({
-        pathname: '/auth/action',
-        search: searchParams.toString()
-      }, { replace: true });
-    }
-  }, [mode, oobCode, navigate, searchParams]);
-
-  return null;
-};
-
-const RequireAuth = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuthStore();
-  const location = useLocation();
-
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-};
+import { AccessGuard } from './components/guards/AccessGuard';
+import { AuthActionRedirector } from './components/guards/AuthActionRedirector';
+import { RequireAuth } from './components/guards/RequireAuth';
+import { DeviceGuard } from './components/guards/DeviceGuard';
+import { TabGuard } from './components/guards/TabGuard';
 
 export default function App() {
   const { setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
 
   useEffect(() => {
     // Offline status listening
@@ -171,6 +65,9 @@ export default function App() {
         }
         if (data.maintenanceDevices) {
           setMaintenanceDevices(data.maintenanceDevices);
+        }
+        if (data.blockedDevices) {
+          setBlockedDevices(data.blockedDevices);
         }
       }
     }, (err) => {
@@ -210,13 +107,13 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs]);
+  }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices]);
 
+  // Main UI render logic
   if (loading) {
     return <LoadingScreen />;
   }
 
-  // Maintenance mode guard
   if (maintenanceMode && !isAdmin) {
     return <MaintenancePage />;
   }
@@ -251,9 +148,7 @@ export default function App() {
               <Route path="about" element={<AboutPage />} />
               <Route path="airdrop" element={<TabGuard tabKey="airdrop"><AirdropPage /></TabGuard>} />
               <Route path="notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
-              <Route path="tasks" element={<RequireAuth><TabGuard tabKey="tasks"><TasksPage /></TabGuard></RequireAuth>} />
               <Route path="contact" element={<ContactPage />} />
-              <Route path="dns" element={<RequireAuth><TabGuard tabKey="dns"><DnsRequestPage /></TabGuard></RequireAuth>} />
               
               {/* Admin Routes */}
               <Route path="admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" />} />

@@ -16,44 +16,43 @@ const BankCard = ({ bank, index }: { bank: any, index: number }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
+      className="glass-card flex flex-col h-full hover:bg-white/[0.05] transition-all"
     >
-      <div className="flex items-start gap-4 mb-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-          {bank.logoUrl ? (
-            <img src={bank.logoUrl} alt={bank.title} className="w-full h-full object-cover" />
-          ) : (
-            <Landmark className="w-8 h-8 text-slate-400" />
+      <div className="p-8 flex flex-col h-full">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+            {bank.logoUrl ? (
+              <img src={bank.logoUrl} alt={bank.title} className="w-full h-full object-cover" />
+            ) : (
+              <Landmark className="w-6 h-6 text-slate-500" />
+            )}
+          </div>
+          <h3 className="text-xl font-medium text-white tracking-tight leading-tight uppercase">{bank.title}</h3>
+        </div>
+        
+        <div className="flex-1 space-y-4">
+          <p className={`text-slate-400 text-sm leading-relaxed ${!showMore && isLong ? 'line-clamp-3' : ''}`}>
+            {bank.description}
+          </p>
+          {isLong && (
+            <button 
+              onClick={() => setShowMore(!showMore)}
+              className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors"
+            >
+              {showMore ? 'Thu gọn' : 'Chi tiết'}
+            </button>
           )}
         </div>
-        <div>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight mb-1 group-hover:text-blue-500 transition-colors">{bank.title}</h3>
-        </div>
+        
+        <a 
+          href={bank.affiliateUrl} 
+          target="_blank" 
+          rel="noreferrer"
+          className="mt-8 h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95"
+        >
+          Mở tài khoản <ArrowRight className="w-4 h-4" />
+        </a>
       </div>
-      
-      <div className="flex-1 mb-6">
-        <p className={`text-slate-600 dark:text-slate-400 text-sm leading-relaxed ${!showMore && isLong ? 'line-clamp-3' : ''}`}>
-          {bank.description}
-        </p>
-        {isLong && (
-          <button 
-            onClick={() => setShowMore(!showMore)}
-            className="mt-2 text-[10px] font-medium text-blue-600  tracking-normal hover:underline"
-          >
-            {showMore ? 'Thu gọn' : 'Xem thêm'}
-          </button>
-        )}
-      </div>
-      
-      <a 
-        href={bank.affiliateUrl} 
-        target="_blank" 
-        rel="noreferrer"
-        className="w-full py-4 px-4 bg-slate-50 dark:bg-white/5 hover:bg-blue-600 hover:text-white text-slate-700 dark:text-slate-300 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 group/btn"
-      >
-        Mở tài khoản ngay
-        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-      </a>
     </motion.div>
   );
 };
@@ -70,31 +69,25 @@ export default function BanksPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-20 pt-4 px-4 lg:px-8">
+    <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
       <OfflineGuard message="Danh sách Ngân hàng đối tác cần kết nối mạng để hiển thị các ưu đãi mới nhất.">
-        <div className="flex flex-col gap-1 md:gap-2">
+      <div className="flex flex-col gap-6 mb-16">
         <motion.h1 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-2xl md:text-4xl font-medium text-slate-900 dark:text-white tracking-tight flex items-center gap-2 md:gap-3"
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="text-5xl md:text-7xl font-display font-medium text-white tracking-tighter uppercase"
         >
-          <Landmark className="w-8 h-8 md:w-10 md:h-10 text-blue-500" />
           Ngân hàng đối tác
         </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-slate-500 text-sm md:text-lg"
-        >
-          Mở thẻ và tài khoản ngân hàng nhanh chóng
-        </motion.p>
+        <p className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
+          Mở tài khoản và quản lý tài chính với các đối tác ngân hàng uy tín hàng đầu.
+        </p>
       </div>
       
       {banks.length === 0 ? (
         <NoData 
-          message="Đang cập nhật đối tác" 
-          description="Chúng tôi đang đàm phán với nhiều ngân hàng để mang lại quyền lợi tốt nhất cho bạn."
+          message="Hệ thống đang lựa chọn các ngân hàng uy tín nhất để giới thiệu đến bạn." 
+          description="Vui lòng quay lại sau ít phút."
           icon={Landmark}
         />
       ) : (

@@ -10,6 +10,8 @@ interface AppState {
   setMaintenanceTabs: (tabs: { [key: string]: boolean }) => void;
   maintenanceDevices: { pc: boolean; mobile: boolean; tablet: boolean };
   setMaintenanceDevices: (devices: { pc: boolean; mobile: boolean; tablet: boolean }) => void;
+  blockedDevices: { ios: boolean; android: boolean };
+  setBlockedDevices: (devices: { ios: boolean; android: boolean }) => void;
   isOnline: boolean;
   setOnlineStatus: (status: boolean) => void;
   darkMode: boolean;
@@ -35,7 +37,6 @@ export const useAppStore = create<AppState>((set) => ({
     tasks: false,
     airdrop: false,
     profile: false,
-    dns: false,
   },
   setMaintenanceTabs: (tabs) => set({ maintenanceTabs: tabs }),
   maintenanceDevices: {
@@ -44,6 +45,11 @@ export const useAppStore = create<AppState>((set) => ({
     tablet: false,
   },
   setMaintenanceDevices: (devices) => set({ maintenanceDevices: devices }),
+  blockedDevices: {
+    ios: false,
+    android: false,
+  },
+  setBlockedDevices: (devices) => set({ blockedDevices: devices }),
   isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
   setOnlineStatus: (status) => set({ isOnline: status }),
   darkMode: typeof window !== 'undefined' ? (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) : false,

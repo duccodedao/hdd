@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { Hammer, Loader2, Sparkles, ServerCrash } from 'lucide-react';
 
-export default function MaintenancePage() {
+export default function MaintenancePage({ message }: { message?: string }) {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Decorative background elements */}
@@ -42,7 +42,7 @@ export default function MaintenancePage() {
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 max-w-lg mx-auto leading-relaxed">
-            Chúng tôi đang nâng cấp hệ thống để mang lại trải nghiệm tốt nhất. Vui lòng quay lại sau ít phút.
+            {message || "Chúng tôi đang nâng cấp hệ thống để mang lại trải nghiệm tốt nhất. Vui lòng quay lại sau ít phút."}
           </p>
 
           <div className="pt-8 flex flex-col items-center gap-4">

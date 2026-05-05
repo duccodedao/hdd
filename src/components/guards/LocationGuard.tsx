@@ -32,10 +32,25 @@ export default function LocationGuard({ children }: LocationGuardProps) {
         // Update user location in Firestore if logged in
         if (user) {
           try {
+            // Fetch address from Nominatim (OpenStreetMap)
+            let address = '';
+            try {
+              const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
+                headers: { 'Accept-Language': 'vi' }
+              });
+              if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                address = geoData.display_name;
+              }
+            } catch (e) {
+              console.error("Geocoding failed:", e);
+            }
+
             await updateDoc(doc(db, 'users', user.uid), {
               location: {
                 lat: latitude,
                 lng: longitude,
+                address: address,
                 updatedAt: serverTimestamp()
               }
             });

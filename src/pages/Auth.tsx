@@ -180,292 +180,235 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fafafa] dark:bg-[#0a0a0b] selection:bg-blue-500/10 transition-colors duration-700">
-      
-      {/* Dynamic Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[80%] h-[80%] bg-blue-500/5 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[80%] h-[80%] bg-indigo-500/5 blur-[120px] rounded-full animate-pulse delay-1000" />
-      </div>
-
-      <div className="w-full max-w-xl px-10 relative z-10 space-y-16">
-        
-        {/* Branding */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-6"
-        >
-          <div className="w-24 h-24 glass-card p-5 rounded-[2rem] flex items-center justify-center shadow-2xl border border-white/5 ring-1 ring-slate-200 dark:ring-white/10 hover:scale-105 transition-transform duration-500">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0c0c12]">
+      <div className="w-full max-w-md space-y-12">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-16 h-16 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-center p-3">
             <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <div className="text-center space-y-1">
-            <h1 className="text-3xl font-display font-medium tracking-tight italic text-gradient">
-              Định danh
-            </h1>
-            <p className="text-[10px] font-bold tracking-[0.4em] uppercase text-slate-400">Portal Truy cập Hệ thống</p>
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-display font-medium text-white tracking-widest uppercase">BMASS</h1>
+            <p className="text-slate-500 text-sm font-medium tracking-wide">Hệ sinh thái quản trị tối giản</p>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Auth Interface */}
-        <div className="space-y-10">
-          
-          <nav className="flex gap-2 p-2 glass rounded-[1.5rem] border border-white/5 max-w-xs mx-auto">
-            {[
-              { id: 'login', label: 'Xác thực' },
-              { id: 'register', label: 'Tham gia' }
-            ].map(tab => (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveCard(tab.id as any)}
-                className={cn(
-                  "flex-1 h-12 rounded-xl text-[10px] font-bold tracking-widest uppercase transition-all duration-500",
-                  activeCard === tab.id 
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-black shadow-2xl" 
-                    : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+        {/* Tab Switcher */}
+        <div className="flex p-1 bg-white/5 rounded-xl border border-white/5">
+          <button 
+            onClick={() => setActiveCard('login')}
+            className={cn(
+              "flex-1 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+              activeCard === 'login' ? "bg-white text-black" : "text-slate-500 hover:text-white"
+            )}
+          >
+            Đăng nhập
+          </button>
+          <button 
+            onClick={() => setActiveCard('register')}
+            className={cn(
+              "flex-1 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+              activeCard === 'register' ? "bg-white text-black" : "text-slate-500 hover:text-white"
+            )}
+          >
+            Đăng ký
+          </button>
+        </div>
 
+        {/* Form Section */}
+        <div className="space-y-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeCard}
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: -10 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="glass p-10 md:p-14 rounded-[2.5rem] border border-slate-200 dark:border-white/5 shadow-2xl"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
             >
-               {activeCard === 'login' ? (
-                 <form onSubmit={handleLogin} className="space-y-10">
-                   <header className="space-y-2">
-                     <h2 className="text-4xl md:text-5xl font-display font-medium italic tracking-tight text-gradient">Chào mừng trở lại.</h2>
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Cung cấp thông tin để truy cập</p>
-                   </header>
-
-                   <div className="space-y-8">
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email đăng ký</label>
-                        <div className="relative">
-                          <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type="email" 
-                            value={loginEmail}
-                            onChange={(e) => setLoginEmail(e.target.value)}
-                            className="w-full h-14 pl-14 pr-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                            placeholder="email@vidu.vn"
-                            required
-                          />
-                        </div>
+              {activeCard === 'login' ? (
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email</label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+                        <input 
+                          type="email" 
+                          disabled={loginLoading}
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          className="h-12 w-full bg-white/5 border border-white/5 rounded-xl pl-12 pr-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                          placeholder="name@email.com"
+                          required
+                        />
                       </div>
+                    </div>
 
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Mật khẩu bảo mật</label>
-                          <button type="button" onClick={() => setShowForgotModal(true)} className="text-[9px] font-bold text-blue-500 uppercase tracking-widest hover:underline leading-none">Quên link?</button>
-                        </div>
-                        <div className="relative">
-                          <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type={showLoginPassword ? "text" : "password"} 
-                            value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            className="w-full h-14 pl-14 pr-16 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                            placeholder="••••••••"
-                            required
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
-                          >
-                            {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center mb-2 px-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mật khẩu</label>
+                        <button type="button" onClick={() => setShowForgotModal(true)} className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300">Quên?</button>
                       </div>
-                   </div>
-
-                   <div className="flex items-center gap-3 ml-1 group cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
-                      <div className={cn(
-                        "w-5 h-5 rounded-lg border-2 transition-all flex items-center justify-center",
-                        rememberMe ? 'bg-blue-500 border-blue-500' : 'border-slate-200 dark:border-white/10'
-                      )}>
-                        {rememberMe && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+                        <input 
+                          type={showLoginPassword ? "text" : "password"} 
+                          disabled={loginLoading}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="h-12 w-full bg-white/5 border border-white/5 rounded-xl pl-12 pr-12 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                          placeholder="••••••••"
+                          required
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-700 hover:text-white transition-colors"
+                        >
+                          {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Duy trì đăng nhập</span>
-                   </div>
+                    </div>
+                  </div>
 
-                   <div className="space-y-6 pt-4">
-                      <button 
-                        type="submit" 
-                        disabled={loginLoading || googleLoading}
-                        className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group disabled:opacity-50"
-                      >
-                        {loginLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                          <>Khởi tạo truy cập <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></>
-                        )}
-                      </button>
-                      
-                      <div className="flex items-center gap-6 px-4">
-                        <div className="flex-1 h-px bg-slate-200 dark:bg-white/5" />
-                        <span className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.5em]">Mạng xã hội</span>
-                        <div className="flex-1 h-px bg-slate-200 dark:bg-white/5" />
-                      </div>
+                  <button 
+                    type="submit" 
+                    disabled={loginLoading}
+                    className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {loginLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Đăng nhập hệ thống'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tên của bạn</label>
+                      <input 
+                        type="text" 
+                        disabled={registerLoading}
+                        value={registerName}
+                        onChange={(e) => setRegisterName(e.target.value)}
+                        className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                        placeholder="Họ và tên"
+                        required
+                      />
+                    </div>
 
-                      <button 
-                        type="button"
-                        onClick={handleGoogleAuth}
-                        disabled={loginLoading || googleLoading}
-                        className="w-full h-16 glass rounded-2xl border border-slate-200 dark:border-white/10 hover:border-blue-500/30 transition-all flex items-center justify-center gap-4 group disabled:opacity-50"
-                      >
-                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-all" alt="Google" />
-                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Truy cập bằng Google</span>
-                      </button>
-                   </div>
-                 </form>
-               ) : (
-                 <form onSubmit={handleRegister} className="space-y-10">
-                   <header className="space-y-2">
-                     <h2 className="text-4xl md:text-5xl font-display font-medium italic tracking-tight text-gradient">Tạo định danh.</h2>
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tham gia hệ sinh thái phi tập trung</p>
-                   </header>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email</label>
+                      <input 
+                        type="email" 
+                        disabled={registerLoading}
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                        placeholder="name@email.com"
+                        required
+                      />
+                    </div>
 
-                   <div className="space-y-8">
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tên hiển thị</label>
-                        <div className="relative">
-                          <User className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type="text" 
-                            value={registerName}
-                            onChange={(e) => setRegisterName(e.target.value)}
-                            className="w-full h-14 pl-14 pr-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                            placeholder="Nhập tên của bạn"
-                            required
-                          />
-                        </div>
-                      </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Mật khẩu</label>
+                      <input 
+                        type={showRegisterPassword ? "text" : "password"} 
+                        disabled={registerLoading}
+                        value={registerPassword}
+                        onChange={(e) => setRegisterPassword(e.target.value)}
+                        className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                        placeholder="••••••••"
+                        required
+                      />
+                    </div>
+                  </div>
 
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email chính</label>
-                        <div className="relative">
-                          <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type="email" 
-                            value={registerEmail}
-                            onChange={(e) => setRegisterEmail(e.target.value)}
-                            className="w-full h-14 pl-14 pr-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                            placeholder="email@vidu.vn"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Mật khẩu bí mật</label>
-                        <div className="relative">
-                          <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type={showRegisterPassword ? "text" : "password"} 
-                            value={registerPassword}
-                            onChange={(e) => setRegisterPassword(e.target.value)}
-                            className="w-full h-14 pl-14 pr-16 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                            placeholder="••••••••"
-                            required
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                            className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
-                          >
-                            {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                   </div>
-
-                   <button 
-                     type="submit" 
-                     disabled={registerLoading || googleLoading}
-                     className="w-full h-16 bg-blue-500 text-white rounded-2xl font-bold text-[10px] tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-blue-500/30 flex items-center justify-center gap-4 group disabled:opacity-50"
-                   >
-                     {registerLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                       <>Hoàn tất đăng ký <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" /></>
-                     )}
-                   </button>
-                 </form>
-               )}
+                  <button 
+                    type="submit" 
+                    disabled={registerLoading}
+                    className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {registerLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Bắt đầu ngay'}
+                  </button>
+                </form>
+              )}
             </motion.div>
           </AnimatePresence>
+
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 h-px bg-white/5"></div>
+              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Hoặc</span>
+              <div className="flex-1 h-px bg-white/5"></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={handleGoogleAuth}
+              disabled={loginLoading || registerLoading || googleLoading}
+              className="w-full h-12 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
+              <span className="text-[10px] font-bold text-white uppercase tracking-widest leading-none">Tiếp tục bằng Google</span>
+            </button>
+          </div>
         </div>
+
+        <p className="text-center text-[10px] font-medium text-slate-600 uppercase tracking-widest">
+          BMASS Ecosystem
+        </p>
       </div>
 
-      {/* Forgot Password Integrated Modal */}
+      {/* Forgot Password Modal */}
       <AnimatePresence>
         {showForgotModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowForgotModal(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md glass p-10 md:p-14 rounded-[2.5rem] border border-white/10 shadow-full"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-[#121218] border border-white/5 p-8 rounded-2xl shadow-2xl"
             >
               <button 
                 onClick={() => setShowForgotModal(false)}
-                className="absolute top-10 right-10 p-3 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="absolute top-6 right-6 p-2 text-slate-500 hover:text-white transition-all"
                >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
 
-              <div className="mb-12 space-y-6">
-                <div className="w-16 h-16 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-xl shadow-blue-500/20">
-                  <Fingerprint className="w-8 h-8" />
+              <div className="space-y-6 text-center pt-4 mb-8">
+                <div className="w-14 h-14 bg-white/5 rounded-xl flex items-center justify-center mx-auto border border-white/5">
+                  <Mail className="w-6 h-6 text-indigo-400" />
                 </div>
-                <div>
-                  <h2 className="text-3xl font-display font-medium text-slate-900 dark:text-white italic tracking-tight text-gradient">Khôi phục truy cập.</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Gửi liên kết khôi phục tới định danh đã xác thực</p>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-medium text-white uppercase tracking-widest">Quên mật khẩu?</h3>
+                  <p className="text-xs text-slate-500 font-medium">Chúng tôi sẽ gửi liên kết khôi phục qua email.</p>
                 </div>
               </div>
 
-              <form onSubmit={handleForgotPassword} className="space-y-8">
-                <div className="space-y-3">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email đã đăng ký</label>
+              <form onSubmit={handleForgotPassword} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email của bạn</label>
                   <input 
                     type="email" 
                     required
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full h-14 px-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold italic text-sm"
-                    placeholder="email@vidu.vn"
+                    className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white"
+                    placeholder="name@email.com"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={forgotLoading}
-                  className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] tracking-widest uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3"
+                  className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                 >
-                  {forgotLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Gửi liên kết'}
+                  {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Gửi yêu cầu'}
                 </button>
               </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      {/* Footer Decoration */}
-      <footer className="fixed bottom-10 left-0 right-0 text-center pointer-events-none opacity-30">
-         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.5em]">Chỉ dành cho các truy cập được ủy quyền</p>
-      </footer>
     </div>
   );
 }

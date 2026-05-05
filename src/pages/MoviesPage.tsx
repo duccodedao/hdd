@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Search, Filter, ChevronLeft, ChevronRight, Loader2, Star, Clock, Globe, ArrowRight, Sparkles, Library, Film, Zap, Tv } from 'lucide-react';
+import { Play, Search, Filter, ChevronLeft, ChevronRight, Loader2, Star, Clock, Globe, ArrowRight, Sparkles, Library, Film, Zap, Tv, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { OfflineGuard } from '../components/OfflineGuard';
+import { cn } from '../lib/utils';
 
 interface MovieItem {
   _id: string;
@@ -26,8 +27,32 @@ const CATEGORIES = [
   { id: 'tv-shows', name: 'TV Shows', icon: <Tv className="w-3.5 h-3.5" /> },
 ];
 
+import { useAuthStore } from '../store/authStore';
+
 export default function MoviesPage() {
+  const { user } = useAuthStore();
   const navigate = useNavigate();
+  
+  if (!user) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 flex flex-col items-center justify-center text-center space-y-8">
+        <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
+          <Lock className="w-10 h-10 text-indigo-500" />
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-3xl font-display font-medium text-white uppercase tracking-widest">Truy cập bị giới hạn</h2>
+          <p className="text-slate-500 font-medium max-w-sm">Vui lòng đăng nhập để khám phá kho phim đặc sắc của hệ thống.</p>
+        </div>
+        <button 
+          onClick={() => navigate('/login')}
+          className="px-10 py-4 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95"
+        >
+          Đăng nhập ngay
+        </button>
+      </div>
+    );
+  }
+
   const [activeCategory, setActiveCategory] = useState('phim-moi');
   const [movies, setMovies] = useState<MovieItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +112,12 @@ export default function MoviesPage() {
     fetchMovies(1, activeCategory, searchKey, activeGenre, activeCountry);
   }, [activeCategory, activeGenre, activeCountry]);
 
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchMovies(newPage, activeCategory, searchKey, activeGenre, activeCountry);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const getImageUrl = (path: string) => {
     if (!path) return 'https://phimimg.com/upload/vod/20260428-1/d563a77898b12886e0cc5eea272f1745.jpg';
     let fullUrl = path.startsWith('http') ? path : `${cdnDomain.replace(/\/$/, '')}/${path.startsWith('/') ? path.slice(1) : path}`;
@@ -103,128 +134,95 @@ export default function MoviesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16 space-y-24">
+    <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
       <OfflineGuard message="Truyền phát trực tuyến cần có kết nối mạng ổn định.">
         
-        {/* Cinematic Header */}
-        <header className="relative flex flex-col md:flex-row md:items-end justify-between gap-12">
-          <div className="space-y-6">
-            <motion.div 
-               initial={{ opacity: 0, x: -20 }}
-               animate={{ opacity: 1, x: 0 }}
-               className="inline-flex items-center gap-2.5 px-4 py-1.5 glass rounded-full"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-slate-500">Điện ảnh cao cấp</span>
-            </motion.div>
-            <h1 className="text-6xl md:text-9xl font-display font-medium tracking-tight italic leading-none text-gradient">
-              BMass <span className="text-blue-500">Cinema</span>
-            </h1>
-            <p className="max-w-xl text-lg text-slate-500 font-medium leading-relaxed">
-              Trải nghiệm nền tảng phim trực tuyến chất lượng cao với giao diện tối giản và hiệu suất tối đa.
+        {/* Header */}
+        <header className="flex flex-col gap-6 mb-16">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-5xl md:text-7xl font-display font-medium text-white tracking-tighter uppercase"
+          >
+            Điện ảnh & Phim
+          </motion.h1>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <p className="text-slate-400 text-lg md:text-xl font-medium max-w-xl leading-relaxed">
+              Khám phá thế giới điện ảnh đa ngôn ngữ, chất lượng cao nhất dành cho bạn.
             </p>
-          </div>
-
-          <div className="w-full md:w-[400px]">
-             <form onSubmit={handleSearch} className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  type="text"
-                  placeholder="Tìm kiếm phim của bạn..."
-                  value={searchKey}
-                  onChange={(e) => setSearchKey(e.target.value)}
-                  className="w-full h-14 pl-14 pr-6 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-semibold text-sm"
-                />
-             </form>
+            <form onSubmit={handleSearch} className="relative w-full md:w-96">
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+               <input 
+                 type="text"
+                 placeholder="Tìm kiếm phim..."
+                 value={searchKey}
+                 onChange={(e) => setSearchKey(e.target.value)}
+                 className="w-full h-12 pl-11 pr-4 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-indigo-500 transition-all font-medium text-sm text-white"
+               />
+            </form>
           </div>
         </header>
 
-        {/* Filter Navigation */}
-        <section className="space-y-8">
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => { setActiveCategory(cat.id); setActiveGenre(''); setActiveCountry(''); setIsSearching(false); setSearchKey(''); }}
-                className={cn(
-                  "flex items-center gap-3 px-6 py-3.5 rounded-2xl text-[11px] font-bold tracking-widest uppercase transition-all duration-500 border whitespace-nowrap",
-                  activeCategory === cat.id && !isSearching && !activeGenre && !activeCountry
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white shadow-xl shadow-blue-500/10 scale-[1.02]"
-                    : "bg-white dark:bg-white/[0.03] text-slate-500 border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20"
-                )}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <select 
-              value={activeGenre}
-              onChange={(e) => { setActiveGenre(e.target.value); setActiveCategory(''); }}
-              className="px-5 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-widest outline-none focus:ring-2 focus:ring-blue-500/10 transition-all cursor-pointer"
+        {/* Categories */}
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar mb-12">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => { setActiveCategory(cat.id); setActiveGenre(''); setActiveCountry(''); setIsSearching(false); setSearchKey(''); }}
+              className={cn(
+                "flex items-center gap-2 h-10 px-6 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all whitespace-nowrap border",
+                activeCategory === cat.id 
+                  ? "bg-white text-black border-white" 
+                  : "bg-transparent text-slate-500 border-white/10 hover:border-white/30"
+              )}
             >
-              <option value="">Tất cả thể loại</option>
-              {genres.map(g => <option key={g.slug} value={g.slug}>{g.name}</option>)}
-            </select>
-            <select 
-              value={activeCountry}
-              onChange={(e) => { setActiveCountry(e.target.value); setActiveCategory(''); }}
-              className="px-5 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-widest outline-none focus:ring-2 focus:ring-blue-500/10 transition-all cursor-pointer"
-            >
-              <option value="">Tất cả quốc gia</option>
-              {countries.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-            </select>
-          </div>
-        </section>
+              {cat.icon}
+              <span>{cat.name}</span>
+            </button>
+          ))}
+        </div>
 
         {/* Results Grid */}
-        <section className="min-h-[400px]">
+        <section>
           {loading ? (
-            <div className="flex flex-col items-center justify-center pt-32 space-y-6">
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-                <Loader2 className="w-10 h-10 text-blue-500/50" />
-              </motion.div>
-              <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-slate-400">Đang khởi tạo dữ liệu...</span>
+            <div className="flex flex-col items-center justify-center py-24 space-y-4">
+              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+              <span className="text-[10px] font-bold tracking-widest uppercase text-slate-500">Đang tải dữ liệu...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-8 gap-y-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
               <AnimatePresence>
                 {movies.map((movie, idx) => (
                   <motion.div
                     key={movie._id}
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ scale: 1.02 }}
+                    transition={{ delay: Math.min(idx * 0.05, 0.5) }}
                     onClick={() => navigate(`/movies/${movie.slug}`)}
-                    className="group cursor-pointer"
+                    className="group cursor-pointer space-y-4"
                   >
-                    <div className="relative aspect-[2/3] rounded-[1.5rem] overflow-hidden mb-6 shadow-2xl group-hover:shadow-blue-500/20 transition-all duration-700">
+                    <div className="relative aspect-[2/3] rounded-2xl overflow-hidden bg-slate-900 border border-white/5 shadow-lg shadow-black/20">
                       <img 
                         src={getImageUrl(movie.poster_url)} 
                         alt={movie.name}
-                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 grayscale group-hover:grayscale-0"
+                        className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500 group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 flex items-center justify-center">
-                         <div className="w-14 h-14 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center scale-75 group-hover:scale-100 transition-transform duration-700">
-                            <Play className="w-6 h-6 text-white fill-white" />
-                         </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute top-3 left-3 px-2 py-1 bg-white/10 backdrop-blur-md rounded-lg text-[9px] font-bold tracking-widest uppercase border border-white/10 text-white">
+                        {movie.episode_current}
                       </div>
-                      {movie.episode_current && (
-                        <div className="absolute top-4 left-4 px-3 py-1 glass rounded-lg text-[9px] font-bold border border-white/20 text-white">
-                          {movie.episode_current}
-                        </div>
-                      )}
                     </div>
+                    
                     <div className="space-y-1">
-                      <h3 className="text-base font-display font-medium text-slate-900 dark:text-white leading-tight italic line-clamp-1 group-hover:text-blue-500 transition-colors">
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider leading-tight line-clamp-1 group-hover:text-indigo-400 transition-colors">
                         {movie.name}
                       </h3>
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                         <span>{movie.year}</span>
-                        <div className="w-1 h-1 bg-slate-200 dark:bg-white/10 rounded-full" />
-                        <span>CHẤT LƯỢNG HD</span>
+                        <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                        <span>HD</span>
+                        <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                        <span>{movie.lang}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -236,24 +234,27 @@ export default function MoviesPage() {
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <footer className="flex items-center justify-center gap-12 pt-12">
+          <footer className="flex items-center justify-center gap-6 py-16">
             <button 
               disabled={page === 1}
-              onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className="p-4 glass rounded-full hover:scale-110 active:scale-95 disabled:opacity-30 transition-all"
+              onClick={() => handlePageChange(page - 1)}
+              className="w-12 h-12 flex items-center justify-center bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 disabled:opacity-20 transition-all"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 text-white" />
             </button>
-            <div className="flex flex-col items-center">
-              <span className="text-lg font-display italic text-slate-900 dark:text-white leading-none mb-1">{page} / {totalPages}</span>
-              <span className="text-[8px] font-bold tracking-widest uppercase text-slate-400">SỐ TRANG TIẾP THEO</span>
+            
+            <div className="px-6 py-3 bg-white/5 border border-white/5 rounded-xl">
+               <span className="text-white font-bold tracking-widest text-[10px]">
+                  {page} / {totalPages}
+               </span>
             </div>
+            
             <button 
               disabled={page === totalPages}
-              onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className="p-4 glass rounded-full hover:scale-110 active:scale-95 disabled:opacity-30 transition-all"
+              onClick={() => handlePageChange(page + 1)}
+              className="w-12 h-12 flex items-center justify-center bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 disabled:opacity-20 transition-all"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 text-white" />
             </button>
           </footer>
         )}
@@ -262,4 +263,11 @@ export default function MoviesPage() {
   );
 }
 
-import { cn } from '../lib/utils';
+// A custom animated globe spinner to match the aesthetic
+const SpinnerGlobe = () => (
+  <div className="relative w-16 h-16">
+    <div className="absolute inset-0 rounded-full border-2 border-purple-500/20" />
+    <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="absolute inset-0 rounded-full border-t-2 border-purple-400" />
+    <motion.div animate={{ rotate: -360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute inset-2 rounded-full border-b-2 border-blue-400/50" />
+  </div>
+);

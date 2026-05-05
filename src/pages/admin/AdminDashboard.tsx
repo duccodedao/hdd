@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -18,18 +18,24 @@ import AdminIpBlocking from './AdminIpBlocking';
 import AdminLogins from './AdminLogins';
 import AdminBanks from './AdminBanks';
 import AdminExchanges from './AdminExchanges';
-import AdminDnsRequests from './AdminDnsRequests';
 import { useConfirmStore } from '../../store/confirmStore';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
 export default function AdminDashboard() {
   const { isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices } = useAppStore();
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'products' | 'utilities' | 'notifications' | 'github' | 'about' | 'contacts' | 'airdrop' | 'logins' | 'banks' | 'exchanges' | 'dns' | 'stats'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'products' | 'utilities' | 'notifications' | 'github' | 'about' | 'contacts' | 'airdrop' | 'logins' | 'banks' | 'exchanges' | 'stats'>('stats');
+
+  const [noticeConfig, setNoticeConfig] = useState({
+    active: false,
+    text: '',
+    type: 'info' as 'info' | 'warning' | 'error',
+    id: 'default'
+  });
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -61,7 +67,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const unsubGithub = onSnapshot(doc(db, 'settings', 'github'), (doc) => {
       if (doc.exists()) {
-        setGithubConfig(doc.data() as any);
+        setGithubConfig(prev => ({ ...prev, ...doc.data() }));
       }
     });
 
@@ -69,9 +75,20 @@ export default function AdminDashboard() {
       setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const unsubNotice = onSnapshot(doc(db, 'settings', 'notice'), (snap) => {
+      if (snap.exists()) setNoticeConfig(prev => ({ ...prev, ...snap.data() }));
+    });
+
+    const unsubSystem = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
+      }
+    });
+
     const fetchAbout = async () => {
       const snap = await getDoc(doc(db, 'settings', 'about'));
-      if (snap.exists()) setAboutConfig(snap.data() as any);
+      if (snap.exists()) setAboutConfig(prev => ({ ...prev, ...snap.data() }));
     };
     fetchAbout();
 
@@ -86,6 +103,8 @@ export default function AdminDashboard() {
     return () => {
       unsubGithub();
       unsubContacts();
+      unsubNotice();
+      unsubSystem();
       unsubStatsUsers();
       unsubStatsIps();
       unsubStatsFiles();
@@ -220,6 +239,32 @@ export default function AdminDashboard() {
     });
   };
 
+  const saveNoticeConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'notice'), {
+        ...noticeConfig,
+        id: noticeConfig.active ? (noticeConfig.id === 'default' ? Date.now().toString() : noticeConfig.id) : noticeConfig.id
+      });
+      toast.success('Đã cập nhật thông báo hệ thống');
+    } catch (e) {
+      toast.error('Lỗi khi lưu thông báo');
+    }
+  };
+
+  const toggleBlockedDevice = async (type: 'ios' | 'android') => {
+    const newBlocked = {
+      ...blockedDevices,
+      [type]: !blockedDevices[type]
+    };
+    setBlockedDevices(newBlocked);
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { blockedDevices: newBlocked }, { merge: true });
+      toast.success(`Đã cập nhật trạng thái cấm cho thiết bị ${type.toUpperCase()}.`);
+    } catch (e) {
+      toast.error('Lỗi cập nhật cấu hình cấm thiết bị.');
+    }
+  };
+
   const toggleMaintenance = async () => {
     if (!isSuperAdmin) return toast.error('Quyền truy cập bị từ chối.');
     openConfirm({
@@ -302,9 +347,9 @@ export default function AdminDashboard() {
   const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'];
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col lg:flex-row min-h-[80vh] bg-transparent">
       {/* Sidebar Navigation */}
-      <div className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-4 lg:p-6 flex flex-col gap-4 lg:gap-8 bg-white dark:bg-slate-900 lg:bg-transparent">
+      <div className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-4 lg:p-6 flex flex-col gap-4 lg:gap-8 bg-transparent">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Shield className="w-7 h-7 text-amber-500" />
             Quản trị Hệ thống
@@ -326,7 +371,6 @@ export default function AdminDashboard() {
             { id: 'about', label: 'About Setup', icon: Info },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
             { id: 'airdrop', label: 'Quản lý Airdrop', icon: Gift },
-            { id: 'dns', label: 'DNS Subdomain', icon: Server },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -339,7 +383,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-4 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-3xl font-medium text-slate-900 dark:text-white mb-8  tracking-tight">
-            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', products: 'Sản phẩm', notifications: 'Thông báo', utilities: 'Tiện ích', github: 'GitHub', about: 'About', contacts: 'Yêu cầu hỗ trợ', airdrop: 'Quản lý Airdrop', logins: 'Tài khoản đăng nhập', banks: 'Ngân hàng đối tác', exchanges: 'Sàn giao dịch đối tác', dns: 'Bản ghi DNS Subdomain'}[activeTab] }
+            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', products: 'Sản phẩm', notifications: 'Thông báo', utilities: 'Tiện ích', github: 'GitHub', about: 'About', contacts: 'Yêu cầu hỗ trợ', airdrop: 'Quản lý Airdrop', logins: 'Tài khoản đăng nhập', banks: 'Ngân hàng đối tác', exchanges: 'Sàn giao dịch đối tác'}[activeTab] }
         </h1>
 
       {activeTab === 'stats' && (
@@ -685,12 +729,6 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
-      {activeTab === 'dns' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminDnsRequests />
-        </motion.div>
-      )}
-
       {activeTab === 'logins' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminLogins />
@@ -757,24 +795,38 @@ export default function AdminDashboard() {
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 min-w-[180px]">
+                      <td className="px-6 py-4 text-slate-500 min-w-[200px]">
                         <div className="text-[11px] leading-relaxed">
                           <div className="flex items-center gap-1.5 text-blue-500 font-bold mb-0.5">
                             <Globe className="w-3 h-3" />
                             <span>{(u as any).lastIpAddress || 'Hidden'}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-slate-400 font-mono">
-                            <MapPin className="w-3 h-3" />
-                            {u.location ? (
-                              <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
-                            ) : (
-                              <span>Bản đồ (Trống)</span>
-                            )}
-                          </div>
-                          {u.location?.address && (
-                             <div className="text-[10px] text-slate-500 mt-1 truncate max-w-[160px] italic">
-                               {u.location.address}
-                             </div>
+                          {u.location ? (
+                            <a 
+                              href={`https://www.google.com/maps?q=${u.location.lat},${u.location.lng}`} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="flex flex-col gap-0.5 p-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:border-blue-200 dark:hover:border-blue-500/20 transition-all group/loc"
+                            >
+                              <div className="flex items-center gap-1.5 text-slate-400 group-hover/loc:text-blue-500 font-mono transition-colors">
+                                <MapPin className="w-3 h-3" />
+                                <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
+                              </div>
+                              {u.location.address ? (
+                                <div className="text-[10px] text-slate-500 mt-1 line-clamp-2 italic leading-tight">
+                                  {u.location.address}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-blue-500/70 font-medium mt-1">
+                                   Xem trên bản đồ →
+                                </div>
+                              )}
+                            </a>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-slate-400 font-mono italic">
+                              <MapPin className="w-3 h-3" />
+                              <span>Chưa có dữ liệu</span>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -790,7 +842,7 @@ export default function AdminDashboard() {
                           </button>
                           <select
                             disabled={!isSuperAdmin}
-                            value={u.role}
+                          value={u.role || 'user'}
                             onChange={(e) => handleRoleChange(u.uid, e.target.value)}
                             className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                           >
@@ -899,15 +951,12 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { key: 'profile', label: 'Hồ sơ Cá nhân', icon: UserCircle, page: 'Profile.tsx' },
-                { key: 'tasks', label: 'Quản lý Công việc', icon: CheckSquare, page: 'TasksPage.tsx' },
                 { key: 'products', label: 'Cửa hàng Sản phẩm', icon: Box, page: 'ProductsPage.tsx' },
                 { key: 'utilities', label: 'Tiện ích Web', icon: Wrench, page: 'UtilitiesPage.tsx' },
                 { key: 'banks', label: 'Cổng Ngân hàng', icon: Landmark, page: 'BanksPage.tsx' },
                 { key: 'exchanges', label: 'Sàn Giao dịch', icon: LineChart, page: 'ExchangesPage.tsx' },
                 { key: 'movies', label: 'Phim ảnh (Cinema)', icon: Play, page: 'MoviesPage.tsx' },
-                { key: 'news', label: 'Tin tức & Trending', icon: Newspaper, page: 'NewsPage.tsx' },
                 { key: 'airdrop', label: 'Sự kiện Phần thưởng', icon: Gift, page: 'AirdropPage.tsx' },
-                { key: 'dns', label: 'Máy chủ DNS', icon: Globe, page: 'DnsRequestPage.tsx' },
               ].map((tab) => (
                 <div key={tab.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -932,6 +981,89 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-500 mt-6">
               Khi bật bảo trì, chỉ có tài khoản Quản trị viên mới truy cập được tab tương ứng.
             </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                <ShieldAlert className="w-6 h-6 text-rose-500" />
+                Cấm sử dụng theo Hệ điều hành
+                </h3>
+                <p className="text-xs text-slate-500 mb-6 italic">* Lưu ý: Khi bật, thiết bị sử dụng HĐH tương ứng sẽ bị chặn truy cập hoàn toàn.</p>
+                <div className="space-y-4">
+                {[
+                    { key: 'ios', label: 'Điện thoại iOS (iPhone)', icon: Apple },
+                    { key: 'android', label: 'Điện thoại Android', icon: MonitorSmartphone },
+                ].map((dev) => (
+                    <div key={dev.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                        <dev.icon className="w-5 h-5 text-rose-600" />
+                        </div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{dev.label}</h4>
+                    </div>
+                    <button 
+                        onClick={() => toggleBlockedDevice(dev.key as any)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${blockedDevices[dev.key as keyof typeof blockedDevices] ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${blockedDevices[dev.key as keyof typeof blockedDevices] ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                    </div>
+                ))}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                <Bell className="w-6 h-6 text-blue-500" />
+                Thông báo đầu trang (Notice)
+                </h3>
+                
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Trạng thái hiển thị</label>
+                        <button 
+                            onClick={() => setNoticeConfig({...noticeConfig, active: !noticeConfig.active})}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${noticeConfig.active ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${noticeConfig.active ? 'translate-x-6' : 'translate-x-1'}`}/>
+                        </button>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nội dung thông báo</label>
+                        <textarea 
+                            value={noticeConfig.text || ''}
+                            onChange={(e) => setNoticeConfig({...noticeConfig, text: e.target.value})}
+                            className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white resize-none"
+                            rows={3}
+                            placeholder="Nhập nội dung thông báo..."
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Loại thông báo</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {['info', 'warning', 'error'].map(type => (
+                                <button 
+                                    key={type}
+                                    onClick={() => setNoticeConfig({...noticeConfig, type: type as any})}
+                                    className={`py-2 rounded-lg text-xs font-bold capitalize transition-all ${noticeConfig.type === type ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500'}`}
+                                >
+                                    {type}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={saveNoticeConfig}
+                        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold mt-4 hover:opacity-90 transition-opacity"
+                    >
+                        Lưu cấu hình thông báo
+                    </button>
+                </div>
+            </div>
           </div>
         </motion.div>
       )}

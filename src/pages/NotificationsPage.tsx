@@ -82,7 +82,14 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 lg:px-8 pb-20 pt-4">
+    <div className="max-w-3xl mx-auto px-4 lg:px-8 pb-20 pt-4 relative">
+      
+      {/* Background Orbs */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none mix-blend-screen opacity-40">
+        <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-blue-600/20 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[20%] right-[10%] w-[400px] h-[400px] bg-purple-600/20 blur-[150px] rounded-full" />
+      </div>
+
       <AnimatePresence>
         {activeItem && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -91,41 +98,41 @@ export default function NotificationsPage() {
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
               onClick={() => setActiveItem(null)}
-              className="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative z-10"
+              className="bg-white/[0.05] border border-white/10 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10 backdrop-blur-2xl"
             >
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0 border border-blue-500/20">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center flex-shrink-0 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
                   <Bell className="w-6 h-6" />
                 </div>
                 <button
                   onClick={() => setActiveItem(null)}
-                  className="p-2 -mr-2 -mt-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                  className="p-2 -mr-2 -mt-2 text-white/50 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-snug">
+              <h2 className="text-xl font-bold text-white mb-2 leading-snug drop-shadow-md">
                 {activeItem.title}
               </h2>
-              <div className="text-xs text-slate-500 mb-6">
+              <div className="text-xs text-white/40 mb-6 font-medium uppercase tracking-wider">
                 {activeItem.createdAt ? format(toSafeDate(activeItem.createdAt), 'dd MMMM yyyy, HH:mm', { locale: vi }) : ''}
               </div>
               
-              <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              <div className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">
                 {activeItem.content}
               </div>
 
               <div className="mt-8 text-right">
                 <button
                   onClick={() => setActiveItem(null)}
-                  className="px-5 py-2.5 rounded-xl font-medium bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                  className="px-5 py-2.5 rounded-xl font-bold text-[10px] tracking-widest uppercase bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/10 backdrop-blur-md"
                 >
                   Đóng
                 </button>
@@ -135,21 +142,24 @@ export default function NotificationsPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-12 relative z-10">
         <div>
-          <h1 className="text-4xl font-medium text-slate-900 dark:text-white tracking-tight mb-2">Thông báo</h1>
-          <p className="text-slate-500 text-lg">Cật nhật những thông tin mới nhất từ hệ thống.</p>
+          <h1 className="text-5xl md:text-[6rem] font-display font-medium text-white tracking-tighter uppercase leading-[0.9] mb-4 drop-shadow-2xl">
+            Trung tâm <br/>
+            <span className="text-stroke text-transparent" style={{ WebkitTextStroke: '1px currentColor' }}>Thông báo</span>
+          </h1>
+          <p className="text-white/60 text-lg font-medium max-w-lg drop-shadow-md">Cập nhật tin tức quan trọng và biến động hệ thống thao tác thời gian thực.</p>
         </div>
         <button 
           onClick={markAllRead}
-          className="text-sm font-medium  tracking-normal text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 bg-blue-500/5 px-4 py-2 rounded-xl transition-all"
+          className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70 hover:text-white flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3.5 rounded-2xl transition-all h-fit backdrop-blur-md shadow-xl"
         >
           <CheckCircle2 className="w-4 h-4" />
           Đọc tất cả
         </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 relative z-10">
         <AnimatePresence>
           {notifications.length === 0 ? (
             <NoData 
@@ -166,40 +176,40 @@ export default function NotificationsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   key={item.id} 
-                  className={`bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl relative overflow-hidden transition-all ${isRead ? 'opacity-70 grayscale-[0.3]' : 'shadow-md border-l-4 border-l-blue-500'}`}
+                  className={`bg-white/[0.03] backdrop-blur-xl border p-5 rounded-3xl relative overflow-hidden transition-all duration-300 hover:bg-white/[0.05] ${isRead ? 'opacity-70 border-white/5 grayscale-[0.2]' : 'shadow-[0_10px_30px_rgba(0,0,0,0.3)] border-white/10 border-l-4 border-l-blue-500 hover:shadow-[0_15px_40px_rgba(59,130,246,0.1)]'}`}
                 >
-                  <div className="flex gap-4">
-                    <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center ${isRead ? 'bg-slate-100 dark:bg-white/5 text-slate-400' : 'bg-blue-500/20 text-blue-500'}`}>
+                  <div className="flex gap-5">
+                    <div className={`w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center border shadow-inner ${isRead ? 'bg-white/5 text-white/30 border-white/5' : 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]'}`}>
                       <Bell className="w-6 h-6" />
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className={`text-base font-bold truncate pr-4 ${isRead ? 'text-slate-600 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
+                        <h3 className={`text-base font-bold truncate pr-4 ${isRead ? 'text-white/50' : 'text-white drop-shadow-sm'}`}>
                           {item.title}
                         </h3>
-                        <span className="text-xs text-slate-400 whitespace-nowrap pt-1">
+                        <span className="text-[10px] font-bold tracking-wider text-white/40 whitespace-nowrap pt-1 uppercase">
                           {item.createdAt ? format(toSafeDate(item.createdAt), 'dd/MM, HH:mm') : ''}
                         </span>
                       </div>
-                      <p className={`text-sm mb-3 line-clamp-2 ${isRead ? 'text-slate-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                      <p className={`text-sm mb-4 line-clamp-2 ${isRead ? 'text-white/40' : 'text-white/70'}`}>
                         {item.content}
                       </p>
                       
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-6">
                         {!isRead && (
                           <button 
                             onClick={() => markAsRead(item.id, item.readBy || [])}
-                            className="text-xs font-semibold text-blue-500 hover:text-blue-700  tracking-wider"
+                            className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest transition-colors flex items-center gap-1.5"
                           >
-                            Đánh dấu đã đọc
+                            <CheckCircle2 className="w-3 h-3" /> Đánh dấu đã đọc
                           </button>
                         )}
                         <button 
                           onClick={() => handleOpenDetail(item)}
-                          className="text-xs font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-0.5 group"
+                          className="text-[10px] font-bold text-white/40 hover:text-white uppercase tracking-widest flex items-center gap-1 group transition-colors"
                         >
-                          Xem chi tiết <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                          Xem chi tiết <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                         </button>
                       </div>
                     </div>

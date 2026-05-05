@@ -5,7 +5,10 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 
-export default function BlockedPage({ reason = 'Your account or IP has been banned due to a violation of our terms.' }: { reason?: string }) {
+export default function BlockedPage({ 
+  title = 'ACCESS DENIED', 
+  reason = 'Your account or IP has been banned due to a violation of our terms.' 
+}: { title?: string, reason?: string }) {
   const navigate = useNavigate();
   const { setUser, setUserData } = useAuthStore();
 
@@ -25,7 +28,7 @@ export default function BlockedPage({ reason = 'Your account or IP has been bann
         
         <div className="space-y-4">
           <h1 className="text-3xl font-medium text-slate-900 dark:text-white tracking-tight">
-            ACCESS DENIED
+            {title}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium">
             {reason}

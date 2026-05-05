@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { OfflineGuard } from '../components/OfflineGuard';
 import GuestView from '../components/ui/GuestView';
 import FindMyDeviceUtility from './FindMyDeviceUtility';
+import { cn } from '../lib/utils';
 
 interface UtilityItem {
   id: string;
@@ -26,46 +27,40 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.05 }}
-      className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-5 hover:shadow-2xl hover:shadow-blue-500/10 transition-all flex flex-col h-full"
+      className="glass-card p-6 md:p-8 flex flex-col h-full hover:bg-white/[0.05] transition-all"
     >
-      <div className="flex items-start justify-between mb-6">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
-          {item.type === 'embed' ? <ExternalLink className="w-7 h-7" /> : <Lightbulb className="w-7 h-7" />}
+      <div className="flex items-start justify-between mb-8">
+        <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-500">
+          {item.type === 'embed' ? <ExternalLink className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />}
         </div>
-        <div className="flex flex-col items-end">
-          <span className={`text-[10px]  font-heavy tracking-normal px-2 py-1 rounded-lg ${item.type === 'embed' ? 'bg-purple-100 text-purple-600 dark:bg-purple-500/10' : 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'}`}>
-            {item.type === 'embed' ? 'Công cụ Web' : 'Hệ thống'}
-          </span>
-        </div>
+        <span className={cn(
+          "text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border",
+          item.type === 'embed' ? 'bg-blue-500/10 text-blue-400 border-blue-500/10' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/10'
+        )}>
+          {item.type === 'embed' ? 'Web Tool' : 'System'}
+        </span>
       </div>
       
-      <h3 className="text-xl font-medium text-slate-900 dark:text-white mb-2 leading-tight">
-        {item.title}
-      </h3>
-      <div className="flex-1">
-        <p className={`text-sm text-slate-500 dark:text-slate-400 leading-relaxed ${!showMore && isLong ? 'line-clamp-3' : ''}`}>
-          {item.description}
+      <div className="flex-1 space-y-4">
+        <h3 className="text-xl font-medium text-white tracking-tight uppercase leading-tight">{item.title}</h3>
+        <p className={`text-slate-400 text-sm leading-relaxed ${!showMore && isLong ? 'line-clamp-3' : ''}`}>
+           {item.description}
         </p>
         {isLong && (
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMore(!showMore);
-            }}
-            className="mt-2 text-[10px] font-medium text-blue-600  tracking-normal hover:underline flex items-center gap-1"
+            onClick={(e) => { e.stopPropagation(); setShowMore(!showMore); }}
+            className="text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-indigo-400 transition-colors"
           >
-            {showMore ? 'Thu gọn' : 'Xem thêm'}
-            <ChevronRight className={`w-3 h-3 transition-transform ${showMore ? '-rotate-90' : 'rotate-90'}`} />
+            {showMore ? 'Thu gọn' : 'Chi tiết'}
           </button>
         )}
       </div>
       
       <button
         onClick={() => onSelect(item)}
-        className="mt-6 w-full py-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl font-bold text-slate-900 dark:text-white hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all flex items-center justify-center gap-2 group/btn"
+        className="mt-8 h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95"
       >
-        Mở tiện ích
-        <ExternalLink className="w-4 h-4 opacity-0 group-hover/btn:opacity-100 group-hover/btn:translate-x-1 transition-all" />
+        Khám phá <ArrowRight className="w-4 h-4" />
       </button>
     </motion.div>
   );
@@ -90,11 +85,12 @@ export default function UtilitiesPage() {
     
     if (activeUtility.type === 'embed') {
       return (
-        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-8">
-          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors w-fit">
+        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-8 relative">
+          <div className="absolute inset-0 bg-blue-500/5 blur-[100px] pointer-events-none" />
+          <button onClick={() => setActiveUtility(null)} className="relative z-10 flex items-center gap-2 text-white/50 hover:text-white mb-6 transition-colors w-fit px-4 py-2 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md">
             ← Quay lại
           </button>
-          <div className="flex-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+          <div className="relative z-10 flex-1 bg-white/[0.02] border border-white/10 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
             <OfflineGuard message="Tiện ích này là một công cụ web bên ngoài, yêu cầu kết nối Internet để tải nội dung.">
               <iframe 
                 src={activeUtility.embedUrl} 
@@ -123,41 +119,21 @@ const nativeUtilities: UtilityItem[] = [
   const allItems = [...nativeUtilities, ...utilities];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-20 pt-4 px-4 lg:px-8">
-      <div className="flex flex-col gap-3 md:gap-4 mb-12">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4"
+    <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
+      <div className="flex flex-col gap-6 mb-16">
+        <motion.h1 
+           initial={{ opacity: 0, y: -20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="text-5xl md:text-7xl font-display font-medium text-white tracking-tighter uppercase"
         >
-          <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-2xl shadow-blue-500/20">
-            <LayoutList className="w-6 h-6 md:w-8 md:h-8" />
-          </div>
-          <div>
-            <h1 className="text-4xl md:text-7xl font-display font-medium text-slate-900 dark:text-white tracking-tight italic leading-none">
-              Tiện Ích & Tool
-            </h1>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-[10px] font-medium  tracking-[0.2em] text-blue-600 bg-blue-50 dark:bg-blue-500/10 px-3 py-1 rounded-lg">
-                Trung tâm tiện ích
-              </span>
-              <span className="text-[10px] font-medium  tracking-[0.2em] text-slate-400">
-                {allItems.length} đang hoạt động
-              </span>
-            </div>
-          </div>
-        </motion.div>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-slate-500 text-sm md:text-lg font-medium max-w-2xl leading-relaxed"
-        >
-          Khám phá bộ sưu tập các công cụ thông minh, thủ thuật và tiện ích nâng cao được tích hợp sẵn dành riêng cho bạn.
-        </motion.p>
+          Tiện ích & Tool
+        </motion.h1>
+        <p className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
+          Khám phá bộ công cụ tính toán và tiện ích nội bộ tối ưu hóa quy trình làm việc của bạn.
+        </p>
       </div>
 
-      <GuestView title="Trung tâm Tiện ích" description="Đăng nhập để trải nghiệm toàn bộ các công cụ thông minh và các tiện ích nhúng mạnh mẽ dành riêng cho thành viên.">
+      <GuestView title="Trung tâm Tiện ích" description="Đăng nhập để trải nghiệm toàn bộ các công cụ thông minh.">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {allItems.map((item, idx) => (
             <UtilityCard key={item.id} item={item} idx={idx} onSelect={setActiveUtility} />
