@@ -134,6 +134,11 @@ export default function AboutPage() {
               {config.zalo && <a href={`https://zalo.me/${config.zalo}`} target="_blank" rel="noreferrer" className="hover:text-indigo-400">Zalo</a>}
               {config.email && <a href={`mailto:${config.email}`} className="hover:text-indigo-400">Email</a>}
             </div>
+            <div className="flex flex-wrap gap-4 text-[10px] text-slate-700 font-bold uppercase tracking-widest mt-2">
+              <a href="/terms" className="hover:text-white transition-colors">Điều khoản</a>
+              <span>•</span>
+              <a href="/privacy" className="hover:text-white transition-colors">Bảo mật</a>
+            </div>
             <p className="text-xs text-slate-600 font-medium tracking-wider uppercase">©2026 Admin Pro Ecosystem</p>
           </div>
         </section>

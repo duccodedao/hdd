@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'products' | 'utilities' | 'notifications' | 'github' | 'about' | 'contacts' | 'airdrop' | 'logins' | 'banks' | 'exchanges' | 'stats'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'products' | 'utilities' | 'notifications' | 'github' | 'about' | 'contacts' | 'airdrop' | 'logins' | 'banks' | 'exchanges' | 'stats' | 'tiktok'>('stats');
 
   const [noticeConfig, setNoticeConfig] = useState({
     active: false,
@@ -63,11 +63,23 @@ export default function AdminDashboard() {
     repo: '',
     token: ''
   });
+  const [tiktokConfig, setTiktokConfig] = useState({
+    clientKey: '',
+    clientSecret: '',
+    redirectUri: '',
+    enabled: true
+  });
 
   useEffect(() => {
     const unsubGithub = onSnapshot(doc(db, 'settings', 'github'), (doc) => {
       if (doc.exists()) {
         setGithubConfig(prev => ({ ...prev, ...doc.data() }));
+      }
+    });
+
+    const unsubTiktok = onSnapshot(doc(db, 'settings', 'tiktok'), (doc) => {
+      if (doc.exists()) {
+        setTiktokConfig(prev => ({ ...prev, ...doc.data() }));
       }
     });
 
@@ -102,6 +114,7 @@ export default function AdminDashboard() {
 
     return () => {
       unsubGithub();
+      unsubTiktok();
       unsubContacts();
       unsubNotice();
       unsubSystem();
@@ -150,6 +163,15 @@ export default function AdminDashboard() {
       toast.success('Đã lưu cấu hình GitHub');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình GitHub');
+    }
+  };
+
+  const saveTiktokConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'tiktok'), tiktokConfig);
+      toast.success('Đã lưu cấu hình TikTok');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình TikTok');
     }
   };
 
@@ -367,6 +389,7 @@ export default function AdminDashboard() {
             { id: 'banks', label: 'Ngân hàng ĐT', icon: Landmark },
             { id: 'exchanges', label: 'Sàn GT ĐT', icon: LineChart },
             { id: 'logins', label: 'Tài khoản ĐN', icon: Users },
+            { id: 'tiktok', label: 'TikTok Setup', icon: MonitorSmartphone },
             { id: 'github', label: 'GitHub Setup', icon: Code },
             { id: 'about', label: 'About Setup', icon: Info },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
@@ -670,6 +693,82 @@ export default function AdminDashboard() {
       {activeTab === 'notifications' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminNotifications />
+        </motion.div>
+      )}
+
+      {activeTab === 'tiktok' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+              <img src="https://sf-static.tiktokcdn.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png" className="w-6 h-6" alt="" />
+              TikTok Login Kit Configuration
+            </h3>
+            
+            <div className="space-y-6 max-w-2xl">
+              <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl">
+                <div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">Trạng thái TikTok Login</h4>
+                  <p className="text-[10px] text-slate-500 font-medium">Bật hoặc tắt chức năng đăng nhập qua TikTok</p>
+                </div>
+                <button 
+                  onClick={() => setTiktokConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                  className={`w-12 h-6 rounded-full transition-colors relative flex items-center p-1 ${tiktokConfig.enabled ? 'bg-indigo-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${tiktokConfig.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Client Key</label>
+                  <input 
+                    type="text" 
+                    value={tiktokConfig.clientKey}
+                    onChange={(e) => setTiktokConfig({...tiktokConfig, clientKey: e.target.value})}
+                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    placeholder="Enter Client Key"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Client Secret</label>
+                  <input 
+                    type="password" 
+                    value={tiktokConfig.clientSecret}
+                    onChange={(e) => setTiktokConfig({...tiktokConfig, clientSecret: e.target.value})}
+                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    placeholder="Enter Client Secret"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Redirect URI</label>
+                  <input 
+                    type="text" 
+                    value={tiktokConfig.redirectUri}
+                    onChange={(e) => setTiktokConfig({...tiktokConfig, redirectUri: e.target.value})}
+                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                    placeholder="https://your-app.com/api/auth/tiktok/callback"
+                  />
+                  <p className="text-[10px] text-slate-500 font-medium italic">Redirect URI phải khớp chính xác với cấu hình trên TikTok Developer Portal.</p>
+                </div>
+              </div>
+              
+              <div className="pt-4">
+                <button 
+                  onClick={saveTiktokConfig}
+                  className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-95 text-[10px] uppercase tracking-widest"
+                >
+                  Lưu cấu hình TikTok
+                </button>
+              </div>
+
+              <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
+                <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Lưu ý bảo mật</h4>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">
+                  Cấu hình này sẽ được áp dụng cho toàn bộ hệ thống. Đảm bảo bạn đã cấu hình chính xác redirect URI và quyền truy cập 'user.info.basic' trên trang quản trị nhà phát triển TikTok.
+                </p>
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
 

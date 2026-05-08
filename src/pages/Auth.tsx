@@ -8,7 +8,7 @@ import {
   browserLocalPersistence,
   setPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -26,15 +26,15 @@ export default function Auth() {
   const [rememberMe, setRememberMe] = useState(false);
 
   // Login states
-  const [loginEmail, setLoginEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem('rememberedEmail');
+    const savedId = localStorage.getItem('rememberedIdentifier');
     const savedPass = localStorage.getItem('rememberedPass');
-    if (savedEmail && savedPass) {
-      setLoginEmail(savedEmail);
+    if (savedId && savedPass) {
+      setIdentifier(savedId);
       setLoginPassword(savedPass);
       setRememberMe(true);
     }
@@ -42,15 +42,45 @@ export default function Auth() {
 
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [tiktokLoading, setTiktokLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tiktokStatus = params.get('tiktok_status');
+    const message = params.get('message');
+    
+    if (tiktokStatus === 'unlinked') {
+       toast.error('Tài khoản TikTok chưa được liên kết. Vui lòng đăng nhập bằng tài khoản sẵn có và liên kết sau.');
+       window.history.replaceState({}, '', '/auth');
+    } else if (tiktokStatus === 'error') {
+       toast.error('Lỗi nhận diện TikTok: ' + (message || 'Vui lòng thử lại.'));
+       window.history.replaceState({}, '', '/auth');
+    }
+  }, []);
+
+  const handleTiktokLogin = () => {
+    setTiktokLoading(true);
+    window.location.href = '/api/auth/tiktok';
+  };
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  const resolveIdentifierToEmail = async (id: string) => {
+    if (id.includes('@')) return id;
+    const q = query(collection(db, 'users'), where('phoneNumber', '==', id));
+    const snap = await getDocs(q);
+    if (snap.empty) throw new Error('Tài khoản/Số điện thoại không tồn tại.');
+    return snap.docs[0].data().email;
+  };
 
   const checkAndSaveLocation = async (uid: string) => {
     let ip = 'Unknown';
@@ -78,24 +108,26 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginPassword) return toast.error('Vui lòng nhập đầy đủ thông tin.');
+    if (!identifier || !loginPassword) return toast.error('Vui lòng nhập đầy đủ thông tin.');
     
     setLoginLoading(true);
     try {
       if (rememberMe) {
-        localStorage.setItem('rememberedEmail', loginEmail);
+        localStorage.setItem('rememberedIdentifier', identifier);
         localStorage.setItem('rememberedPass', loginPassword);
       } else {
-        localStorage.removeItem('rememberedEmail');
+        localStorage.removeItem('rememberedIdentifier');
         localStorage.removeItem('rememberedPass');
       }
       await setPersistence(auth, browserLocalPersistence);
-      const userCred = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      await logActivity(ActivityType.LOGIN, 'Đăng nhập thành công qua ID/Pass');
+      
+      const email = await resolveIdentifierToEmail(identifier);
+      const userCred = await signInWithEmailAndPassword(auth, email, loginPassword);
+      await logActivity(ActivityType.LOGIN, `Đăng nhập qua ${identifier.includes('@') ? 'Email' : 'Phone'}`);
       await checkAndSaveLocation(userCred.user.uid);
       navigate('/');
     } catch (error: any) {
-      toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      toast.error(error.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setLoginLoading(false);
     }
@@ -103,14 +135,23 @@ export default function Auth() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registerName || !registerEmail || !registerPassword) return toast.error('Vui lòng nhập đầy đủ thông tin.');
+    if (!registerName || !registerEmail || !registerPhone || !registerPassword) return toast.error('Vui lòng nhập đầy đủ thông tin.');
+    if (!agreeToTerms) return toast.error('Bạn cần đồng ý với Điều khoản Dịch vụ để tiếp tục.');
     
     setRegisterLoading(true);
     try {
+      // Check phone existence
+      const qPhone = query(collection(db, 'users'), where('phoneNumber', '==', registerPhone));
+      const snapPhone = await getDocs(qPhone);
+      if (!snapPhone.empty) {
+        throw new Error('Số điện thoại đã được sử dụng.');
+      }
+
       const userCred = await createUserWithEmailAndPassword(auth, registerEmail, registerPassword);
       await setDoc(doc(db, 'users', userCred.user.uid), {
         uid: userCred.user.uid,
         email: userCred.user.email,
+        phoneNumber: registerPhone,
         displayName: registerName,
         photoURL: '',
         role: registerEmail === 'sonlyhongduc@gmail.com' ? 'superadmin' : 'user',
@@ -123,7 +164,7 @@ export default function Auth() {
       toast.success('Đăng ký hoàn tất.');
       navigate('/');
     } catch (error: any) {
-      toast.error('Tạo tài khoản thất bại.');
+      toast.error(error.message || 'Tạo tài khoản thất bại.');
     } finally {
       setRegisterLoading(false);
     }
@@ -166,15 +207,16 @@ export default function Auth() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail) return toast.error('Identifier required.');
+    if (!forgotIdentifier) return toast.error('Identifier required.');
     
     setForgotLoading(true);
     try {
-      await sendPasswordResetEmail(auth, forgotEmail);
-      toast.success('Recovery link dispatched.');
+      const email = await resolveIdentifierToEmail(forgotIdentifier);
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Recovery link dispatched to Gmail.');
       setShowForgotModal(false);
     } catch (error: any) {
-      toast.error('Dispatched failed.');
+      toast.error(error.message || 'Dispatched failed.');
     } finally {
       setForgotLoading(false);
     }
@@ -230,16 +272,16 @@ export default function Auth() {
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email hoặc Số điện thoại</label>
                       <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
                         <input 
-                          type="email" 
+                          type="text" 
                           disabled={loginLoading}
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
+                          value={identifier}
+                          onChange={(e) => setIdentifier(e.target.value)}
                           className="h-12 w-full bg-white/5 border border-white/5 rounded-xl pl-12 pr-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
-                          placeholder="name@email.com"
+                          placeholder="Email hoặc số điện thoại"
                           required
                         />
                       </div>
@@ -270,6 +312,19 @@ export default function Auth() {
                         </button>
                       </div>
                     </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div 
+                        onClick={() => setRememberMe(!rememberMe)}
+                        className={cn(
+                          "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                          rememberMe ? "bg-indigo-600 border-indigo-500" : "bg-white/5 border-white/10 group-hover:border-white/20"
+                        )}
+                      >
+                        {rememberMe && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Ghi nhớ mật khẩu</span>
+                    </label>
                   </div>
 
                   <button 
@@ -277,7 +332,7 @@ export default function Auth() {
                     disabled={loginLoading}
                     className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
-                    {loginLoading ? <MiniLoading className="w-5 h-5 mx-auto" logoClass="bg-blue-600" /> : 'Đăng nhập hệ thống'}
+                    {loginLoading ? <MiniLoading className="w-5 h-5 mx-auto" /> : 'Đăng nhập hệ thống'}
                   </button>
                 </form>
               ) : (
@@ -310,6 +365,19 @@ export default function Auth() {
                     </div>
 
                     <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Số điện thoại (Bắt buộc)</label>
+                      <input 
+                        type="tel" 
+                        disabled={registerLoading}
+                        value={registerPhone}
+                        onChange={(e) => setRegisterPhone(e.target.value)}
+                        className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white placeholder:text-slate-700"
+                        placeholder="09xx xxx xxx"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Mật khẩu</label>
                       <input 
                         type={showRegisterPassword ? "text" : "password"} 
@@ -321,6 +389,19 @@ export default function Auth() {
                         required
                       />
                     </div>
+
+                    <label className="flex items-center gap-3 cursor-pointer group mt-4">
+                      <div 
+                        onClick={() => setAgreeToTerms(!agreeToTerms)}
+                        className={cn(
+                          "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                          agreeToTerms ? "bg-indigo-600 border-indigo-500" : "bg-white/5 border-white/10 group-hover:border-white/20"
+                        )}
+                      >
+                        {agreeToTerms && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Tôi đồng ý với Điều khoản Dịch vụ</span>
+                    </label>
                   </div>
 
                   <button 
@@ -328,8 +409,13 @@ export default function Auth() {
                     disabled={registerLoading}
                     className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
-                    {registerLoading ? <MiniLoading className="w-5 h-5 mx-auto" logoClass="bg-blue-600" /> : 'Bắt đầu ngay'}
+                    {registerLoading ? <MiniLoading className="w-5 h-5 mx-auto" /> : 'Bắt đầu ngay'}
                   </button>
+
+                  <p className="text-[9px] text-slate-600 font-medium text-center uppercase tracking-widest leading-relaxed mt-4">
+                    Bằng việc đăng ký, bạn đồng ý với <br />
+                    <Link to="/terms" className="text-slate-400 hover:text-white transition-colors">Điều khoản</Link> và <Link to="/privacy" className="text-slate-400 hover:text-white transition-colors">Chính sách bảo mật</Link>
+                  </p>
                 </form>
               )}
             </motion.div>
@@ -345,11 +431,21 @@ export default function Auth() {
             <button 
               type="button"
               onClick={handleGoogleAuth}
-              disabled={loginLoading || registerLoading || googleLoading}
+              disabled={loginLoading || registerLoading || googleLoading || tiktokLoading}
               className="w-full h-12 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
             >
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
               <span className="text-[10px] font-bold text-white uppercase tracking-widest leading-none">Tiếp tục bằng Google</span>
+            </button>
+
+            <button 
+              type="button"
+              onClick={handleTiktokLogin}
+              disabled={loginLoading || registerLoading || googleLoading || tiktokLoading}
+              className="w-full h-12 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <img src="https://sf-static.tiktokcdn.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png" className="w-4 h-4" alt="TikTok" onError={(e) => (e.currentTarget.src = 'https://www.tiktok.com/favicon.ico')} />
+              <span className="text-[10px] font-bold text-white uppercase tracking-widest leading-none">Tiếp tục bằng TikTok</span>
             </button>
           </div>
         </div>
@@ -382,20 +478,20 @@ export default function Auth() {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-xl font-medium text-white uppercase tracking-widest">Quên mật khẩu?</h3>
-                  <p className="text-xs text-slate-500 font-medium">Chúng tôi sẽ gửi liên kết khôi phục qua email.</p>
+                  <p className="text-xs text-slate-500 font-medium">Nhập Email hoặc SĐT để nhận link khôi phục.</p>
                 </div>
               </div>
 
               <form onSubmit={handleForgotPassword} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email của bạn</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email hoặc SĐT</label>
                   <input 
-                    type="email" 
+                    type="text" 
                     required
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
+                    value={forgotIdentifier}
+                    onChange={(e) => setForgotIdentifier(e.target.value)}
                     className="h-12 w-full bg-white/5 border border-white/5 rounded-xl px-4 outline-none focus:border-white transition-all text-sm font-medium text-white"
-                    placeholder="name@email.com"
+                    placeholder="Email hoặc số điện thoại"
                   />
                 </div>
                 <button 
@@ -403,7 +499,7 @@ export default function Auth() {
                   disabled={forgotLoading}
                   className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
                 >
-                  {forgotLoading ? <MiniLoading className="w-4 h-4 mx-auto" logoClass="bg-blue-600" /> : 'Gửi yêu cầu'}
+                  {forgotLoading ? <MiniLoading className="w-4 h-4 mx-auto" /> : 'Gửi yêu cầu'}
                 </button>
               </form>
             </motion.div>

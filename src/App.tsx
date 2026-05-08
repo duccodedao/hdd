@@ -31,8 +31,9 @@ import AirdropPage from './pages/AirdropPage';
 import BanksPage from './pages/BanksPage';
 import ExchangesPage from './pages/ExchangesPage';
 import BlockedPage from './pages/BlockedPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import NotFoundPage from './pages/NotFoundPage';
-import TasksPage from './pages/TasksPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineNotification } from './components/ui/OfflineNotification';
 import LocationGuard from './components/guards/LocationGuard';
@@ -149,6 +150,8 @@ export default function App() {
               <Route path="airdrop" element={<TabGuard tabKey="airdrop"><AirdropPage /></TabGuard>} />
               <Route path="notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
               <Route path="contact" element={<ContactPage />} />
+              <Route path="terms" element={<TermsPage />} />
+              <Route path="privacy" element={<PrivacyPage />} />
               
               {/* Admin Routes */}
               <Route path="admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" />} />

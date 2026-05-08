@@ -33,8 +33,8 @@ export default function Profile() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [notifPerms, setNotifPerms] = useState({ system: true, security: true, location: true });
   const [activeTab, setActiveTab] = useState<'profile' | 'social' | 'system'>('profile');
-  const [socialLinks, setSocialLinks] = useState({
-    google: '', facebook: '', github: '', twitter: ''
+  const [socialLinks, setSocialLinks] = useState<any>({
+    google: '', facebook: '', github: '', twitter: '', tiktok: null
   });
 
   const [permissions, setPermissions] = useState({
@@ -172,6 +172,25 @@ export default function Profile() {
     } catch (e) { toast.error('Lỗi'); } finally { setLoading(false); }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tiktokStatus = params.get('tiktok_status');
+    const message = params.get('message');
+    
+    if (tiktokStatus === 'success') {
+      toast.success('Kết nối TikTok thành công!');
+      window.history.replaceState({}, '', '/profile');
+    } else if (tiktokStatus === 'error') {
+      toast.error('Lỗi kết nối TikTok: ' + (message || 'Vui lòng thử lại sau.'));
+      window.history.replaceState({}, '', '/profile');
+    }
+  }, []);
+
+  const handleConnectTikTok = () => {
+    if (!user) return toast.error('Bạn cần đăng nhập để thực hiện.');
+    window.location.href = `/api/auth/tiktok?uid=${user.uid}`;
+  };
+
   const handleUpdateSocialLinks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -262,10 +281,16 @@ export default function Profile() {
               <span className="inline-block px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold tracking-widest uppercase text-indigo-400">
                 {userData?.role || 'Member'}
               </span>
-              <h1 className="text-4xl md:text-6xl font-display font-medium text-white tracking-tight">
+              <h1 className="text-4xl md:text-6xl font-display font-medium text-white tracking-tight flex items-center justify-center md:justify-start gap-3">
                 {userData?.displayName || 'Cư dân'}
+                {user?.emailVerified && (
+                  <CheckCircle2 className="w-8 h-8 md:w-12 md:h-12 text-[#1d9bf0] fill-[#1d9bf0]/10" />
+                )}
               </h1>
-              <p className="text-slate-400 font-medium">{user?.email}</p>
+              <p className="text-slate-400 font-medium flex items-center justify-center md:justify-start gap-2">
+                {user?.email}
+                {user?.emailVerified && <CheckCircle2 className="w-3.5 h-3.5 text-[#1d9bf0]" />}
+              </p>
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
                <button onClick={handleLogout} className="px-6 py-3 bg-white/5 hover:bg-rose-500/10 text-rose-400 border border-white/5 rounded-xl transition-all font-bold text-[10px] tracking-widest uppercase">
@@ -358,17 +383,82 @@ export default function Profile() {
                 )}
 
                 {activeTab === 'social' && (
-                  <form onSubmit={handleUpdateSocialLinks} className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {['google', 'github', 'facebook', 'twitter'].map(id => (
-                        <div key={id} className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{id}</label>
-                          <input type="text" value={(socialLinks as any)[id] || ''} onChange={e => setSocialLinks({...socialLinks, [id]: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 font-medium text-sm text-white outline-none focus:border-indigo-500 transition-all" />
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Google Connection */}
+                      <div className="p-6 rounded-2xl bg-white/3 border border-white/5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-4" alt="Google" />
+                            <span className="text-xs font-bold text-white uppercase tracking-widest">Google</span>
+                          </div>
+                          {user?.emailVerified ? (
+                            <div className="flex items-center gap-1 text-[#1d9bf0] text-[10px] font-bold uppercase tracking-widest">
+                              <CheckCircle2 className="w-3 h-3" /> Connected
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Not Verified</span>
+                          )}
                         </div>
-                      ))}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-white flex items-center gap-2">
+                            {user?.email}
+                            {user?.emailVerified && <CheckCircle2 className="w-3 h-3 text-[#1d9bf0]" />}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-medium uppercase">Primary Account Identity</p>
+                        </div>
+                      </div>
+
+                      {/* TikTok Connection */}
+                      <div className="p-6 rounded-2xl bg-white/3 border border-white/5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <img src="https://sf-static.tiktokcdn.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png" className="w-5 h-5" alt="TikTok" onError={(e) => (e.currentTarget.src = 'https://www.tiktok.com/favicon.ico')} />
+                            <span className="text-xs font-bold text-white uppercase tracking-widest">TikTok</span>
+                          </div>
+                          {userData?.socialLinks?.tiktok ? (
+                            <div className="flex items-center gap-1 text-[#1d9bf0] text-[10px] font-bold uppercase tracking-widest">
+                              <CheckCircle2 className="w-3 h-3" /> Synced
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Unconnected</span>
+                          )}
+                        </div>
+                        {userData?.socialLinks?.tiktok ? (
+                          <div className="flex items-center gap-4">
+                            <img src={userData.socialLinks.tiktok.avatar} className="w-10 h-10 rounded-full border border-white/10" alt="TikTok Avatar" />
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-medium text-white">@{userData.socialLinks.tiktok.username}</p>
+                              <p className="text-[10px] text-slate-500 font-medium uppercase">{userData.socialLinks.tiktok.displayName}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            className="w-full py-2.5 bg-black text-white border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-center flex items-center justify-center gap-2"
+                            onClick={handleConnectTikTok}
+                          >
+                            <img src="https://sf-static.tiktokcdn.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png" className="w-3 h-3" alt="" />
+                            Kết nối TikTok
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <button type="submit" className="px-10 py-4 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest">Cập nhật</button>
-                  </form>
+
+                    <form onSubmit={handleUpdateSocialLinks} className="space-y-6 pt-6 border-t border-white/5">
+                      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Liên kết khác (URL)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {['github', 'facebook', 'twitter'].map(id => (
+                          <div key={id} className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{id}</label>
+                            <input type="text" value={(socialLinks as any)[id] || ''} onChange={e => setSocialLinks({...socialLinks, [id]: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3 font-medium text-sm text-white outline-none focus:border-indigo-500 transition-all" />
+                          </div>
+                        ))}
+                      </div>
+                      <button type="submit" disabled={loading} className="px-10 py-4 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all">
+                        {loading ? 'Đang lưu...' : 'Lưu cài đặt'}
+                      </button>
+                    </form>
+                  </div>
                 )}
 
                 {activeTab === 'system' && (

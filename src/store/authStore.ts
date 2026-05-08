@@ -17,6 +17,7 @@ export interface UserData {
   email: string;
   displayName: string;
   photoURL: string;
+  phoneNumber?: string;
   role: 'user' | 'admin' | 'superadmin';
   status: 'active' | 'banned';
   isBanned?: boolean;
@@ -32,6 +33,12 @@ export interface UserData {
   socialLinks?: {
     google?: string;
     facebook?: string;
+    tiktok?: {
+      id: string;
+      username: string;
+      avatar: string;
+      displayName: string;
+    };
     playGames?: string;
     gameCenter?: string;
     apple?: string;
