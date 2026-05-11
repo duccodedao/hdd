@@ -348,7 +348,7 @@ export default function AdminDashboard() {
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'logins', label: 'Tài khoản ĐN', icon: Users },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'about', label: 'Mạng xã hội & Giới thiệu', icon: Info },
+            { id: 'about', label: 'Mạng xã hội', icon: Info },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -361,7 +361,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-900 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', notifications: 'Thông báo', utilities: 'Tiện ích', contacts: 'Yêu cầu hỗ trợ', logins: 'Tài khoản đăng nhập', forms: 'Form & Folders', about: 'Mạng xã hội & Giới thiệu'}[activeTab as any] }
+            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', notifications: 'Thông báo', utilities: 'Tiện ích', contacts: 'Yêu cầu hỗ trợ', logins: 'Tài khoản đăng nhập', forms: 'Form & Folders', about: 'Mạng xã hội'}[activeTab as any] }
         </h1>
 
       {activeTab === 'stats' && (
