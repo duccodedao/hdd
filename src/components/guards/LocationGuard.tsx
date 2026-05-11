@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ShieldAlert, Settings, RefreshCw, Lock } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 interface LocationGuardProps {
@@ -15,49 +15,19 @@ export default function LocationGuard({ children }: LocationGuardProps) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const checkLocation = () => {
+  const checkLocation = (silent = false) => {
     if (!("geolocation" in navigator)) {
       setPermission('denied');
       setError("Trình duyệt không hỗ trợ định vị.");
       return;
     }
 
-    setPermission('loading');
+    if (!silent) setPermission('loading');
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ lat: latitude, lng: longitude });
         setPermission('granted');
-        
-        // Update user location in Firestore if logged in
-        if (user) {
-          try {
-            // Fetch address from Nominatim (OpenStreetMap)
-            let address = '';
-            try {
-              const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
-                headers: { 'Accept-Language': 'vi' }
-              });
-              if (geoRes.ok) {
-                const geoData = await geoRes.json();
-                address = geoData.display_name;
-              }
-            } catch (e) {
-              console.error("Geocoding failed:", e);
-            }
-
-            await updateDoc(doc(db, 'users', user.uid), {
-              location: {
-                lat: latitude,
-                lng: longitude,
-                address: address,
-                updatedAt: serverTimestamp()
-              }
-            });
-          } catch (err) {
-            console.error("Failed to update location in DB:", err);
-          }
-        }
       },
       (err) => {
         setPermission('denied');
@@ -73,101 +43,106 @@ export default function LocationGuard({ children }: LocationGuardProps) {
 
   useEffect(() => {
     checkLocation();
-
-    // Re-check on visibility change
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkLocation();
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => window.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user?.uid]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (user && userData && location) {
+      const updateLocation = async () => {
+        try {
+          let address = '';
+          try {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=10&addressdetails=1&email=sonlyhongduc@gmail.com`, {
+              headers: { 'Accept-Language': 'vi' }
+            });
+            if (geoRes.ok) {
+              const geoData = await geoRes.json();
+              if (mounted) address = geoData.display_name;
+            }
+          } catch (e) {
+            console.warn("Geocoding unvailable");
+          }
+          if (!mounted) return;
+          await setDoc(doc(db, 'users', user.uid), {
+            location: {
+              lat: location.lat,
+              lng: location.lng,
+              address: address,
+              updatedAt: serverTimestamp()
+            }
+          }, { merge: true });
+        } catch (err) {
+          console.error("Failed to update location in DB:", err);
+        }
+      };
+      updateLocation();
+    }
+    return () => { mounted = false; };
+  }, [user, userData, location]);
 
   if (permission === 'granted') return <>{children}</>;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-50 dark:bg-[#0a0a0b] flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[9999] bg-zinc-950 flex shadow-2xl items-center justify-center p-6 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.05),transparent_70%)]">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full glass-card p-10 rounded-[2.5rem] text-center space-y-8 shadow-2xl relative overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-[400px] w-full bg-zinc-900 border border-white/5 rounded-[2rem] p-8 md:p-10 text-center space-y-8 shadow-2xl relative overflow-hidden"
       >
-        <div className="absolute top-0 left-0 w-full h-1 bg-red-500" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full" />
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500/50 to-transparent" />
         
-        <div className="relative inline-block">
-          <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
-            <Lock className="w-10 h-10 text-red-500" />
+        <div className="relative inline-block mt-4">
+          <div className="w-20 h-20 bg-zinc-950 border border-white/10 rounded-[1.5rem] flex items-center justify-center mx-auto mb-2 shadow-inner">
+            <MapPin className="w-8 h-8 text-indigo-400 animate-pulse" />
           </div>
           <motion.div 
             animate={{ scale: [1, 1.2, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="absolute -top-1 -right-1 w-8 h-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-full flex items-center justify-center shadow-lg"
+            className="absolute -top-2 -right-2 w-8 h-8 bg-zinc-800 border border-white/5 rounded-full flex items-center justify-center shadow-lg"
           >
-            <MapPin className="w-4 h-4 text-red-500" />
+            <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
           </motion.div>
         </div>
 
-        <div className="space-y-4">
-          <h2 className="text-3xl font-display font-medium italic tracking-tight text-gradient">
-            Yêu cầu Vị trí
+        <div className="space-y-3 relative z-10">
+          <h2 className="text-2xl font-display font-medium text-white tracking-tight uppercase">
+            Xác thực vị trí
           </h2>
-          <p className="text-slate-500 font-medium leading-relaxed">
-            Để bảo vệ hệ thống và xác thực định danh, {error || "bạn cần cấp quyền truy cập vị trí chính xác để tiếp tục."}
+          <p className="text-sm font-medium text-zinc-400 leading-relaxed">
+            {error || "Yêu cầu cấp quyền truy cập vị trí cục bộ để tiếp tục đồng bộ an toàn với máy chủ."}
           </p>
         </div>
 
-        <div className="p-6 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-100 dark:border-white/5 text-left space-y-3">
-          <div className="flex items-center gap-3">
-            <Settings className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng thái xác thực</span>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Quyền GPS</p>
-              <p className={cn("text-xs font-bold italic", permission === 'denied' ? "text-red-500" : "text-amber-500")}>
-                {permission === 'denied' ? 'Bị từ chối' : 'Đang kiểm tra...'}
-              </p>
+        <div className="p-5 bg-zinc-950/50 rounded-2xl border border-white/5 text-left space-y-4 relative z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-zinc-500" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">System Logs</span>
             </div>
-            <div className="space-y-1">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tọa độ</p>
-              <p className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">Không xác định</p>
+            <div className="w-2 h-2 rounded-full bg-red-500/50 animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
+               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Status / GPS</span>
+               <span className={cn("text-[10px] font-bold uppercase tracking-widest", permission === 'denied' ? "text-red-400" : "text-amber-400")}>
+                 {permission === 'denied' ? 'DENIED' : 'LOCATING...'}
+               </span>
+            </div>
+            <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
+               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Co-ords</span>
+               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest font-mono">NULL</span>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 relative z-10">
           <button 
-            onClick={checkLocation}
-            className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold tracking-[0.2em] uppercase hover:scale-[1.02] active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3"
+            onClick={() => checkLocation()}
+            className="w-full h-14 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold tracking-[0.2em] text-[11px] uppercase transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(99,102,241,0.2)] active:scale-95"
           >
-            {permission === 'loading' ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Thử lại ngay"}
+            {permission === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Truy vấn lại"}
           </button>
-          
-          <div className="space-y-4 pt-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hướng dẫn bật vị trí:</p>
-            <div className="flex justify-center gap-6">
-              <div className="text-center group cursor-help">
-                <div className="w-10 h-10 rounded-xl glass border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-2 group-hover:border-blue-500/50 transition-colors">
-                  <span className="text-xs font-bold">iOS</span>
-                </div>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Settings → Privacy</p>
-              </div>
-              <div className="text-center group cursor-help">
-                <div className="w-10 h-10 rounded-xl glass border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-2 group-hover:border-blue-500/50 transition-colors">
-                  <span className="text-xs font-bold">Android</span>
-                </div>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Settings → Location</p>
-              </div>
-              <div className="text-center group cursor-help">
-                <div className="w-10 h-10 rounded-xl glass border border-slate-200 dark:border-white/10 flex items-center justify-center mx-auto mb-2 group-hover:border-blue-500/50 transition-colors">
-                  <span className="text-xs font-bold">PC</span>
-                </div>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Icon ổ khóa → Location</p>
-              </div>
-            </div>
-          </div>
         </div>
       </motion.div>
     </div>

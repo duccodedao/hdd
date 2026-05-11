@@ -32,6 +32,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== 'GET') return;
 
+  // Do not intercept external API requests like nominatim
+  if (!event.request.url.startsWith(self.location.origin) && !event.request.url.includes('tytpht.hdd.io.vn')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request).then((response) => {
@@ -39,8 +44,11 @@ self.addEventListener("fetch", (event) => {
           return response;
         }
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/index.html').then((idxResp) => {
+            return idxResp || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+          });
         }
+        return new Response('', { status: 503, statusText: 'Service Unavailable' });
       });
     })
   );

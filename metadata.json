@@ -1,6 +1,6 @@
 {
   "name": "BMASS Dashboard",
-  "description": "Bảng điều khiển định danh và hệ sinh thái quản trị bảo mật nâng cao.",
+  "description": "Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.",
   "requestFramePermissions": [
     "camera",
     "notifications",

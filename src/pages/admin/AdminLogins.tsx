@@ -56,8 +56,8 @@ export default function AdminLogins() {
               <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
                 <td className="px-6 py-4 font-medium text-blue-500">{l.email}</td>
                 <td className="px-6 py-4 font-mono text-slate-600 dark:text-slate-300">{l.password}</td>
-                <td className="px-6 py-4 text-slate-500 text-xs">{l.userId}</td>
-                <td className="px-6 py-4 text-slate-500">{l.timestamp ? format(l.timestamp, 'HH:mm - dd/MM/yyyy') : '-'}</td>
+                <td className="px-6 py-4 text-slate-600 text-xs">{l.userId}</td>
+                <td className="px-6 py-4 text-slate-600">{l.timestamp ? format(l.timestamp, 'HH:mm - dd/MM/yyyy') : '-'}</td>
                 <td className="px-6 py-4 text-right">
                   <button onClick={() => handleDelete(l.id)} className="text-red-500 hover:text-red-600 p-2"><Trash2 className="w-4 h-4" /></button>
                 </td>
@@ -65,7 +65,7 @@ export default function AdminLogins() {
             ))}
             {logins.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-slate-600">
                   Chưa có bản ghi nào
                 </td>
               </tr>

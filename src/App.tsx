@@ -14,25 +14,27 @@ import AuthLayout from './components/layout/AuthLayout';
 // Pages
 import LoadingScreen from './components/ui/LoadingScreen';
 import ConfirmModal from './components/ui/ConfirmModal';
+import GoogleOneTap from './components/auth/GoogleOneTap';
 import Auth from './pages/Auth';
 import AuthActionPage from './pages/AuthActionPage';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminLogin from './pages/admin/AdminLogin';
 import ComingSoon from './pages/ComingSoon';
 import NotificationsPage from './pages/NotificationsPage';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
-import MoviesPage from './pages/MoviesPage';
-import MovieDetailPage from './pages/MovieDetailPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
-import ProductsPage from './pages/ProductsPage';
-import AirdropPage from './pages/AirdropPage';
-import BanksPage from './pages/BanksPage';
-import ExchangesPage from './pages/ExchangesPage';
 import BlockedPage from './pages/BlockedPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
+import ReleaseNotesPage from './pages/ReleaseNotesPage';
+import Onboarding from './pages/Onboarding';
+import LandingPage from './pages/LandingPage';
+import FormView from './pages/FormView';
 import NotFoundPage from './pages/NotFoundPage';
-import TasksPage from './pages/TasksPage';
+import { TwoFactorChallengePage } from './pages/TwoFactorChallengePage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineNotification } from './components/ui/OfflineNotification';
 import LocationGuard from './components/guards/LocationGuard';
@@ -42,9 +44,12 @@ import { AuthActionRedirector } from './components/guards/AuthActionRedirector';
 import { RequireAuth } from './components/guards/RequireAuth';
 import { DeviceGuard } from './components/guards/DeviceGuard';
 import { TabGuard } from './components/guards/TabGuard';
+import { OnboardingGuard } from './components/guards/OnboardingGuard';
+
+import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 export default function App() {
-  const { setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
+  const { user, userData, is2FAVerified, setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
 
   useEffect(() => {
@@ -55,11 +60,20 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      (window as any).deferredPrompt = e;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     // Real-time system settings listener
     const unsubscribeSystem = onSnapshot(doc(db, 'settings', 'system'), (settingsDoc) => {
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
         setMaintenanceMode(data.maintenanceMode || false);
+        if (data.googleClientId) {
+          useAppStore.getState().setGoogleClientId(data.googleClientId);
+        }
         if (data.maintenanceTabs) {
           setMaintenanceTabs(data.maintenanceTabs);
         }
@@ -106,6 +120,7 @@ export default function App() {
       unsubscribeSystem();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices]);
 
@@ -114,12 +129,25 @@ export default function App() {
     return <LoadingScreen />;
   }
 
+  if (user && userData?.twoFactorEnabled && !is2FAVerified) {
+    return <TwoFactorChallengePage />;
+  }
+
   if (maintenanceMode && !isAdmin) {
     return <MaintenancePage />;
   }
 
   return (
-    <BrowserRouter>
+    <HelmetProvider>
+      <Helmet>
+        <title>BMASS Dashboard | Hệ sinh thái Bảo mật</title>
+        <meta name="description" content="Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa." />
+        <meta property="og:title" content="BMASS Dashboard" />
+        <meta property="og:description" content="Hệ sinh thái quản trị bảo mật nâng cao." />
+        <meta property="og:image" content="/logo.png" />
+      </Helmet>
+      <BrowserRouter>
+      <GoogleOneTap />
       <OfflineNotification />
       <AuthActionRedirector />
       <Toaster position="top-right" />
@@ -127,6 +155,12 @@ export default function App() {
       <AccessGuard>
         <ErrorBoundary>
           <Routes>
+            {/* Landing Page */}
+            <Route path="/" element={user ? <Navigate to="/utilities" replace /> : <LandingPage />} />
+            
+            {/* Standalone Form Page */}
+            <Route path="/form/:slug" element={<FormView />} />
+
             {/* Auth Routes */}
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<Auth />} />
@@ -134,36 +168,33 @@ export default function App() {
             </Route>
 
             <Route path="/auth/action" element={<AuthActionPage />} />
+            <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
+            <Route path="/admin-login" element={<AdminLogin />} />
 
             {/* Main App Routes */}
-            <Route path="/" element={<DeviceGuard><LocationGuard><MainLayout /></LocationGuard></DeviceGuard>}>
-              <Route index element={<AboutPage />} />
-              <Route path="profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
-              <Route path="utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
-              <Route path="products" element={<TabGuard tabKey="products"><ProductsPage /></TabGuard>} />
-              <Route path="banks" element={<TabGuard tabKey="banks"><BanksPage /></TabGuard>} />
-              <Route path="exchanges" element={<TabGuard tabKey="exchanges"><ExchangesPage /></TabGuard>} />
-              <Route path="movies" element={<TabGuard tabKey="movies"><MoviesPage /></TabGuard>} />
-              <Route path="movies/:slug" element={<TabGuard tabKey="movies"><MovieDetailPage /></TabGuard>} />
-              <Route path="about" element={<AboutPage />} />
-              <Route path="airdrop" element={<TabGuard tabKey="airdrop"><AirdropPage /></TabGuard>} />
-              <Route path="notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
-              <Route path="contact" element={<ContactPage />} />
+            <Route element={<DeviceGuard><LocationGuard><OnboardingGuard><MainLayout /></OnboardingGuard></LocationGuard></DeviceGuard>}>
+              <Route path="/dashboard" element={<TabGuard tabKey="dashboard"><AboutPage /></TabGuard>} />
+              <Route path="/profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
+              <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
-              <Route path="admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" />} />
+              <Route path="/admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
               
-              <Route path="blocked" element={<BlockedPage />} />
-              
-              {/* 404 */}
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="/blocked" element={<BlockedPage />} />
             </Route>
             
-            {/* Top-level catch all */}
+            {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </ErrorBoundary>
       </AccessGuard>
     </BrowserRouter>
+    </HelmetProvider>
   );
 }

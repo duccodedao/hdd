@@ -12,7 +12,13 @@ service cloud.firestore {
     function isAdmin() { 
       return isSignedIn() && (
         request.auth.token.email == 'sonlyhongduc@gmail.com' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin']
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
+      );
+    }
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'sonlyhongduc@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
       );
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -34,15 +40,21 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if (isOwner(userId) || isAdmin()) && 
-                    // Prevent users from changing their own role unless they are admin
-                    (isAdmin() || incoming().role == existing().role);
-      allow delete: if isAdmin();
+                    // Prevent users from changing their own role/status unless they are superadmin
+                    (isSuperAdmin() || (incoming().get('role', existing().get('role', 'user')) == existing().get('role', 'user') && 
+                                       incoming().get('isBanned', existing().get('isBanned', false)) == existing().get('isBanned', false) &&
+                                       incoming().get('status', existing().get('status', 'active')) == existing().get('status', 'active')));
+      allow delete: if isSuperAdmin();
+
+      match /private/security {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // SETTINGS / SYSTEM
     match /settings/{docId} {
-      allow read: if true; 
-      allow write: if isAdmin();
+      allow read: if docId == 'apiKeys' ? isSignedIn() : true; 
+      allow write: if isAdmin() && (docId != 'system' || isSuperAdmin());
     }
 
     // NOTIFICATIONS
@@ -76,6 +88,36 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if true; 
       allow delete: if isAdmin();
+    }
+
+    match /activities/{id} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /blockedIps/{ip} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // FILES
+    match /files/{fileId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+    }
+
+    // FORMS & FOLDERS
+    match /forms/{formId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /form_responses/{responseId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
   }
 }

@@ -1,22 +1,25 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCLCcgaoW9gNYhKk0c0gDWC6i5mKVTN4XE",
-  authDomain: "profile-d1214.firebaseapp.com",
-  projectId: "profile-d1214",
-  storageBucket: "profile-d1214.firebasestorage.app",
-  messagingSenderId: "914980131889",
-  appId: "1:914980131889:web:72f8da15c42dbee671b110",
-  measurementId: "G-C587M69LZW"
-};
+import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId); 
 export const storage = getStorage(app);
+
+// Test connection strictly as requested in guidelines
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if(error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Please check your Firebase configuration.");
+    }
+  }
+}
+testConnection();
 
 export enum OperationType {
   CREATE = 'create',

@@ -103,7 +103,7 @@ export default function AdminNotifications() {
               <h2 className="text-2xl font-medium text-slate-900 dark:text-white tracking-tight  italic">
                 {editingId ? 'Cập Nhật Thông Báo' : 'Tạo Thông Báo'}
               </h2>
-              <p className="text-xs font-bold text-slate-500  tracking-normal mt-1">Gửi thông báo hệ thống</p>
+              <p className="text-xs font-bold text-slate-600  tracking-normal mt-1">Gửi thông báo hệ thống</p>
             </div>
           </div>
           {editingId && (
@@ -116,7 +116,7 @@ export default function AdminNotifications() {
         <form onSubmit={handleCreateOrUpdate} className="space-y-6 max-w-2xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Tiêu đề</label>
+              <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-500 ml-1">Tiêu đề</label>
               <input 
                 value={title} 
                 onChange={e=>setTitle(e.target.value)} 
@@ -126,7 +126,7 @@ export default function AdminNotifications() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Người Nhận</label>
+              <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-500 ml-1">Người Nhận</label>
               <div className="relative">
                 <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <select 
@@ -143,7 +143,7 @@ export default function AdminNotifications() {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-400 ml-1">Nội dung</label>
+            <label className="text-[10px] font-medium  tracking-[0.2em] text-slate-500 ml-1">Nội dung</label>
             <textarea 
               rows={4} 
               value={content} 
@@ -171,7 +171,7 @@ export default function AdminNotifications() {
             <MessageSquare className="w-5 h-5 text-indigo-500" />
             Lịch sử thông báo
           </h2>
-          <span className="text-[10px] font-medium  tracking-normal text-slate-400 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg">
+          <span className="text-[10px] font-medium  tracking-normal text-slate-500 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg">
             Tổng cộng: {notifications.length}
           </span>
         </div>

@@ -16,27 +16,33 @@ interface AppState {
   setOnlineStatus: (status: boolean) => void;
   darkMode: boolean;
   toggleDarkMode: () => void;
+  googleClientId: string | null;
+  setGoogleClientId: (id: string | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  sidebarOpen: false,
+  sidebarOpen: window.innerWidth >= 1024,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),
   maintenanceMode: false,
   setMaintenanceMode: (status) => set({ maintenanceMode: status }),
   maintenanceTabs: {
+    dashboard: false,
+    profile: false,
+    utilities: false,
     tools: false,
     features: false,
     products: false,
-    utilities: false,
     games: false,
     banks: false,
     exchanges: false,
-    movies: false,
     news: false,
     tasks: false,
     airdrop: false,
-    profile: false,
+    'utility_ai-scanner': false,
+    'utility_image-to-pdf': false,
+    'utility_pdf-to-word': false,
+    'utility_find-my-device': false,
   },
   setMaintenanceTabs: (tabs) => set({ maintenanceTabs: tabs }),
   maintenanceDevices: {
@@ -64,4 +70,6 @@ export const useAppStore = create<AppState>((set) => ({
     }
     return { darkMode: nextMode };
   }),
+  googleClientId: null,
+  setGoogleClientId: (id) => set({ googleClientId: id }),
 }));

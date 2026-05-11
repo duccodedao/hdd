@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -10,14 +10,12 @@ import { format } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import { vi } from 'date-fns/locale';
 
-import AdminProducts from './AdminProducts';
 import AdminUtilities from './AdminUtilities';
 import AdminNotifications from './AdminNotifications';
-import AdminAirdrop from './AdminAirdrop';
 import AdminIpBlocking from './AdminIpBlocking';
 import AdminLogins from './AdminLogins';
-import AdminBanks from './AdminBanks';
-import AdminExchanges from './AdminExchanges';
+import AdminApiKeys from './AdminApiKeys';
+import AdminForms from './AdminForms';
 import { useConfirmStore } from '../../store/confirmStore';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
@@ -28,7 +26,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'products' | 'utilities' | 'notifications' | 'github' | 'about' | 'contacts' | 'airdrop' | 'logins' | 'banks' | 'exchanges' | 'stats'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'notifications' | 'logins' | 'contacts' | 'about' | 'stats' | 'apikeys' | 'forms'>('stats');
 
   const [noticeConfig, setNoticeConfig] = useState({
     active: false,
@@ -38,38 +36,28 @@ export default function AdminDashboard() {
   });
 
   const [contacts, setContacts] = useState<any[]>([]);
+  const [allUtilities, setAllUtilities] = useState<any[]>([]);
   const [stats, setStats] = useState({
     users: 0,
     blockedIps: 0,
-    files: 0,
     notifications: 0,
-    airdrops: 0,
-    utilities: 0
+    utilities: 0,
+    forms: 0
   });
   const [aboutConfig, setAboutConfig] = useState({
-    introTitle: 'BmassFilm - Thế giới điện ảnh trong tầm tay',
-    introDesc: 'Trải nghiệm những bộ phim chất lượng cao, cập nhật liên tục với BmassFilm. Đa dạng thể loại, tốc độ tải nhanh, giao diện thân thiện cho mọi thiết bị, mang đến trải nghiệm giải trí hoàn hảo nhất.',
-    adminName: 'BmassHD',
-    adminBio: 'Là một người đam mê công nghệ và phát triển các nền tảng số. Tôi tập trung vào xây dựng web/app đa nền tảng, tích hợp API, sử dụng Firebase và các công nghệ hiện đại để tạo ra những sản phẩm tối ưu, tiện ích và thân thiện với người dùng.',
-    adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    introTitle: 'Hệ thống - Nền tảng công nghệ toàn diện',
+    introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
+    adminName: 'Quản trị viên',
+    adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
+    adminPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     zalo: '0123456789',
     youtube: 'https://youtube.com/@your-channel',
-    email: 'contact@bmassfilm.com'
-  });
-  const [githubConfig, setGithubConfig] = useState({
-    username: '',
-    repo: '',
-    token: ''
+    email: 'contact@system.com'
   });
 
   useEffect(() => {
-    const unsubGithub = onSnapshot(doc(db, 'settings', 'github'), (doc) => {
-      if (doc.exists()) {
-        setGithubConfig(prev => ({ ...prev, ...doc.data() }));
-      }
-    });
 
     const unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
       setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -78,7 +66,7 @@ export default function AdminDashboard() {
     const unsubNotice = onSnapshot(doc(db, 'settings', 'notice'), (snap) => {
       if (snap.exists()) setNoticeConfig(prev => ({ ...prev, ...snap.data() }));
     });
-
+    
     const unsubSystem = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -95,22 +83,24 @@ export default function AdminDashboard() {
     // Stats listeners
     const unsubStatsUsers = onSnapshot(collection(db, 'users'), s => setStats(prev => ({ ...prev, users: s.size })));
     const unsubStatsIps = onSnapshot(collection(db, 'blockedIps'), s => setStats(prev => ({ ...prev, blockedIps: s.size })));
-    const unsubStatsFiles = onSnapshot(collection(db, 'files'), s => setStats(prev => ({ ...prev, files: s.size })));
     const unsubStatsNotifs = onSnapshot(collection(db, 'notifications'), s => setStats(prev => ({ ...prev, notifications: s.size })));
-    const unsubStatsAirdrops = onSnapshot(collection(db, 'airdrops'), s => setStats(prev => ({ ...prev, airdrops: s.size })));
     const unsubStatsUtils = onSnapshot(collection(db, 'utilities'), s => setStats(prev => ({ ...prev, utilities: s.size })));
+    const unsubStatsForms = onSnapshot(collection(db, 'forms'), s => setStats(prev => ({ ...prev, forms: s.size })));
+
+    const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
+      setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
     return () => {
-      unsubGithub();
       unsubContacts();
       unsubNotice();
       unsubSystem();
       unsubStatsUsers();
       unsubStatsIps();
-      unsubStatsFiles();
       unsubStatsNotifs();
-      unsubStatsAirdrops();
       unsubStatsUtils();
+      unsubStatsForms();
+      unsubAllUtils();
     };
   }, []);
 
@@ -141,16 +131,7 @@ export default function AdminDashboard() {
   };
 
   const handleReply = (email: string) => {
-    window.location.href = `mailto:${email}?subject=Phản hồi yêu cầu hỗ trợ từ Đội ngũ Chúng tôi - BmassHD`;
-  };
-
-  const saveGithubConfig = async () => {
-    try {
-      await setDoc(doc(db, 'settings', 'github'), githubConfig);
-      toast.success('Đã lưu cấu hình GitHub');
-    } catch (e) {
-      toast.error('Lỗi khi lưu cấu hình GitHub');
-    }
+    window.location.href = `mailto:${email}?subject=Phản hồi yêu cầu hỗ trợ từ Đội ngũ Quản trị`;
   };
 
   const fetchUsers = async () => {
@@ -359,18 +340,15 @@ export default function AdminDashboard() {
           {[
             { id: 'stats', label: 'Thống kê', icon: LineChart },
             { id: 'users', label: 'Người dùng', icon: Users },
+            { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
             { id: 'system', label: 'Hệ thống', icon: Settings },
-            { id: 'products', label: 'Sản phẩm', icon: Box },
+            { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'notifications', label: 'Thông báo', icon: MessageSquare },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
-            { id: 'banks', label: 'Ngân hàng ĐT', icon: Landmark },
-            { id: 'exchanges', label: 'Sàn GT ĐT', icon: LineChart },
             { id: 'logins', label: 'Tài khoản ĐN', icon: Users },
-            { id: 'github', label: 'GitHub Setup', icon: Code },
-            { id: 'about', label: 'About Setup', icon: Info },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'airdrop', label: 'Quản lý Airdrop', icon: Gift },
+            { id: 'about', label: 'Mạng xã hội & Giới thiệu', icon: Info },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -381,17 +359,17 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-4 lg:p-10 overflow-x-auto w-full">
-        <h1 className="text-3xl font-medium text-slate-900 dark:text-white mb-8  tracking-tight">
-            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', products: 'Sản phẩm', notifications: 'Thông báo', utilities: 'Tiện ích', github: 'GitHub', about: 'About', contacts: 'Yêu cầu hỗ trợ', airdrop: 'Quản lý Airdrop', logins: 'Tài khoản đăng nhập', banks: 'Ngân hàng đối tác', exchanges: 'Sàn giao dịch đối tác'}[activeTab] }
+      <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
+        <h1 className="text-2xl lg:text-3xl font-medium text-slate-900 dark:text-white mb-6 lg:mb-8 tracking-tight">
+            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', notifications: 'Thông báo', utilities: 'Tiện ích', contacts: 'Yêu cầu hỗ trợ', logins: 'Tài khoản đăng nhập', forms: 'Form & Folders', about: 'Mạng xã hội & Giới thiệu'}[activeTab as any] }
         </h1>
 
       {activeTab === 'stats' && (
-        <div className="space-y-8 pb-10">
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-8 rounded-2xl shadow-sm">
-                 <h3 className="text-lg font-medium mb-6  tracking-normal text-slate-400">Hoạt động hệ thống (14 ngày qua)</h3>
-                 <div className="h-[300px] w-full">
+        <div className="space-y-6 lg:space-y-8 pb-10">
+           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-8">
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 lg:p-8 rounded-2xl shadow-sm">
+                 <h3 className="text-sm lg:text-lg font-medium mb-4 lg:mb-6 tracking-normal text-slate-500">Hoạt động hệ thống (14 ngày qua)</h3>
+                 <div className="h-[250px] lg:h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                        <AreaChart data={activityData}>
                           <defs>
@@ -412,9 +390,9 @@ export default function AdminDashboard() {
                  </div>
               </div>
 
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-8 rounded-2xl shadow-sm">
-                 <h3 className="text-lg font-medium mb-6  tracking-normal text-slate-400">Cơ cấu người dùng</h3>
-                 <div className="h-[300px] w-full">
+              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 lg:p-8 rounded-2xl shadow-sm">
+                 <h3 className="text-sm lg:text-lg font-medium mb-4 lg:mb-6 tracking-normal text-slate-500">Cơ cấu người dùng</h3>
+                 <div className="h-[250px] lg:h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                        <PieChart>
                           <Pie
@@ -439,23 +417,27 @@ export default function AdminDashboard() {
            </div>
 
            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-8 rounded-2xl shadow-sm">
-              <h3 className="text-lg font-medium mb-6  tracking-normal text-slate-400">Dữ liệu tổng quát</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <h3 className="text-lg font-medium mb-6  tracking-normal text-slate-500">Dữ liệu tổng quát</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-5 gap-6">
                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-400  tracking-normal mb-1">Tổng thành viên</p>
+                    <p className="text-[10px] font-medium text-slate-500  tracking-normal mb-1">Tổng thành viên</p>
                     <p className="text-3xl font-medium text-slate-900 dark:text-white">{stats.users}</p>
                  </div>
                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-400  tracking-normal mb-1">IP bị chặn</p>
+                    <p className="text-[10px] font-medium text-slate-500  tracking-normal mb-1">IP bị chặn</p>
                     <p className="text-3xl font-medium text-rose-500">{stats.blockedIps}</p>
                  </div>
                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-400  tracking-normal mb-1">Thông báo</p>
+                    <p className="text-[10px] font-medium text-slate-500  tracking-normal mb-1">Thông báo</p>
                     <p className="text-3xl font-medium text-blue-500">{stats.notifications}</p>
                  </div>
                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-400  tracking-normal mb-1">Dữ liệu hệ thống</p>
-                    <p className="text-3xl font-medium text-emerald-500">{stats.files}</p>
+                    <p className="text-[10px] font-medium text-slate-500  tracking-normal mb-1">Hệ thống</p>
+                    <p className="text-3xl font-medium text-emerald-500">{stats.utilities}</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
+                    <p className="text-[10px] font-medium text-slate-500  tracking-normal mb-1">Folders/Form</p>
+                    <p className="text-3xl font-medium text-purple-500">{stats.forms}</p>
                  </div>
               </div>
            </div>
@@ -470,7 +452,7 @@ export default function AdminDashboard() {
               <Info className="w-6 h-6 text-blue-500" /> Cấu hình trang Giới thiệu (About)
             </h3>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                {/* Left: Thông tin chung */}
                <div className="space-y-4">
                   <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Thông tin chung website</h4>
@@ -593,59 +575,88 @@ export default function AdminDashboard() {
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
               <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                <MessageSquare className="w-5 h-5 text-rose-500" /> Danh sách yêu cầu hỗ trợ
+                <MessageSquare className="w-5 h-5 text-rose-500" /> Hệ thống Phản hồi & Liên hệ
               </h2>
+              <div className="px-3 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full">
+                {contacts.length} hội thoại
+              </div>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {contacts.length > 0 ? contacts.map((req) => (
-                <div key={req.id} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-6 rounded-2xl relative group flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
-                           {req.name.charAt(0)}
-                         </div>
-                         <div>
-                           <h4 className="font-bold text-slate-900 dark:text-white">{req.name}</h4>
-                           <p className="text-xs text-slate-500">{req.email}</p>
+            
+            <div className="p-6">
+              {contacts.length > 0 ? (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {contacts.map((req) => (
+                    <div key={req.id} className="group relative bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 transition-all hover:bg-slate-100 dark:hover:bg-white-[0.07] overflow-hidden">
+                      {/* Decorative gradient */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
+                      
+                      <div className="flex items-start justify-between relative z-10 gap-4">
+                        <div className="flex gap-4">
+                           <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 flex items-center justify-center font-bold text-xl text-indigo-500 shadow-sm">
+                             {req.name.charAt(0)}
+                           </div>
+                           <div className="space-y-1">
+                             <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">{req.name}</h4>
+                             <div className="flex items-center gap-2">
+                               <p className="text-xs text-slate-500 font-medium">{req.email}</p>
+                               <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/10" />
+                               <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">{format(toSafeDate(req.createdAt), 'dd/MM/yyyy')}</span>
+                             </div>
+                           </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => handleReply(req.email)}
+                            className="w-10 h-10 flex items-center justify-center bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm"
+                            title="Phản hồi Email"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteContact(req.id)}
+                            className="w-10 h-10 flex items-center justify-center bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 relative">
+                         <div className="absolute left-[-10px] top-4 bottom-4 w-[2px] bg-indigo-500/20" />
+                         <div className="bg-white dark:bg-zinc-900/50 p-6 rounded-2xl border border-slate-100 dark:border-white/5 relative">
+                            {/* Message bubble tail */}
+                            <div className="absolute left-[-6px] top-6 w-3 h-3 bg-white dark:bg-[#1a1a1e] border-l border-b border-slate-100 dark:border-white/5 rotate-45" />
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                              {req.message}
+                            </p>
                          </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => handleReply(req.email)}
-                          className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
-                          title="Trả lời qua Email"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => deleteContact(req.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+
+                      <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">
+                         <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3" />
+                            {format(toSafeDate(req.createdAt), 'HH:mm')}
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Encrypted Channel
+                         </div>
                       </div>
                     </div>
-                    <div className="p-4 bg-white dark:bg-white/5 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed italic border border-slate-100 dark:border-white/5 mb-3">
-                      "{req.message}"
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-medium pt-3 border-t border-slate-100 dark:border-white/5">
-                    Gửi lúc: {format(toSafeDate(req.createdAt), 'HH:mm - dd/MM/yyyy')}
-                  </div>
+                  ))}
                 </div>
-              )) : (
-                <div className="col-span-full py-12 text-center text-slate-500">Chưa có yêu cầu nào.</div>
+              ) : (
+                <div className="py-32 text-center">
+                   <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <MessageSquare className="w-8 h-8 text-slate-300 dark:text-white/10" />
+                   </div>
+                   <p className="text-slate-500 font-medium">Hộp thư đang trống</p>
+                </div>
               )}
             </div>
           </div>
-        </motion.div>
-      )}
-
-      {activeTab === 'products' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminProducts />
         </motion.div>
       )}
 
@@ -655,81 +666,21 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
-      {activeTab === 'banks' && (
+      {activeTab === 'forms' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminBanks />
+          <AdminForms />
         </motion.div>
       )}
 
-      {activeTab === 'exchanges' && (
+      {activeTab === 'apikeys' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminExchanges />
+          <AdminApiKeys />
         </motion.div>
       )}
 
       {activeTab === 'notifications' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminNotifications />
-        </motion.div>
-      )}
-
-      {activeTab === 'github' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-              <Code className="w-6 h-6 text-slate-800 dark:text-white" />
-              GitHub Repository Setup
-            </h3>
-            
-            <div className="space-y-4 max-w-2xl">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">GitHub Username</label>
-                <input 
-                  type="text" 
-                  value={githubConfig.username}
-                  onChange={(e) => setGithubConfig({...githubConfig, username: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. duclsh"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Repository Name</label>
-                <input 
-                  type="text" 
-                  value={githubConfig.repo}
-                  onChange={(e) => setGithubConfig({...githubConfig, repo: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. cdn-storage"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Personal Access Token (PAT)</label>
-                <input 
-                  type="password" 
-                  value={githubConfig.token}
-                  onChange={(e) => setGithubConfig({...githubConfig, token: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="ghp_xxxxxxxxxxxx"
-                />
-                <p className="text-[11px] text-slate-500 mt-2 italic">
-                  Token này được dùng để upload ảnh (Avatar, Banner) và Files lên GitHub làm CDN.
-                </p>
-              </div>
-              
-              <button 
-                onClick={saveGithubConfig}
-                className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity"
-              >
-                Lưu cấu hình
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {activeTab === 'airdrop' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminAirdrop />
         </motion.div>
       )}
 
@@ -753,14 +704,15 @@ export default function AdminDashboard() {
               <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
             ) : (
               <table className="w-full text-left border-collapse min-w-[1000px]">
-                <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
+                <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600">
                   <tr>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500">Tài khoản</th>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500">Vai trò</th>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500">Trạng thái</th>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500">IP / Vị trí</th>
-                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-500 text-right">Quản trị</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">Tài khoản</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">Số điện thoại</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">Vai trò</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">Trạng thái</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">Đăng nhập lần cuối</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600">IP / Vị trí</th>
+                    <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-slate-600 text-right">Quản trị</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
@@ -782,6 +734,11 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                          {u.phoneNumber || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 text-[10px]  font-bold rounded-full ${u.role?.includes('admin') ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                           {u.role}
                         </span>
@@ -794,12 +751,12 @@ export default function AdminDashboard() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
                         <div className="text-xs">
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-500 min-w-[200px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[200px]">
                         <div className="text-[11px] leading-relaxed">
                           <div className="flex items-center gap-1.5 text-blue-500 font-bold mb-0.5">
                             <Globe className="w-3 h-3" />
@@ -817,7 +774,7 @@ export default function AdminDashboard() {
                                 <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
                               </div>
                               {u.location.address ? (
-                                <div className="text-[10px] text-slate-500 mt-1 line-clamp-2 italic leading-tight">
+                                <div className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic leading-tight">
                                   {u.location.address}
                                 </div>
                               ) : (
@@ -876,13 +833,12 @@ export default function AdminDashboard() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           {/* Quick Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {[
-              { label: 'Người dùng', value: stats.users, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-              { label: 'IP Bị chặn', value: stats.blockedIps, icon: ShieldAlert, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-              { label: 'Thông báo', value: stats.notifications, icon: Bell, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-              { label: 'Airdrops', value: stats.airdrops, icon: Gift, color: 'text-pink-500', bg: 'bg-pink-500/10' },
-              { label: 'Tiện ích', value: stats.utilities, icon: Box, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-            ].map((s, i) => (
+              {[
+                { label: 'Người dùng', value: stats.users, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                { label: 'IP Bị chặn', value: stats.blockedIps, icon: ShieldAlert, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+                { label: 'Thông báo', value: stats.notifications, icon: Bell, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                { label: 'Tiện ích', value: stats.utilities, icon: Box, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+              ].map((s, i) => (
               <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
                   <s.icon className={`w-5 h-5 ${s.color}`} />
@@ -937,7 +893,8 @@ export default function AdminDashboard() {
                   </div>
                   <button 
                     onClick={() => toggleDeviceMaintenance(dev.key as any)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceDevices[dev.key as keyof typeof maintenanceDevices] ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    disabled={!isSuperAdmin}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${maintenanceDevices[dev.key as keyof typeof maintenanceDevices] ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceDevices[dev.key as keyof typeof maintenanceDevices] ? 'translate-x-6' : 'translate-x-1'}`}/>
                   </button>
@@ -952,15 +909,11 @@ export default function AdminDashboard() {
               Bảo trì từng tính năng
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
               {[
-                { key: 'profile', label: 'Hồ sơ Cá nhân', icon: UserCircle, page: 'Profile.tsx' },
-                { key: 'products', label: 'Cửa hàng Sản phẩm', icon: Box, page: 'ProductsPage.tsx' },
-                { key: 'utilities', label: 'Tiện ích Web', icon: Wrench, page: 'UtilitiesPage.tsx' },
-                { key: 'banks', label: 'Cổng Ngân hàng', icon: Landmark, page: 'BanksPage.tsx' },
-                { key: 'exchanges', label: 'Sàn Giao dịch', icon: LineChart, page: 'ExchangesPage.tsx' },
-                { key: 'movies', label: 'Phim ảnh (Cinema)', icon: Play, page: 'MoviesPage.tsx' },
-                { key: 'airdrop', label: 'Sự kiện Phần thưởng', icon: Gift, page: 'AirdropPage.tsx' },
+                { key: 'dashboard', label: 'Trang Tổng quan', icon: Layout, page: 'Trang chủ' },
+                { key: 'profile', label: 'Hồ sơ / Tài khoản', icon: UserCircle, page: 'Hệ thống' },
+                { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
               ].map((tab) => (
                 <div key={tab.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -974,15 +927,84 @@ export default function AdminDashboard() {
                   </div>
                   <button 
                     onClick={() => toggleTabMaintenance(tab.key)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${maintenanceTabs[tab.key] ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    disabled={!isSuperAdmin}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${maintenanceTabs[tab.key] ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs[tab.key] ? 'translate-x-6' : 'translate-x-1'}`}/>
                   </button>
                 </div>
               ))}
             </div>
+
+            <div className="mt-8 mb-4 flex items-center gap-2">
+               <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
+               <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Tiện ích hệ thống (Mặc định)</span>
+               <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {[
+                { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
+                { id: 'image-to-pdf', title: 'Ảnh sang PDF', icon: FileImage },
+                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText },
+                { id: 'find-my-device', title: 'Định Vị Thiết Bị', icon: Box }
+              ].map((util) => (
+                <div key={util.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                      <util.icon className="w-4 h-4" />
+                    </div>
+                    <div className="truncate">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-[11px] truncate">{util.title}</h4>
+                      <p className="text-[9px] text-slate-500 italic">Core Utility</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
+                    disabled={!isSuperAdmin}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {allUtilities.length > 0 && (
+              <>
+                <div className="mt-8 mb-4 flex items-center gap-2">
+                   <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
+                   <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em]">Tiện ích mở rộng (Cài đặt)</span>
+                   <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                   {allUtilities.map((util) => (
+                      <div key={util.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                            <Box className="w-4 h-4" />
+                          </div>
+                          <div className="truncate">
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] truncate">{util.title}</h4>
+                            <p className="text-[9px] text-slate-500 italic">ID: {util.id.slice(0, 8)}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
+                          disabled={!isSuperAdmin}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        >
+                          <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
+                        </button>
+                      </div>
+                   ))}
+                </div>
+              </>
+            )}
             
-            <p className="text-xs text-slate-500 mt-6">
+            <p className="text-xs text-slate-500 mt-6 md:flex items-center gap-2">
+              <Info className="w-4 h-4 text-amber-500" />
               Khi bật bảo trì, chỉ có tài khoản Quản trị viên mới truy cập được tab tương ứng.
             </p>
           </div>
@@ -1008,7 +1030,8 @@ export default function AdminDashboard() {
                     </div>
                     <button 
                         onClick={() => toggleBlockedDevice(dev.key as any)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${blockedDevices[dev.key as keyof typeof blockedDevices] ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        disabled={!isSuperAdmin}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${blockedDevices[dev.key as keyof typeof blockedDevices] ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'}`}
                     >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${blockedDevices[dev.key as keyof typeof blockedDevices] ? 'translate-x-6' : 'translate-x-1'}`}/>
                     </button>

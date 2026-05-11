@@ -25,15 +25,15 @@ export default function ComingSoon({ title }: { title: string }) {
         <h1 className="text-3xl md:text-5xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-400">
           {title}
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mb-10 text-lg leading-relaxed">
-          Tính năng này đang được phát triển và tối ưu hóa. Chúng tôi sẽ sớm ra mắt phiên bản hoàn thiện nhất. Cảm ơn tài khoản bmassHD đã tin tưởng!
+        <p className="text-zinc-400 mb-10 text-lg leading-relaxed">
+          Tính năng này đang được phát triển và tối ưu hóa. Chúng tôi sẽ sớm ra mắt phiên bản hoàn thiện nhất. Xin chân thành cảm ơn!
         </p>
         
         <button 
           onClick={() => navigate(-1)}
-          className="group flex items-center gap-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-bold hover:scale-105 active:scale-95 transition shadow-xl"
+          className="group flex items-center gap-3 bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-zinc-200 uppercase tracking-widest text-[10px] active:scale-95 transition mx-auto shadow-xl"
         >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Quay lại ngay
         </button>
       </div>

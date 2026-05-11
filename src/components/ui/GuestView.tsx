@@ -34,7 +34,7 @@ export default function GuestView({
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="absolute inset-x-0 inset-y-0 flex items-center justify-center z-10 px-6 py-12"
+        className="absolute inset-x-0 top-0 bottom-0 flex items-start justify-center z-10 px-6 pt-24"
       >
         <div className="glass-card bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-8 md:p-12 text-center max-w-lg shadow-2xl overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl -mr-16 -mt-16 pointer-events-none" />

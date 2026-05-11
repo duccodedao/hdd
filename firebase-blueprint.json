@@ -1,4 +1,76 @@
 {
-  "entities": {},
-  "firestore": {}
+  "entities": {
+    "Form": {
+      "title": "Form",
+      "description": "Metadata and question structure for a dynamic form (folder)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "type": { "enum": ["text", "textarea", "number", "date", "select"] },
+              "required": { "type": "boolean" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "role": { "enum": ["standard", "primary", "prefilled"] }
+            }
+          }
+        },
+        "hasDataset": { "type": "boolean" },
+        "dataset": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "slug", "questions", "createdAt", "createdBy"]
+    },
+    "FormResponse": {
+      "title": "Form Response",
+      "description": "User submitted answers for a specific form",
+      "type": "object",
+      "properties": {
+        "formId": { "type": "string" },
+        "formSlug": { "type": "string" },
+        "answers": { "type": "object" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["formId", "formSlug", "answers", "submittedAt"]
+    },
+    "FileMetadata": {
+      "title": "File Metadata",
+      "description": "Metadata for files uploaded to Firebase Storage",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "path": { "type": "string" },
+        "size": { "type": "number" },
+        "type": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" },
+        "uploadedBy": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "url", "path", "size", "type", "uploadedAt", "userId"]
+    }
+  },
+  "firestore": {
+    "forms": {
+      "schema": "Form",
+      "description": "Store all dynamic forms (folders)"
+    },
+    "form_responses": {
+      "schema": "FormResponse",
+      "description": "Store all user responses for forms"
+    },
+    "files": {
+      "schema": "FileMetadata",
+      "description": "Store metadata of all uploaded files"
+    }
+  }
 }
