@@ -33,7 +33,7 @@ async function startServer() {
 
   // Zalo Webhook Endpoint
   app.post("/api/zalo/webhook", async (req, res) => {
-    // console.log("Zalo Webhook Event:", JSON.stringify(req.body, null, 2));
+    console.log("[ZaloWebhook] Incoming request body:", JSON.stringify(req.body));
     const event = req.body;
     const secretTokenHeader = req.headers["x-bot-api-secret-token"];
 
@@ -52,8 +52,16 @@ async function startServer() {
       const zaloPlatformBotToken = zaloConfig.botToken; // New Bot Platform Token
       const zaloWebhookSecret = zaloConfig.webhookSecret; // Secret Token for validation
 
+      console.log("[ZaloWebhook] Config check:", { 
+        hasGeminiKey: !!geminiApiKey, 
+        hasOA: !!zaloAccessToken, 
+        hasPlatformBot: !!zaloPlatformBotToken,
+        hasSecret: !!zaloWebhookSecret 
+      });
+
       // Verify secret token if configured
       if (zaloWebhookSecret && secretTokenHeader !== zaloWebhookSecret) {
+        console.warn("[ZaloWebhook] Unauthorized: Secret token mismatch");
         return res.status(401).send("Unauthorized");
       }
 
@@ -64,21 +72,35 @@ async function startServer() {
       // Detect Event Source
       if (event.event_name === "user_send_text") {
         // Zalo OA Event
-        senderId = event.sender.id;
-        userMessage = event.message.text;
+        senderId = event.sender?.id;
+        userMessage = event.message?.text;
+        console.log("[ZaloWebhook] Type: Legacy OA", { senderId, userMessage });
       } else if (event.message && event.message.chat_id) {
-        // Potential New Platform Bot Event (Assuming standard structure if not explicitly shown)
+        // New Platform Bot Event
         senderId = event.message.chat_id;
         userMessage = event.message.text;
         isPlatformBot = true;
+        console.log("[ZaloWebhook] Type: Platform Bot (Nested)", { senderId, userMessage });
       } else if (event.chat_id && event.text) {
         // Alternate structure for new platform
         senderId = event.chat_id;
         userMessage = event.text;
         isPlatformBot = true;
+        console.log("[ZaloWebhook] Type: Platform Bot (Root)", { senderId, userMessage });
+      } else if (event.from?.id && event.text) {
+        // Another common platform structure
+        senderId = event.from.id;
+        userMessage = event.text;
+        isPlatformBot = true;
+        console.log("[ZaloWebhook] Type: Platform Bot (From)", { senderId, userMessage });
       }
 
-      if (senderId && userMessage && geminiApiKey) {
+      if (senderId && userMessage) {
+        if (!geminiApiKey) {
+          console.error("[ZaloWebhook] Gemini API Key is missing. Cannot reply.");
+          return res.status(200).send("OK");
+        }
+
         const utilities = productsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
         const baseUrl = req.protocol + "://" + req.get("host");
         const utilityContext = utilities.map(u => `- ${u.title}: ${u.description} (Link: ${baseUrl}/utilities?id=${u.id})`).join("\n");
@@ -95,24 +117,29 @@ async function startServer() {
           Trả lời bằng Tiếng Việt.
         `;
 
-        const genAI = new GoogleGenAI(geminiApiKey) as any;
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const aiResponse = response.text() || "Xin lỗi, hiện tại tôi gặp sự cố khi xử lý yêu cầu.";
+        console.log("[ZaloWebhook] Reasoning with Gemini...");
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt
+        });
+        
+        const aiResponse = response.text || "Xin lỗi, hiện tại tôi gặp sự cố khi xử lý yêu cầu.";
+        console.log("[ZaloWebhook] AI Response:", aiResponse.substring(0, 50) + "...");
 
         if (isPlatformBot && zaloPlatformBotToken) {
-          // Send back via New Bot Platform API
-          await axios.post(
+          console.log("[ZaloWebhook] Sending reply via Platform Bot API");
+          const replyRes = await axios.post(
             `https://bot-api.zaloplatforms.com/bot${zaloPlatformBotToken}/sendMessage`,
             {
               chat_id: senderId,
               text: aiResponse
             }
           );
+          console.log("[ZaloWebhook] Platform Bot Reply Status:", replyRes.data);
         } else if (zaloAccessToken) {
-          // Send back via OA API
-          await axios.post(
+          console.log("[ZaloWebhook] Sending reply via Legacy OA API");
+          const replyRes = await axios.post(
             "https://openapi.zalo.me/v2.0/oa/message",
             {
               recipient: { user_id: senderId },
@@ -125,10 +152,15 @@ async function startServer() {
               }
             }
           );
+          console.log("[ZaloWebhook] OA Reply Status:", replyRes.data);
+        } else {
+          console.warn("[ZaloWebhook] No bot token/access token configured to send reply.");
         }
+      } else {
+        console.warn("[ZaloWebhook] Could not detect senderId or userMessage in event.");
       }
-    } catch (error) {
-      console.error("Zalo Webhook AI Error:", error);
+    } catch (error: any) {
+      console.error("[ZaloWebhook] Critical Error:", error.response?.data || error.message);
     }
 
     res.status(200).send("OK");
