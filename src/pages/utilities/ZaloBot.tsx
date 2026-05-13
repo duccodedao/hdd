@@ -70,7 +70,9 @@ export default function ZaloBot() {
       try {
         data = JSON.parse(responseText);
       } catch (e) {
-        throw new Error(`Server returned invalid response: ${responseText.substring(0, 50)}...`);
+        console.error('Invalid JSON from server:', responseText);
+        const preview = responseText.substring(0, 100).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        throw new Error(`Server returned invalid response (first 100 chars): ${preview}`);
       }
 
       if (data.ok) {
