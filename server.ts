@@ -139,29 +139,48 @@ async function startServer() {
     const { method } = req.params;
     const { botToken, ...payload } = req.body;
 
+    console.log(`[ZaloProxy] Requesting ${method} for botToken: ${botToken?.substring(0, 5)}...`);
+
     if (!botToken) {
+      console.warn("[ZaloProxy] Missing botToken");
       return res.status(400).json({ ok: false, description: "Missing botToken" });
     }
 
     try {
+      const cleanToken = botToken.trim();
+      const url = `https://bot-api.zaloplatforms.com/bot${cleanToken}/${method}`;
+      
+      console.log(`[ZaloProxy] Forwarding to: ${url}`);
+      
       const response = await axios.post(
-        `https://bot-api.zaloplatforms.com/bot${botToken}/${method}`,
+        url,
         payload,
         { 
           headers: { "Content-Type": "application/json" },
           timeout: 10000 
         }
       );
+      
+      console.log(`[ZaloProxy] Success:`, response.data);
       res.json(response.data);
     } catch (error: any) {
-      console.error(`Zalo Proxy Error (${method}):`, error.response?.data || error.message);
-      
       const status = error.response?.status || 500;
-      const errorData = error.response?.data || { 
-        ok: false, 
-        description: error.message,
-        error_code: -1
-      };
+      const responseData = error.response?.data;
+      
+      console.error(`[ZaloProxy] Error (${method}):`, {
+        status,
+        message: error.message,
+        data: responseData
+      });
+      
+      // Ensure we always return a JSON object even if Zalo returns HTML or something else
+      const errorData = (typeof responseData === 'object' && responseData !== null) 
+        ? responseData 
+        : { 
+            ok: false, 
+            description: typeof responseData === 'string' ? responseData : error.message,
+            error_code: -1
+          };
       
       res.status(status).json(errorData);
     }
