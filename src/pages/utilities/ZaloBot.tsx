@@ -54,11 +54,12 @@ export default function ZaloBot() {
 
     setSettingWebhook(true);
     try {
-      // Direct call to Zalo Bot API (might hit CORS if not proxied, but following documented structure)
-      const response = await fetch(`https://bot-api.zaloplatforms.com/bot${config.botToken}/setWebhook`, {
+      // Use Backend Proxy instead of direct call to avoid CORS
+      const response = await fetch('/api/zalo/proxy/setWebhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          botToken: config.botToken,
           url: webhookUrl,
           secret_token: config.webhookSecret
         })
@@ -71,7 +72,7 @@ export default function ZaloBot() {
         toast.error(`Lỗi: ${data.description || 'Không xác định'}`);
       }
     } catch (error) {
-      toast.error('Lỗi khi gọi API Zalo. Có thể do CORS, vui lòng cấu hình thủ công trên portal Zalo.');
+      toast.error('Lỗi khi thiết lập Webhook qua server.');
     } finally {
       setSettingWebhook(false);
     }
@@ -94,24 +95,23 @@ export default function ZaloBot() {
     try {
       let response;
       if (botToken) {
-        // Test via New Bot Platform
-        response = await fetch(`https://bot-api.zaloplatforms.com/bot${botToken}/sendMessage`, {
+        // Test via New Bot Platform Proxy
+        response = await fetch('/api/zalo/proxy/sendMessage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            botToken: botToken,
             chat_id: testId,
             text: testMessage
           })
         });
       } else {
-        // Test via Legacy OA
-        response = await fetch('https://openapi.zalo.me/v2.0/oa/message', {
+        // Test via Legacy OA Proxy
+        response = await fetch('/api/zalo/oa-proxy/message', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'access_token': oaToken || ''
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            accessToken: oaToken || '',
             recipient: { user_id: testId },
             message: { text: testMessage }
           })
@@ -127,7 +127,7 @@ export default function ZaloBot() {
       }
     } catch (error) {
       console.error('Zalo API Error:', error);
-      toast.error('Không thể kết nối đến Zalo API. Có thể do CORS hoặc Token hết hạn.');
+      toast.error('Lỗi khi gửi tin nhắn qua server.');
     } finally {
       setSending(false);
     }

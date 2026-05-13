@@ -136,6 +136,54 @@ async function startServer() {
     res.status(200).send("OK");
   });
 
+  // Proxy for Zalo Platform Bot APIs (Avoid CORS)
+  app.post("/api/zalo/proxy/:method", async (req, res) => {
+    const { method } = req.params;
+    const { botToken, ...payload } = req.body;
+
+    if (!botToken) {
+      return res.status(400).json({ ok: false, description: "Missing botToken" });
+    }
+
+    try {
+      const response = await axios.post(
+        `https://bot-api.zaloplatforms.com/bot${botToken}/${method}`,
+        payload
+      );
+      res.json(response.data);
+    } catch (error: any) {
+      console.error(`Zalo Proxy Error (${method}):`, error.response?.data || error.message);
+      res.status(error.response?.status || 500).json(error.response?.data || { ok: false, description: error.message });
+    }
+  });
+
+  // Proxy for Zalo OA APIs (Legacy)
+  app.post("/api/zalo/oa-proxy/:method", async (req, res) => {
+    const { method } = req.params;
+    const { accessToken, ...payload } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: "Missing accessToken" });
+    }
+
+    try {
+      const response = await axios.post(
+        `https://openapi.zalo.me/v2.0/oa/${method}`,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "access_token": accessToken
+          }
+        }
+      );
+      res.json(response.data);
+    } catch (error: any) {
+      console.error(`Zalo OA Proxy Error (${method}):`, error.response?.data || error.message);
+      res.status(error.response?.status || 500).json(error.response?.data || { error: -1, message: error.message });
+    }
+  });
+
   // Telegram Auth Endpoint
   app.post("/api/auth/telegram", async (req, res) => {
     const { hash, ...data } = req.body;
