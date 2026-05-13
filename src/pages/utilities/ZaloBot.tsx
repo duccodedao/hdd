@@ -55,7 +55,7 @@ export default function ZaloBot() {
     setSettingWebhook(true);
     try {
       // Use Backend Proxy instead of direct call to avoid CORS
-      const response = await fetch('/api/zalo/proxy/setWebhook', {
+      const response = await fetch('/api/zalo-bot/setWebhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,7 +113,7 @@ export default function ZaloBot() {
       let response;
       if (botToken) {
         // Test via New Bot Platform Proxy
-        response = await fetch('/api/zalo/proxy/sendMessage', {
+        response = await fetch('/api/zalo-bot/sendMessage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -124,7 +124,7 @@ export default function ZaloBot() {
         });
       } else {
         // Test via Legacy OA Proxy
-        response = await fetch('/api/zalo/oa-proxy/message', {
+        response = await fetch('/api/zalo-oa/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
