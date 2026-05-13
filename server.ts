@@ -83,7 +83,6 @@ async function startServer() {
         const baseUrl = req.protocol + "://" + req.get("host");
         const utilityContext = utilities.map(u => `- ${u.title}: ${u.description} (Link: ${baseUrl}/utilities?id=${u.id})`).join("\n");
 
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
         const prompt = `
           Bạn là trợ lý AI thông minh của hệ thống Nucleus OS (BMASS).
           Nhiệm vụ: Trả lời tin nhắn của người dùng một cách thân thiện, chuyên nghiệp.
@@ -96,12 +95,11 @@ async function startServer() {
           Trả lời bằng Tiếng Việt.
         `;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: prompt
-        });
-        
-        const aiResponse = response.text || "Xin lỗi, hiện tại tôi gặp sự cố khi xử lý yêu cầu.";
+        const genAI = new GoogleGenAI(geminiApiKey) as any;
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const aiResponse = response.text() || "Xin lỗi, hiện tại tôi gặp sự cố khi xử lý yêu cầu.";
 
         if (isPlatformBot && zaloPlatformBotToken) {
           // Send back via New Bot Platform API
@@ -148,12 +146,24 @@ async function startServer() {
     try {
       const response = await axios.post(
         `https://bot-api.zaloplatforms.com/bot${botToken}/${method}`,
-        payload
+        payload,
+        { 
+          headers: { "Content-Type": "application/json" },
+          timeout: 10000 
+        }
       );
       res.json(response.data);
     } catch (error: any) {
       console.error(`Zalo Proxy Error (${method}):`, error.response?.data || error.message);
-      res.status(error.response?.status || 500).json(error.response?.data || { ok: false, description: error.message });
+      
+      const status = error.response?.status || 500;
+      const errorData = error.response?.data || { 
+        ok: false, 
+        description: error.message,
+        error_code: -1
+      };
+      
+      res.status(status).json(errorData);
     }
   });
 

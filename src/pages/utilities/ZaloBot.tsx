@@ -65,14 +65,22 @@ export default function ZaloBot() {
         })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Server returned invalid response: ${responseText.substring(0, 50)}...`);
+      }
+
       if (data.ok) {
         toast.success('Đã thiết lập Webhook thành công!');
       } else {
-        toast.error(`Lỗi: ${data.description || 'Không xác định'}`);
+        toast.error(`Lỗi từ Zalo: ${data.description || 'Không xác định'}`);
       }
-    } catch (error) {
-      toast.error('Lỗi khi thiết lập Webhook qua server.');
+    } catch (error: any) {
+      console.error('Webhook Setup Error:', error);
+      toast.error(`Lỗi: ${error.message || 'Không thể thiết lập Webhook qua server.'}`);
     } finally {
       setSettingWebhook(false);
     }
