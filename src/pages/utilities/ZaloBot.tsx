@@ -39,7 +39,7 @@ export default function ZaloBot() {
     fetchConfig();
   }, []);
 
-  const webhookUrl = `${window.location.origin}/api/zalo/webhook`;
+  const webhookUrl = 'https://slhd.id.vn/api/zalo/webhook';
 
   const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
@@ -55,7 +55,7 @@ export default function ZaloBot() {
     setSettingWebhook(true);
     try {
       // Use Backend Proxy instead of direct call to avoid CORS
-      const response = await fetch('/api/zalo/proxy/setWebhook', {
+      const response = await fetch('/api/zalo-bot/setWebhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -66,11 +66,20 @@ export default function ZaloBot() {
       });
 
       const responseText = await response.text();
+      console.log('Zalo Proxy Response Status:', response.status);
+      console.log('Zalo Proxy Response Body:', responseText);
+
+      if (!responseText) {
+        throw new Error(`Server returned an empty response (Status: ${response.status})`);
+      }
+
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (e) {
-        throw new Error(`Server returned invalid response: ${responseText.substring(0, 50)}...`);
+        console.error('Invalid JSON from server:', responseText);
+        const preview = responseText.substring(0, 100).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        throw new Error(`Server returned invalid JSON (Status: ${response.status}). Preview: ${preview}`);
       }
 
       if (data.ok) {
@@ -104,7 +113,7 @@ export default function ZaloBot() {
       let response;
       if (botToken) {
         // Test via New Bot Platform Proxy
-        response = await fetch('/api/zalo/proxy/sendMessage', {
+        response = await fetch('/api/zalo-bot/sendMessage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -115,7 +124,7 @@ export default function ZaloBot() {
         });
       } else {
         // Test via Legacy OA Proxy
-        response = await fetch('/api/zalo/oa-proxy/message', {
+        response = await fetch('/api/zalo-oa/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -126,7 +135,19 @@ export default function ZaloBot() {
         });
       }
       
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error(`Server returned an empty response (Status: ${response.status})`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Invalid JSON from server:', responseText);
+        throw new Error(`Server returned invalid JSON (Status: ${response.status})`);
+      }
+
       if (data.ok || data.error === 0) {
         toast.success('Đã gửi tin nhắn test thành công!');
         setTestMessage('');

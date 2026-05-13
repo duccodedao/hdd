@@ -348,9 +348,9 @@ export default function AdminApiKeys() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Webhook URL Hiện tại</label>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Webhook URL Mặc định</label>
                   <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-xs dark:text-zinc-400 font-mono break-all">
-                    {window.location.origin}/api/zalo/webhook
+                    https://slhd.id.vn/api/zalo/webhook
                   </div>
                 </div>
               </div>

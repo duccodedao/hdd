@@ -135,40 +135,64 @@ async function startServer() {
   });
 
   // Proxy for Zalo Platform Bot APIs (Avoid CORS)
-  app.post("/api/zalo/proxy/:method", async (req, res) => {
+  app.all("/api/zalo-bot/:method", async (req, res) => {
     const { method } = req.params;
+    
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+
+    if (req.method !== "POST") {
+      return res.status(405).json({ ok: false, description: "Only POST method is allowed" });
+    }
+
     const { botToken, ...payload } = req.body;
+
+    console.log(`[ZaloBotProxy] Method: ${method}, hasToken: ${!!botToken}`);
 
     if (!botToken) {
       return res.status(400).json({ ok: false, description: "Missing botToken" });
     }
 
     try {
+      const cleanToken = String(botToken).trim();
+      const url = `https://bot-api.zaloplatforms.com/bot${cleanToken}/${method}`;
+      
       const response = await axios.post(
-        `https://bot-api.zaloplatforms.com/bot${botToken}/${method}`,
+        url,
         payload,
         { 
           headers: { "Content-Type": "application/json" },
-          timeout: 10000 
+          timeout: 15000 
         }
       );
-      res.json(response.data);
+      
+      return res.status(200).json(response.data || { ok: true });
     } catch (error: any) {
-      console.error(`Zalo Proxy Error (${method}):`, error.response?.data || error.message);
-      
       const status = error.response?.status || 500;
-      const errorData = error.response?.data || { 
-        ok: false, 
-        description: error.message,
-        error_code: -1
-      };
+      const responseData = error.response?.data;
       
-      res.status(status).json(errorData);
+      console.error(`[ZaloBotProxy] Error:`, {
+        status,
+        message: error.message,
+        data: responseData
+      });
+      
+      // Ensure we always return an object with description
+      const safeData = (typeof responseData === 'object' && responseData !== null) 
+        ? responseData 
+        : { 
+            ok: false, 
+            description: (typeof responseData === 'string' && responseData.length > 0) ? responseData : error.message,
+            error_code: -1
+          };
+      
+      return res.status(status).json(safeData);
     }
   });
 
   // Proxy for Zalo OA APIs (Legacy)
-  app.post("/api/zalo/oa-proxy/:method", async (req, res) => {
+  app.post("/api/zalo-oa/:method", async (req, res) => {
     const { method } = req.params;
     const { accessToken, ...payload } = req.body;
 
