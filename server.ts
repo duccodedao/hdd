@@ -139,7 +139,7 @@ async function startServer() {
     const { method } = req.params;
     const { botToken, ...payload } = req.body;
 
-    console.log(`[ZaloProxy] Requesting ${method} for botToken: ${botToken?.substring(0, 5)}...`);
+    console.log(`[ZaloProxy] Incoming ${method} request`);
 
     if (!botToken) {
       console.warn("[ZaloProxy] Missing botToken");
@@ -150,39 +150,44 @@ async function startServer() {
       const cleanToken = botToken.trim();
       const url = `https://bot-api.zaloplatforms.com/bot${cleanToken}/${method}`;
       
-      console.log(`[ZaloProxy] Forwarding to: ${url}`);
+      console.log(`[ZaloProxy] Forwarding to Zalo: ${url}`);
       
       const response = await axios.post(
         url,
         payload,
         { 
           headers: { "Content-Type": "application/json" },
-          timeout: 10000 
+          timeout: 15000 
         }
       );
       
-      console.log(`[ZaloProxy] Success:`, response.data);
-      res.json(response.data);
+      console.log(`[ZaloProxy] Zalo Success (${method}):`, JSON.stringify(response.data));
+      
+      if (!response.data) {
+        console.warn(`[ZaloProxy] Zalo returned empty data for ${method}`);
+        return res.status(200).json({ ok: false, description: "Zalo returned empty response" });
+      }
+
+      return res.status(200).json(response.data);
     } catch (error: any) {
       const status = error.response?.status || 500;
       const responseData = error.response?.data;
       
-      console.error(`[ZaloProxy] Error (${method}):`, {
+      console.error(`[ZaloProxy] Zalo Error (${method}):`, {
         status,
         message: error.message,
         data: responseData
       });
       
-      // Ensure we always return a JSON object even if Zalo returns HTML or something else
       const errorData = (typeof responseData === 'object' && responseData !== null) 
         ? responseData 
         : { 
             ok: false, 
-            description: typeof responseData === 'string' ? responseData : error.message,
+            description: typeof responseData === 'string' && responseData.length > 0 ? responseData : error.message,
             error_code: -1
           };
       
-      res.status(status).json(errorData);
+      return res.status(status).json(errorData);
     }
   });
 
