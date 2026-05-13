@@ -285,13 +285,18 @@ export default function ZaloBot() {
             <div className="space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">ID người nhận (Chat ID)</label>
-                <input 
-                  type="text" 
-                  value={testId}
-                  onChange={e => setTestId(e.target.value)}
-                  placeholder="Nhập ID nhận tin nhắn..."
-                  className="w-full h-14 px-5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none dark:text-white"
-                />
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={testId}
+                    onChange={e => setTestId(e.target.value)}
+                    placeholder="Nhập ID nhận tin nhắn..."
+                    className="w-full h-14 px-5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none dark:text-white"
+                  />
+                  <p className="mt-2 text-[10px] text-slate-400 italic ml-1">
+                    * Mẹo: Gửi tin nhắn cho Bot trước, sau đó xem ID trong log Webhook của Server.
+                  </p>
+                </div>
               </div>
 
               <div>
