@@ -66,13 +66,20 @@ export default function ZaloBot() {
       });
 
       const responseText = await response.text();
+      console.log('Zalo Proxy Response Status:', response.status);
+      console.log('Zalo Proxy Response Body:', responseText);
+
+      if (!responseText) {
+        throw new Error(`Server returned an empty response (Status: ${response.status})`);
+      }
+
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('Invalid JSON from server:', responseText);
         const preview = responseText.substring(0, 100).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        throw new Error(`Server returned invalid response (first 100 chars): ${preview}`);
+        throw new Error(`Server returned invalid JSON (Status: ${response.status}). Preview: ${preview}`);
       }
 
       if (data.ok) {
@@ -128,7 +135,19 @@ export default function ZaloBot() {
         });
       }
       
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error(`Server returned an empty response (Status: ${response.status})`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Invalid JSON from server:', responseText);
+        throw new Error(`Server returned invalid JSON (Status: ${response.status})`);
+      }
+
       if (data.ok || data.error === 0) {
         toast.success('Đã gửi tin nhắn test thành công!');
         setTestMessage('');
