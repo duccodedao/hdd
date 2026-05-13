@@ -21,7 +21,6 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
 import ComingSoon from './pages/ComingSoon';
-import NotificationsPage from './pages/NotificationsPage';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import MaintenancePage from './pages/MaintenancePage';
@@ -177,7 +176,6 @@ export default function App() {
               <Route path="/profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
               <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
-              <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />

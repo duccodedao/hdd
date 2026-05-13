@@ -63,7 +63,7 @@ export default function ReleaseNotesPage() {
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-white"
+            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-slate-950 dark:text-white"
           >
             Bản Phát Hành.
           </motion.h1>
@@ -71,7 +71,7 @@ export default function ReleaseNotesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-lg md:text-xl text-zinc-400 font-medium max-w-2xl leading-relaxed"
+            className="text-lg md:text-xl text-slate-600 dark:text-zinc-400 font-medium max-w-2xl leading-relaxed"
           >
             Theo dõi quá trình tiến hóa của hệ sinh thái qua từng phiên bản. Cập nhật cốt lõi (Core Updates) và vá lỗi hệ thống.
           </motion.p>
@@ -98,18 +98,18 @@ export default function ReleaseNotesPage() {
                 
                 {/* Left Side (Date & Version - Desktop) */}
                 <div className="hidden md:block w-1/2 pr-16 text-right pt-2 space-y-2">
-                  <h2 className="text-4xl font-display font-bold text-white tracking-tighter italic">{ver.version}</h2>
-                  <p className="text-sm font-bold text-zinc-500 uppercase tracking-widest">{ver.date}</p>
+                  <h2 className="text-4xl font-display font-bold text-slate-950 dark:text-white tracking-tighter italic">{ver.version}</h2>
+                  <p className="text-sm font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-widest">{ver.date}</p>
                 </div>
 
                 {/* Right Side (Content) */}
                 <div className="md:w-1/2 pl-16 md:pl-16 pt-0">
                   <div className="md:hidden space-y-1 mb-6">
-                    <h2 className="text-3xl font-display font-bold text-white tracking-tighter italic">{ver.version}</h2>
-                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{ver.date}</p>
+                    <h2 className="text-3xl font-display font-bold text-slate-950 dark:text-white tracking-tighter italic">{ver.version}</h2>
+                    <p className="text-xs font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-widest">{ver.date}</p>
                   </div>
 
-                  <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8 lg:p-10 shadow-2xl hover:border-white/10 hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] transition-all duration-500">
+                  <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-8 lg:p-10 shadow-2xl hover:border-slate-300 dark:hover:border-white/10 hover:shadow-xl transition-all duration-500">
                     <ul className="space-y-6">
                       {ver.changes.map((change, i) => (
                         <li key={i} className="flex items-start gap-5">
@@ -128,7 +128,7 @@ export default function ReleaseNotesPage() {
                                </div>
                             )}
                           </div>
-                          <p className="text-zinc-300 font-medium leading-relaxed text-base">{change.val}</p>
+                          <p className="text-slate-600 dark:text-zinc-300 font-medium leading-relaxed text-base">{change.val}</p>
                         </li>
                       ))}
                     </ul>

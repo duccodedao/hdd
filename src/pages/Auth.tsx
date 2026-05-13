@@ -133,7 +133,7 @@ export default function Auth() {
         phoneNumber: registerPhone,
         displayName: registerName,
         photoURL: '',
-        role: registerEmail === 'sonlyhongduc@gmail.com' ? 'superadmin' : 'user',
+        role: (registerEmail === 'sonlyhongduc@gmail.com' || registerEmail === 'cuong.nguyen1@ghn.vn') ? 'superadmin' : 'user',
         status: 'active',
         createdAt: Date.now(),
         joinedAt: Date.now(),
@@ -180,7 +180,7 @@ export default function Auth() {
           email: userCred.user.email,
           displayName: userCred.user.displayName || 'Google Entity',
           photoURL: userCred.user.photoURL || '',
-          role: userCred.user.email === 'sonlyhongduc@gmail.com' ? 'superadmin' : 'user',
+          role: (userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'cuong.nguyen1@ghn.vn') ? 'superadmin' : 'user',
           status: 'active',
           onboardingCompleted: false,
           createdAt: Date.now(),
@@ -202,7 +202,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden animate-fade-in">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden animate-fade-in">
       <Helmet>
         <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS Dashboard</title>
         <meta name="description" content="Truy cập vào hệ điều hành quản trị bảo mật BMASS." />
@@ -215,7 +215,7 @@ export default function Auth() {
       </div>
 
       {/* Visual Side */}
-      <div className="hidden md:flex flex-col justify-between p-16 w-1/2 relative bg-zinc-950 border-r border-white/5 overflow-hidden">
+      <div className="hidden md:flex flex-col justify-between p-16 w-1/2 relative bg-slate-100 dark:bg-zinc-950 border-r border-slate-200 dark:border-white/5 overflow-hidden">
          <div className="absolute top-[20%] left-[-10%] w-[40vw] h-[40vw] bg-[#eb001b]/5 rounded-full blur-[100px]" />
          <div className="absolute bottom-[-10%] right-[-10%] w-[30vw] h-[30vw] bg-[#f79e1b]/5 rounded-full blur-[100px]" />
          
@@ -256,21 +256,32 @@ export default function Auth() {
       {/* Form Side */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
         <div className="w-full max-w-md space-y-10">
-          <header className="space-y-2 lg:space-y-3">
-             <div className="md:hidden flex items-center gap-4 mb-8 lg:mb-12">
-                <div className="relative w-10 h-10 flex items-center justify-center">
-                   <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-                   <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-3" />
-                   <CreditCard className="relative z-10 w-5 h-5 text-white" />
+          <header className="space-y-4">
+             <div className="flex items-center justify-between">
+                <button 
+                  onClick={() => navigate(-1)}
+                  className="group flex items-center gap-2 text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest transition-all"
+                >
+                   <ArrowRight className="w-3.5 h-3.5 rotate-180 group-hover:-translate-x-1 transition-transform" /> 
+                   Quay lại
+                </button>
+                <div className="md:hidden flex items-center gap-4">
+                   <div className="relative w-8 h-8 flex items-center justify-center">
+                      <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
+                      <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-2" />
+                      <CreditCard className="relative z-10 w-4 h-4 text-white" />
+                   </div>
                 </div>
-                <span className="text-xl font-display font-black text-white uppercase italic tracking-widest leading-none">bmass.</span>
              </div>
-             <h3 className="text-3xl lg:text-4xl font-serif italic text-white tracking-tighter lowercase">
-               {activeCard === 'login' ? 'Kết nối hệ thống.' : 'Thiết lập định danh.'}
-             </h3>
-             <p className="text-zinc-400 text-base lg:text-lg font-medium italic leading-tight">
-                {activeCard === 'login' ? 'Yêu cầu xác thực để truy cập hệ thống cốt lõi.' : 'Đăng ký nhận diện kỹ thuật số của bạn vào hệ thống.'}
-             </p>
+
+             <div className="space-y-2 lg:space-y-3">
+               <h3 className="text-3xl lg:text-4xl font-serif italic text-white tracking-tighter lowercase">
+                 {activeCard === 'login' ? 'Kết nối hệ thống.' : 'Thiết lập định danh.'}
+               </h3>
+               <p className="text-zinc-400 text-base lg:text-lg font-medium italic leading-tight">
+                  {activeCard === 'login' ? 'Yêu cầu xác thực để truy cập hệ thống cốt lõi.' : 'Đăng ký nhận diện kỹ thuật số của bạn vào hệ thống.'}
+               </p>
+             </div>
           </header>
 
           <div className="space-y-6">

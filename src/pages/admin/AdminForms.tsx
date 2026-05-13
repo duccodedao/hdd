@@ -462,8 +462,8 @@ export default function AdminForms() {
                       <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
                         <Files className="w-6 h-6" />
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { shareForm(form.slug); }} className="p-2 text-slate-400 hover:text-blue-500 transition-colors" title="Share link"><Share2 className="w-4 h-4" /></button>
+                      <div className="flex items-center gap-2 transition-opacity">
+                        <button onClick={() => { shareForm(form.slug); }} className="p-2 text-slate-500 hover:text-blue-500 transition-colors" title="Share link"><Share2 className="w-4 h-4" /></button>
                         <button onClick={() => { 
                           setSelectedForm(form); 
                           setFormData({ 
@@ -476,8 +476,8 @@ export default function AdminForms() {
                           }); 
                           setCreationMode(form.hasDataset ? 'dataset' : 'standard');
                           setView('edit'); 
-                        }} className="p-2 text-slate-400 hover:text-amber-500 transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => handleDeleteForm(form.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                        }} className="p-2 text-slate-500 hover:text-amber-500 transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteForm(form.id)} className="p-2 text-slate-500 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                       </div>
                    </div>
 

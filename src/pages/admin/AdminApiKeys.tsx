@@ -20,18 +20,24 @@ export default function AdminApiKeys() {
     githubToken: '',
     githubBranch: 'main',
     githubPath: 'assets/uploads',
+    zaloAccessToken: '',
+    zaloWebhookUrl: '',
+    zaloOaId: '',
+    zaloPlatformBotToken: '',
+    zaloWebhookSecret: '',
   });
 
   useEffect(() => {
     const fetchKeys = async () => {
       try {
-        const [apiSnap, sysSnap, githubSnap] = await Promise.all([
+        const [apiSnap, sysSnap, githubSnap, zaloSnap] = await Promise.all([
           getDoc(doc(db, 'settings', 'apiKeys')),
           getDoc(doc(db, 'settings', 'system')),
-          getDoc(doc(db, 'settings', 'github'))
+          getDoc(doc(db, 'settings', 'github')),
+          getDoc(doc(doc(db, 'settings', 'zalo'), 'config', 'bot'))
         ]);
         
-        let fetchedData = {};
+        let fetchedData: any = {};
         if (apiSnap.exists()) {
           fetchedData = { ...fetchedData, ...apiSnap.data() };
         }
@@ -47,6 +53,17 @@ export default function AdminApiKeys() {
             githubToken: data.token || '',
             githubBranch: data.branch || 'main',
             githubPath: data.path || 'assets/uploads'
+          };
+        }
+        if (zaloSnap.exists()) {
+          const data = zaloSnap.data();
+          fetchedData = {
+            ...fetchedData,
+            zaloAccessToken: data.accessToken || '',
+            zaloWebhookUrl: data.webhookUrl || '',
+            zaloOaId: data.oaId || '',
+            zaloPlatformBotToken: data.botToken || '',
+            zaloWebhookSecret: data.webhookSecret || ''
           };
         }
         
@@ -77,6 +94,14 @@ export default function AdminApiKeys() {
           token: apiKeys.githubToken,
           branch: apiKeys.githubBranch,
           path: apiKeys.githubPath
+        }, { merge: true }),
+        setDoc(doc(doc(db, 'settings', 'zalo'), 'config', 'bot'), {
+          accessToken: apiKeys.zaloAccessToken,
+          webhookUrl: apiKeys.zaloWebhookUrl,
+          oaId: apiKeys.zaloOaId,
+          botToken: apiKeys.zaloPlatformBotToken,
+          webhookSecret: apiKeys.zaloWebhookSecret,
+          updatedAt: Date.now()
         }, { merge: true })
       ]);
       toast.success('Đã lưu cấu hình API Keys / Cấu hình');
@@ -230,8 +255,106 @@ export default function AdminApiKeys() {
                    {showKeys['githubToken'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                  </button>
                </div>
-               <p className="text-[11px] text-slate-400 mt-2 font-medium">Bổ sung token nếu repository ở chế độ Private hoặc cần vượt qua rate limit của GitHub API.</p>
+               <p className="text-[11px] text-amber-500 mt-2 font-medium">Lưu ý: Nếu GitHub Token không hoạt động (do hết hạn 30 ngày), vui lòng truy cập <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-600">https://github.com/settings/tokens</a> để tạo token mới (Classic Token với quyền 'repo').</p>
              </div>
+          </div>
+
+          {/* Zalo Bot Config (OA Legacy) */}
+          <div className="bg-slate-50 dark:bg-white/5 p-5 rounded-xl border border-slate-200 dark:border-white/10 relative">
+              <label className="block text-xs font-bold mb-4 ml-1 text-slate-500 uppercase tracking-widest">
+                Cấu hình Zalo Bot (Official Account - Legacy)
+              </label>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">OA ID</label>
+                  <input 
+                    type="text" 
+                    value={apiKeys.zaloOaId}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, zaloOaId: e.target.value }))}
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white font-mono"
+                    placeholder="xxxxxxxxxxxxxxxxxxx"
+                    disabled={!isSuperAdmin}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Zalo Access Token (OA)</label>
+                  <div className="relative">
+                    <input 
+                      type={showKeys['zaloToken'] ? 'text' : 'password'}
+                      value={apiKeys.zaloAccessToken}
+                      onChange={(e) => setApiKeys(prev => ({ ...prev, zaloAccessToken: e.target.value }))}
+                      className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white font-mono"
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      disabled={!isSuperAdmin}
+                    />
+                    <button 
+                      onClick={() => toggleShow('zaloToken')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                    >
+                      {showKeys['zaloToken'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+          </div>
+
+          {/* New Zalo Bot Platform Config */}
+          <div className="bg-slate-50 dark:bg-white/5 p-5 rounded-xl border border-slate-200 dark:border-white/10 relative">
+              <label className="block text-xs font-bold mb-4 ml-1 text-blue-500 uppercase tracking-widest">
+                Cấu hình Zalo Bot (New Platform)
+              </label>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Bot Token</label>
+                  <div className="relative">
+                    <input 
+                      type={showKeys['zaloPlatformBotToken'] ? 'text' : 'password'}
+                      value={apiKeys.zaloPlatformBotToken}
+                      onChange={(e) => setApiKeys(prev => ({ ...prev, zaloPlatformBotToken: e.target.value }))}
+                      className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white font-mono"
+                      placeholder="123456789:abc123xyz"
+                      disabled={!isSuperAdmin}
+                    />
+                    <button 
+                      onClick={() => toggleShow('zaloPlatformBotToken')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                    >
+                      {showKeys['zaloPlatformBotToken'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Webhook Secret Token</label>
+                  <div className="relative">
+                    <input 
+                      type={showKeys['zaloWebhookSecret'] ? 'text' : 'password'}
+                      value={apiKeys.zaloWebhookSecret}
+                      onChange={(e) => setApiKeys(prev => ({ ...prev, zaloWebhookSecret: e.target.value }))}
+                      className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white font-mono"
+                      placeholder="mykey-abcyxz"
+                      disabled={!isSuperAdmin}
+                    />
+                    <button 
+                      onClick={() => toggleShow('zaloWebhookSecret')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                    >
+                      {showKeys['zaloWebhookSecret'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Webhook URL Hiện tại</label>
+                  <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-xs dark:text-zinc-400 font-mono break-all">
+                    {window.location.origin}/api/zalo/webhook
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-blue-500 mt-2 font-medium italic">Sử dụng URL trên để dán vào cấu hình Webhook của Zalo Bot.</p>
           </div>
 
           <div className="flex justify-start mt-8">

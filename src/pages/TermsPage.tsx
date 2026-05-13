@@ -33,7 +33,7 @@ export default function TermsPage() {
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-white"
+            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-slate-950 dark:text-white"
           >
             Khuôn khổ <br/> Pháp lý.
           </motion.h1>
@@ -41,7 +41,7 @@ export default function TermsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-lg md:text-xl text-zinc-400 font-medium max-w-2xl leading-relaxed"
+            className="text-lg md:text-xl text-slate-600 dark:text-zinc-400 font-medium max-w-2xl leading-relaxed"
           >
             Quy định chung và thỏa thuận cấp phép áp dụng cho toàn bộ người dùng và hệ thống trực thuộc không gian ảo của BMASS.
           </motion.p>
@@ -54,11 +54,11 @@ export default function TermsPage() {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
         >
           <div className="lg:col-span-2 space-y-8">
-             <div className="bg-zinc-900 border border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
-                <h2 className="text-3xl font-display font-medium text-white tracking-tight italic mb-8 flex items-center gap-4">
+             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
+                <h2 className="text-3xl font-display font-medium text-slate-950 dark:text-white tracking-tight italic mb-8 flex items-center gap-4">
                   <span className="text-indigo-500">01.</span> Chấp nhận các điều khoản
                 </h2>
-                <p className="text-zinc-400 font-medium leading-relaxed mb-6 text-lg">
+                <p className="text-slate-600 dark:text-zinc-400 font-medium leading-relaxed mb-6 text-lg">
                   Bằng việc truy cập, thiết lập và vận hành nền tảng BMASS, bạn (người dùng cuối/tổ chức) mặc định đồng ý với toàn bộ các giao thức, điều khoản và điều kiện được ghi chú trong tài liệu này mà không có ngoại lệ.
                 </p>
                 <div className="p-8 bg-indigo-500/10 border border-indigo-500/20 rounded-[2rem] flex flex-col md:flex-row gap-6 items-start mt-8">
@@ -71,8 +71,8 @@ export default function TermsPage() {
                 </div>
              </div>
 
-             <div className="bg-zinc-900 border border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
-                <h2 className="text-3xl font-display font-medium text-white tracking-tight italic mb-8 flex items-center gap-4">
+             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
+                <h2 className="text-3xl font-display font-medium text-slate-950 dark:text-white tracking-tight italic mb-8 flex items-center gap-4">
                   <span className="text-indigo-500">02.</span> Trách nhiệm người dùng
                 </h2>
                 <div className="space-y-8">
@@ -82,33 +82,33 @@ export default function TermsPage() {
                     { title: 'Kiểm soát Truy cập', desc: 'Mỗi thiết bị truy cập vào hệ thống sẽ lưu vết theo footprint. Bạn hoàn toàn chịu trách nhiệm cho hành vi bắt nguồn từ tài khoản.' }
                   ].map((item, idx) => (
                     <div key={idx} className="flex gap-6 group">
-                      <div className="w-8 h-8 rounded-full bg-zinc-950 border border-white/10 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-500/20 group-hover:border-indigo-500/30 transition-colors mt-1">
+                      <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-white/10 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-500/20 group-hover:border-indigo-500/30 transition-colors mt-1">
                          <CheckCircle2 className="w-4 h-4 text-indigo-400" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-medium text-white tracking-tight">{item.title}</h3>
-                        <p className="text-zinc-400 font-medium leading-relaxed mt-2 text-base">{item.desc}</p>
+                        <h3 className="text-xl font-medium text-slate-950 dark:text-white tracking-tight">{item.title}</h3>
+                        <p className="text-slate-600 dark:text-zinc-400 font-medium leading-relaxed mt-2 text-base">{item.desc}</p>
                       </div>
                     </div>
                   ))}
                 </div>
              </div>
              
-             <div className="bg-zinc-900 border border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
-                <h2 className="text-3xl font-display font-medium text-white tracking-tight italic mb-8 flex items-center gap-4">
+             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl hover:border-indigo-500/30 transition-all duration-500">
+                <h2 className="text-3xl font-display font-medium text-slate-950 dark:text-white tracking-tight italic mb-8 flex items-center gap-4">
                   <span className="text-indigo-500">03.</span> Bản quyền & Hệ thống
                 </h2>
-                <p className="text-zinc-400 font-medium leading-relaxed text-lg">
+                <p className="text-slate-600 dark:text-zinc-400 font-medium leading-relaxed text-lg">
                   Toàn bộ source code, thiết kế kiến trúc, cơ sở dữ liệu và cấu trúc vi mạch ảo của BMASS là tài sản sở hữu trí tuệ độc quyền. Việc dịch ngược (reverse engineering) hoặc nhái giao diện UI/UX sẽ chịu sự chế tài tối cao của pháp luật.
                 </p>
              </div>
           </div>
           <div className="space-y-8">
-             <div className="bg-zinc-900 border border-white/5 rounded-[3rem] p-8 pb-12 shadow-2xl flex flex-col items-center text-center">
-                <div className="w-full aspect-square bg-zinc-950 rounded-[2rem] border border-white/5 mb-8 flex items-center justify-center p-8">
-                   <ScrollText className="w-full h-full text-zinc-800 opacity-50" />
+             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-8 pb-12 shadow-2xl flex flex-col items-center text-center">
+                <div className="w-full aspect-square bg-slate-50 dark:bg-zinc-950 rounded-[2rem] border border-slate-200 dark:border-white/10 mb-8 flex items-center justify-center p-8">
+                   <ScrollText className="w-full h-full text-slate-200 dark:text-zinc-800 opacity-50" />
                 </div>
-                <h3 className="text-xl font-semibold text-white tracking-tight mb-4">Chứng nhận hợp chuẩn</h3>
+                <h3 className="text-xl font-semibold text-slate-950 dark:text-white tracking-tight mb-4">Chứng nhận hợp chuẩn</h3>
                 <p className="text-zinc-500 text-sm font-medium leading-relaxed">
                    Tài liệu này được soạn thảo và kiểm duyệt tự động dựa trên giao thức pháp lý v2.4. Tính hiệu lực áp dụng toàn cầu kể từ tháng 5/2026.
                 </p>

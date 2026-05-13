@@ -21,7 +21,7 @@ const fixedNavGroups = [
 
 export default function Sidebar({ className }: { className?: string }) {
   const { isAdmin } = useAuthStore();
-  const { setSidebarOpen } = useAppStore();
+  const { setSidebarOpen, maintenanceTabs } = useAppStore();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan']);
 
@@ -39,7 +39,7 @@ export default function Sidebar({ className }: { className?: string }) {
   }, [location.pathname]);
 
   return (
-    <aside className={cn("flex flex-col relative z-20 w-64 bg-zinc-950/90 lg:bg-zinc-950/20 backdrop-blur-xl border-r border-white/5", className)}>
+    <aside className={cn("flex flex-col relative z-20 w-64 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
       <div className="p-8 flex items-center gap-4">
         <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
            <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
@@ -47,13 +47,14 @@ export default function Sidebar({ className }: { className?: string }) {
            <Shield className="relative z-10 w-4 h-4 text-white" />
         </div>
         <div className="flex flex-col">
-          <h2 className="font-display font-black text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
-          <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] mt-1 italic">NUCLEUS OS</span>
+          <h2 className="font-display font-black text-slate-900 dark:text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
+          <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1 italic">NUCLEUS OS</span>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 space-y-6 pt-4 pb-8 no-scrollbar">
-        {fixedNavGroups.map((group, idx) => {
+        {fixedNavGroups.map((group: any, idx) => {
+          if (group.requireAdmin && !isAdmin) return null;
           const isExpanded = expandedGroups.includes(group.title);
           const hasActiveItem = group.items.some(i => i.path === location.pathname);
 
@@ -63,7 +64,7 @@ export default function Sidebar({ className }: { className?: string }) {
                 onClick={() => toggleGroup(group.title)}
                 className={cn(
                   "flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-all",
-                  hasActiveItem ? "text-zinc-200" : "text-zinc-400 hover:text-zinc-200"
+                  hasActiveItem ? "text-slate-800 dark:text-zinc-200" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -83,7 +84,6 @@ export default function Sidebar({ className }: { className?: string }) {
                   >
                     {group.items.map((item: any) => {
                       const isActive = location.pathname === item.path;
-                      const { maintenanceTabs } = useAppStore();
                       const isMaintenance = maintenanceTabs[item.maintenanceKey];
                       return (
                         <NavLink
@@ -93,12 +93,12 @@ export default function Sidebar({ className }: { className?: string }) {
                           className={({ isActive }) => cn(
                             "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium relative group",
                             isActive 
-                              ? "text-white bg-white/5 shadow-sm" 
-                              : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
+                              ? "text-blue-700 bg-blue-50 dark:text-white dark:bg-white/5 shadow-sm" 
+                              : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
                           )}
                         >
                           <div className="flex items-center gap-3">
-                            <item.icon className={cn("w-4 h-4 transition-colors duration-300", isActive ? "text-indigo-400" : "text-zinc-600 group-hover:text-zinc-400")} />
+                            <item.icon className={cn("w-4 h-4 transition-colors duration-300", isActive ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600 group-hover:text-slate-600 dark:group-hover:text-zinc-400")} />
                             <span className={cn(isActive && "font-semibold")}>{item.name}</span>
                           </div>
                           {isMaintenance && (
@@ -115,15 +115,15 @@ export default function Sidebar({ className }: { className?: string }) {
         })}
 
         {isAdmin && (
-          <div className="pt-4 border-t border-white/5">
+          <div className="pt-4 border-t border-slate-200 dark:border-white/5">
             <NavLink
               to="/admin"
               onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
               className={({ isActive }) => cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[11px] font-bold uppercase tracking-widest",
                 isActive 
-                  ? "text-amber-400 bg-amber-400/10" 
-                  : "text-zinc-500 hover:text-amber-400 hover:bg-amber-400/5"
+                  ? "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" 
+                  : "text-slate-500 dark:text-zinc-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-400/5"
               )}
             >
               <Shield className="w-4 h-4" />

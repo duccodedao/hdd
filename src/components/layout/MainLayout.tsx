@@ -6,41 +6,19 @@ import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import NoticeBanner from './NoticeBanner';
-
-import { GeminiChatBox } from '../ui/GeminiChatBox';
 
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar } = useAppStore();
   const { user } = useAuthStore();
   const location = useLocation();
 
-  useEffect(() => {
-    if (!user) return;
-    const askForPermissions = async () => {
-      const hasAsked = localStorage.getItem('perm_initial_asked');
-      if (hasAsked) return;
-      setTimeout(async () => {
-        try {
-          if ('Notification' in window && Notification.permission === 'default') {
-             await Notification.requestPermission();
-          }
-          localStorage.setItem('perm_initial_asked', 'true');
-        } catch (e) {
-          console.error(e);
-        }
-      }, 5000);
-    };
-    askForPermissions();
-  }, [user]);
-
   return (
-    <div className="flex h-screen overflow-hidden relative font-sans bg-zinc-950">
+    <div className="flex h-screen overflow-hidden relative font-sans bg-slate-50 dark:bg-zinc-950">
       
       {/* Dynamic Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 dark:bg-indigo-500/10 rounded-full blur-[120px] animate-blob" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-500/10 dark:bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000" />
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -51,7 +29,7 @@ export default function MainLayout() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={toggleSidebar}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/40 dark:bg-black/40 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
@@ -62,7 +40,6 @@ export default function MainLayout() {
       )} />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10 h-screen">
-        <NoticeBanner />
         
         <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
           <Topbar />
@@ -82,19 +59,17 @@ export default function MainLayout() {
                 </div>
                 
                 <footer className="mt-20 py-12 text-center flex flex-col items-center justify-center gap-4 px-6 opacity-40 hover:opacity-100 transition-opacity duration-700">
-                  <div className="flex justify-center gap-8 text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
-                    <Link to="/terms" className="hover:text-white transition-colors">Legal</Link>
-                    <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+                  <div className="flex justify-center gap-8 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-500">
+                    <Link to="/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">Legal</Link>
+                    <Link to="/privacy" className="hover:text-slate-900 dark:hover:text-white transition-colors">Privacy</Link>
                   </div>
-                  <p className="text-[10px] text-zinc-600 font-medium">© 2026 Nucleus OS. Engineered for privacy.</p>
+                  <p className="text-[10px] text-slate-600 dark:text-zinc-600 font-medium">© 2026 Nucleus OS. Engineered for privacy.</p>
                 </footer>
               </motion.div>
             </AnimatePresence>
           </main>
         </div>
       </div>
-      
-      {user && <GeminiChatBox />}
     </div>
   );
 }

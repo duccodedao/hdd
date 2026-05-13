@@ -107,7 +107,7 @@ export default function ContactPage() {
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter leading-[0.8] uppercase italic text-white"
+              className="text-5xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter leading-[0.8] uppercase italic text-slate-950 dark:text-white"
             >
               Contact <br />
               <span className="text-indigo-600 italic">Us.</span>
@@ -116,7 +116,7 @@ export default function ContactPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-lg md:text-xl text-zinc-400 font-medium leading-relaxed max-w-2xl mx-auto"
+              className="text-lg md:text-xl text-slate-600 dark:text-zinc-400 font-medium leading-relaxed max-w-2xl mx-auto"
             >
               Chúng tôi luôn sẵn sàng lắng nghe mọi ý kiến đóng góp, yêu cầu hỗ trợ hoặc đề xuất hợp tác từ phía bạn.
             </motion.p>
@@ -131,19 +131,19 @@ export default function ContactPage() {
               href={contact.url}
               target="_blank"
               rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 20 }}
+               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + idx * 0.05 }}
-              className="group p-10 rounded-[3rem] bg-zinc-900 border border-white/5 hover:border-indigo-500/50 transition-all duration-700 flex flex-col h-full items-center text-center shadow-sm hover:shadow-[0_40px_80px_rgba(0,0,0,0.2)]"
+              className="group p-10 rounded-[3rem] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 hover:border-indigo-500/50 transition-all duration-700 flex flex-col h-full items-center text-center shadow-sm hover:shadow-2xl"
             >
               <div className={cn(
-                "w-20 h-20 rounded-[2rem] p-5 flex items-center justify-center mb-8 border border-white/5 transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 bg-zinc-950",
+                "w-20 h-20 rounded-[2rem] p-5 flex items-center justify-center mb-8 border border-slate-100 dark:border-white/5 transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 bg-slate-50 dark:bg-zinc-950",
                 contact.color
               )}>
                 <contact.icon className="w-full h-full" />
               </div>
-              <h3 className="text-2xl font-display font-medium text-white mb-2 italic tracking-tight group-hover:text-indigo-400 transition-colors">{contact.name}</h3>
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-8 leading-relaxed">
+              <h3 className="text-2xl font-display font-medium text-slate-950 dark:text-white mb-2 italic tracking-tight group-hover:text-indigo-400 transition-colors">{contact.name}</h3>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-widest mb-8 leading-relaxed">
                 {contact.desc}
               </p>
               <div className="mt-auto pt-8 border-t border-white/5 w-full group-hover:border-indigo-500/20 transition-colors">
@@ -161,7 +161,7 @@ export default function ContactPage() {
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="relative bg-zinc-900 border border-white/5 rounded-[3.5rem] p-12 lg:p-24 overflow-hidden text-center lg:text-left shadow-2xl shadow-black/50"
+            className="relative bg-slate-900 dark:bg-zinc-900 border border-slate-800 dark:border-white/5 rounded-[3.5rem] p-12 lg:p-24 overflow-hidden text-center lg:text-left shadow-2xl"
           >
             <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none blur-3xl" />
             <div className="absolute bottom-0 left-0 w-1/2 h-full bg-gradient-to-tr from-emerald-500/5 to-transparent pointer-events-none blur-3xl" />
@@ -171,7 +171,7 @@ export default function ContactPage() {
                 <h2 className="text-5xl lg:text-7xl font-display font-medium text-white italic tracking-tighter leading-[0.9] uppercase">
                   Gửi phản hồi <br className="hidden lg:block" /> trực tiếp.
                 </h2>
-                <p className="text-lg md:text-xl text-zinc-400 font-medium max-w-xl leading-relaxed">
+                <p className="text-lg md:text-xl text-slate-400 dark:text-zinc-400 font-medium max-w-xl leading-relaxed">
                   Bạn có ý tưởng hoặc yêu cầu kỹ thuật? Hãy gửi thông điệp trực tiếp để chúng tôi hỗ trợ nhanh nhất.
                 </p>
                 

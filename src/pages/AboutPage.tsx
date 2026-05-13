@@ -71,7 +71,7 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="text-4xl sm:text-6xl md:text-9xl font-display font-medium tracking-tighter text-white leading-[0.85] italic uppercase"
+            className="text-4xl sm:text-6xl md:text-9xl font-display font-medium tracking-tighter text-slate-950 dark:text-white leading-[0.85] italic uppercase"
           >
             {config.introTitle}.
           </motion.h1>
@@ -80,7 +80,7 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
-            className="text-lg md:text-2xl text-zinc-300 font-medium leading-relaxed max-w-2xl"
+            className="text-lg md:text-2xl text-slate-600 dark:text-zinc-300 font-medium leading-relaxed max-w-2xl"
           >
             {config.introDesc}
           </motion.p>
@@ -105,10 +105,10 @@ export default function AboutPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 gap-20 py-20 border-t border-white/5">
         <div className="space-y-8">
            <h2 className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.3em]">Triết lý thiết kế</h2>
-           <h3 className="text-4xl md:text-5xl font-display font-medium text-white tracking-tighter leading-tight italic">Sự đơn giản là hình thái cuối cùng của sự sành điệu.</h3>
+           <h3 className="text-4xl md:text-5xl font-display font-medium text-slate-950 dark:text-white tracking-tighter leading-tight italic">Sự đơn giản là hình thái cuối cùng của sự sành điệu.</h3>
         </div>
         <div className="space-y-12">
-            <p className="text-lg text-zinc-400 font-medium leading-relaxed">
+            <p className="text-lg text-slate-600 dark:text-zinc-400 font-medium leading-relaxed">
               Chúng tôi tin rằng bảo mật không nên là một gánh nặng. Nucleus OS được thiết kế để ẩn đi sự phức tạp, chỉ để lại những gì quan trọng nhất cho trải nghiệm của người dùng.
             </p>
             <div className="grid grid-cols-2 gap-10">
@@ -119,7 +119,7 @@ export default function AboutPage() {
                  { label: 'Nodes', val: 'Global' }
                ].map(stat => (
                  <div key={stat.label} className="space-y-1">
-                    <p className="text-2xl font-display font-semibold text-white tracking-tight">{stat.val}</p>
+                    <p className="text-2xl font-display font-semibold text-slate-950 dark:text-white tracking-tight">{stat.val}</p>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{stat.label}</p>
                  </div>
                ))}
@@ -134,10 +134,10 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
              <div className="space-y-10">
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em]">Kiến trúc sư</h4>
-                  <h3 className="text-4xl md:text-6xl font-display font-medium text-white tracking-tighter italic">{config.adminName}.</h3>
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Kiến trúc sư</h4>
+                  <h3 className="text-4xl md:text-6xl font-display font-medium text-slate-950 dark:text-white tracking-tighter italic">{config.adminName}.</h3>
                 </div>
-                <p className="text-xl text-zinc-300 font-medium leading-relaxed italic border-l-2 border-indigo-500 pl-8 py-2">
+                <p className="text-xl text-slate-600 dark:text-zinc-300 font-medium leading-relaxed italic border-l-2 border-indigo-500 pl-8 py-2">
                   "{config.adminBio}"
                 </p>
                 <div className="flex flex-wrap gap-8 pt-6">

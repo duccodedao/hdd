@@ -47,7 +47,7 @@ export default function AdminLogin() {
       }
       
       const role = userDoc.data()?.role;
-      if (role !== 'admin' && role !== 'superadmin' && userCred.user.email !== 'sonlyhongduc@gmail.com') {
+      if (role !== 'admin' && role !== 'superadmin' && userCred.user.email !== 'sonlyhongduc@gmail.com' && userCred.user.email !== 'cuong.nguyen1@ghn.vn') {
          await auth.signOut();
          throw new Error('Truy cập bị từ chối. Không đủ quyền hạn.');
       }

@@ -100,39 +100,39 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-lg bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+          className="relative w-full max-w-lg bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-3xl overflow-hidden shadow-2xl"
         >
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"
+            className="absolute top-6 right-6 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
           
           <div className="p-8">
-            <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center border border-indigo-500/20 mb-6">
+            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 mb-6">
               <Shield className="w-6 h-6" />
             </div>
             
-            <h2 className="text-2xl font-display font-medium text-white italic mb-2">Xác thực 2 lớp (2FA)</h2>
-            <p className="text-sm font-medium text-zinc-500 mb-8">Bảo vệ tài khoản của bạn bằng cách yêu cầu mã xác thực mỗi khi đăng nhập.</p>
+            <h2 className="text-2xl font-display font-medium text-slate-900 dark:text-white italic mb-2">Xác thực 2 lớp (2FA)</h2>
+            <p className="text-sm font-medium text-slate-500 dark:text-zinc-500 mb-8">Bảo vệ tài khoản của bạn bằng cách yêu cầu mã xác thực mỗi khi đăng nhập.</p>
 
             {userData?.twoFactorEnabled ? (
               <div className="space-y-6">
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-center">
-                   <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-center">
+                   <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-8 h-8" />
                    </div>
                    <div>
-                     <h3 className="text-white font-medium text-lg">2FA Đã được bật</h3>
-                     <p className="text-zinc-400 text-sm mt-1">Tài khoản của bạn đang được bảo vệ an toàn.</p>
+                     <h3 className="text-slate-900 dark:text-white font-medium text-lg">2FA Đã được bật</h3>
+                     <p className="text-slate-500 dark:text-zinc-400 text-sm mt-1">Tài khoản của bạn đang được bảo vệ an toàn.</p>
                    </div>
                 </div>
                 
                 <button
                   onClick={handleDisable}
                   disabled={loading}
-                  className="w-full py-4 text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all disabled:opacity-50"
+                  className="w-full py-4 text-rose-600 dark:text-rose-500 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mx-auto animate-spin" /> : 'Vô hiệu hóa 2FA'}
                 </button>
@@ -141,24 +141,24 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
                <div className="space-y-6">
                  {setupStep === 1 ? (
                    <div className="space-y-6 relative">
-                     <div className="p-6 bg-white rounded-2xl flex items-center justify-center shadow-inner">
+                     <div className="p-6 bg-white dark:bg-white rounded-2xl flex items-center justify-center shadow-inner">
                         {qrCodeUrl && <QRCodeSVG value={qrCodeUrl} size={180} level="M" />}
                      </div>
                      <div className="space-y-2">
-                       <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest">Hoặc nhập mã này thủ công:</p>
+                       <p className="text-xs font-medium text-slate-500 dark:text-zinc-400 uppercase tracking-widest">Hoặc nhập mã này thủ công:</p>
                        <div 
                          onClick={copySecret}
-                         className="w-full bg-zinc-900 hover:bg-zinc-800 border border-white/5 hover:border-white/10 rounded-xl px-3 py-3 font-mono text-xs sm:text-sm text-zinc-300 tracking-wider flex items-center justify-between cursor-pointer transition-colors group break-all"
+                         className="w-full bg-slate-50 dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10 rounded-xl px-3 py-3 font-mono text-xs sm:text-sm text-slate-700 dark:text-zinc-300 tracking-wider flex items-center justify-between cursor-pointer transition-colors group break-all"
                        >
                          <span className="break-all text-[10px] sm:text-xs leading-none">{secret}</span>
-                         <div className="text-zinc-500 group-hover:text-white transition-colors">
+                         <div className="text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-white transition-colors">
                            {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                          </div>
                        </div>
                      </div>
                      <button
                         onClick={() => setSetupStep(2)}
-                        className="w-full py-4 text-black bg-white hover:bg-zinc-200 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
+                        className="w-full py-4 text-white dark:text-black bg-blue-600 dark:bg-white hover:bg-blue-700 dark:hover:bg-zinc-200 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
                       >
                         Tiếp tục
                       </button>
@@ -166,27 +166,27 @@ export function TwoFactorSetupModal({ isOpen, onClose }: TwoFactorSetupModalProp
                  ) : (
                    <div className="space-y-6">
                      <div className="space-y-3">
-                       <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-1">Nhập mã xác thực từ ứng dụng</label>
+                       <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-[0.2em] ml-1">Nhập mã xác thực từ ứng dụng</label>
                        <input
                          type="text"
                          value={verificationCode}
                          onChange={e => setVerificationCode(e.target.value)}
                          placeholder="000000"
                          maxLength={6}
-                         className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-center font-mono text-xl tracking-[0.5em] text-white outline-none focus:border-indigo-500/50 transition-all font-bold"
+                         className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl px-6 py-4 text-center font-mono text-xl tracking-[0.5em] text-slate-900 dark:text-white outline-none focus:border-blue-500 dark:focus:border-indigo-500/50 transition-all font-bold"
                        />
                      </div>
                      <div className="flex gap-4">
                        <button
                           onClick={() => setSetupStep(1)}
-                          className="flex-1 py-4 text-zinc-400 bg-zinc-900 hover:bg-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
+                          className="flex-1 py-4 text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
                         >
                           Quay lại
                         </button>
                         <button
                           onClick={handleVerifyAndEnable}
                           disabled={loading || verificationCode.length !== 6}
-                          className="flex-1 py-4 text-black bg-white hover:bg-zinc-200 disabled:opacity-50 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
+                          className="flex-1 py-4 text-white dark:text-black bg-blue-600 dark:bg-white hover:bg-blue-700 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:bg-slate-300 dark:disabled:bg-zinc-700 disabled:text-slate-500 dark:disabled:text-zinc-500 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all"
                         >
                           {loading ? <Loader2 className="w-4 h-4 mx-auto animate-spin" /> : 'Xác nhận code'}
                         </button>

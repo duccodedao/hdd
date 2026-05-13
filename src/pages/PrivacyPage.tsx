@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-white"
+            className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-medium tracking-tighter uppercase italic leading-[0.8] text-slate-950 dark:text-white"
           >
             Chính sách <br/> Bảo mật.
           </motion.h1>
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-lg md:text-xl text-zinc-400 font-medium max-w-2xl leading-relaxed"
+            className="text-lg md:text-xl text-slate-600 dark:text-zinc-400 font-medium max-w-2xl leading-relaxed"
           >
             Dữ liệu của bạn là bất khả xâm phạm. Kiến trúc của BMASS được thiết kế từ cốt lõi để bảo vệ và cách ly toàn bộ thông tin cá nhân.
           </motion.p>
@@ -58,22 +58,22 @@ export default function PrivacyPage() {
               { icon: EyeOff, title: "Không theo dõi", desc: "Chúng tôi loại bỏ các tracker bên thứ ba. Hành vi của bạn không bị bán cho các nhà quảng cáo." },
               { icon: Lock, title: "Bảo mật tài khoản", desc: "Chứng thực chặt chẽ, IAM phân quyền và lưu vết footprint thiết bị với kiến trúc Zero-Trust." }
             ].map((feature, i) => (
-              <div key={i} className="bg-zinc-900 border border-white/5 rounded-[3rem] p-10 hover:border-emerald-500/30 transition-all duration-500 shadow-xl group">
-                 <div className="w-16 h-16 rounded-[1.5rem] bg-zinc-950 flex justify-center items-center mb-8 border border-white/5 group-hover:scale-110 group-hover:bg-emerald-500/10 transition-all duration-500">
+              <div key={i} className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 hover:border-emerald-500/30 transition-all duration-500 shadow-xl group">
+                 <div className="w-16 h-16 rounded-[1.5rem] bg-slate-50 dark:bg-zinc-950 flex justify-center items-center mb-8 border border-slate-200 dark:border-white/10 group-hover:scale-110 group-hover:bg-emerald-500/10 transition-all duration-500">
                     <feature.icon className="w-8 h-8 text-emerald-400" />
                  </div>
-                 <h3 className="text-xl font-display font-medium text-white mb-4 italic tracking-tight">{feature.title}</h3>
-                 <p className="text-zinc-400 font-medium leading-relaxed">{feature.desc}</p>
+                 <h3 className="text-xl font-display font-medium text-slate-950 dark:text-white mb-4 italic tracking-tight">{feature.title}</h3>
+                 <p className="text-slate-600 dark:text-zinc-400 font-medium leading-relaxed">{feature.desc}</p>
               </div>
             ))}
           </div>
 
-          <div className="bg-zinc-900 border border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl relative overflow-hidden group">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 md:p-14 shadow-2xl relative overflow-hidden group">
             <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-emerald-500/10 to-transparent pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
-            <h2 className="text-3xl font-display font-medium text-white tracking-tight italic mb-8 flex items-center gap-4">
+            <h2 className="text-3xl font-display font-medium text-slate-950 dark:text-white tracking-tight italic mb-8 flex items-center gap-4">
                Thu thập & Sử dụng dữ liệu
             </h2>
-            <div className="space-y-6 text-lg text-zinc-400 font-medium leading-relaxed relative z-10 max-w-4xl">
+            <div className="space-y-6 text-lg text-slate-600 dark:text-zinc-400 font-medium leading-relaxed relative z-10 max-w-4xl">
               <p>
                  Chúng tôi chỉ thu thập những thông tin thiết yếu nhất để duy trì định danh và cấp quyền truy cập. Những thông tin này bao gồm: Email, tên người dùng, và token mã hóa của chuỗi đăng nhập.
               </p>

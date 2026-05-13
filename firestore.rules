@@ -11,13 +11,14 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-        request.auth.token.email == 'sonlyhongduc@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
+        request.auth.token.email in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
       );
     }
     function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'sonlyhongduc@gmail.com' ||
+        request.auth.token.email in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
       );
     }
@@ -37,7 +38,7 @@ service cloud.firestore {
 
     // USERS
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if (isOwner(userId) || isAdmin()) && 
                     // Prevent users from changing their own role/status unless they are superadmin
@@ -53,15 +54,14 @@ service cloud.firestore {
 
     // SETTINGS / SYSTEM
     match /settings/{docId} {
-      allow read: if docId == 'apiKeys' ? isSignedIn() : true; 
-      allow write: if isAdmin() && (docId != 'system' || isSuperAdmin());
-    }
+      allow read: if isSignedIn() || docId == 'system' || docId == 'visits_stats'; 
+      allow write: if (isAdmin() && (docId != 'system' || isSuperAdmin())) || (docId == 'visits_stats');
 
-    // NOTIFICATIONS
-    match /notifications/{notifyId} {
-      allow read: if isSignedIn();
-      allow update: if isSignedIn(); // Allow updating read status
-      allow create, delete: if isAdmin();
+      // Support nested settings like /settings/zalo/config/bot
+      match /{allSubcollections=**} {
+        allow read: if isAdmin();
+        allow write: if isSuperAdmin();
+      }
     }
 
     // PRODUCTS / UTILITIES
@@ -91,8 +91,8 @@ service cloud.firestore {
     }
 
     match /activities/{id} {
-      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow read: if true;
+      allow create: if true;
       allow update, delete: if isAdmin();
     }
 
@@ -101,6 +101,30 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // APPS & CATEGORIES
+    match /apps/{appId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // ADMIN REQUESTS
+    match /adminRequests/{reqId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == reqId;
+      allow delete: if isSuperAdmin();
+    }
+    
+    // ACTIVITY LOGS
+    match /activityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+    
     // FILES
     match /files/{fileId} {
       allow read: if isSignedIn();

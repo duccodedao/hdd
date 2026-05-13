@@ -66,8 +66,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   }),
   setUserData: (data) => set({ 
     userData: data,
-    isAdmin: data?.role === 'admin' || data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com',
-    isSuperAdmin: data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com'
+    isAdmin: data?.role === 'admin' || data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'cuong.nguyen1@ghn.vn',
+    isSuperAdmin: data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'cuong.nguyen1@ghn.vn'
   }),
   setLoading: (loading) => set({ loading }),
   set2FAVerified: (verified) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { OfflineGuard } from '../components/OfflineGuard';
@@ -9,6 +9,8 @@ import FindMyDeviceUtility from './FindMyDeviceUtility';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
 import AiScanner from './utilities/AiScanner';
+import GeminiChat from './utilities/GeminiChat';
+import ZaloBot from './utilities/ZaloBot';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
@@ -22,14 +24,19 @@ interface UtilityItem {
   type: 'internal' | 'embed' | 'tool';
   embedUrl?: string;
   createdAt: number;
+  adminOnly?: boolean;
 }
 
 const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void }) => {
   const { maintenanceTabs } = useAppStore();
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isAdmin;
   const Icon = item.icon;
+
+  if (item.adminOnly && !isSuperAdmin) {
+    return null;
+  }
 
   const handleClick = () => {
     if (isBlocked) {
@@ -63,7 +70,7 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         <div className="absolute top-0 right-0 p-3 z-10">
            <div className={cn(
              "p-1.5 rounded-lg border",
-             isAdmin ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-amber-500/20 text-amber-500 border-amber-500/30"
+             isAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
            )}>
               <Lock className="w-3.5 h-3.5" />
            </div>
@@ -72,8 +79,8 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
 
       <div className="flex items-start justify-between mb-8">
         <div className={cn(
-          "w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 transition-all duration-500",
-          !isBlocked && "group-hover:text-white group-hover:bg-indigo-500/10 group-hover:border-indigo-500/20 group-hover:scale-110"
+          "w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-zinc-400 transition-all duration-500",
+          !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-white group-hover:bg-blue-50 dark:group-hover:bg-indigo-500/10 group-hover:border-blue-200 dark:group-hover:border-indigo-500/20 group-hover:scale-110"
         )}>
           {typeof item.icon === 'string' ? (
             item.type === 'embed' ? <ExternalLink className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />
@@ -83,30 +90,30 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         </div>
         <div className={cn(
           "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-          isMaintenanceActive ? (isAdmin ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20') :
-          item.id === 'ai-scanner' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 
-          item.type === 'embed' ? 'bg-zinc-800 text-zinc-500 border-white/5' : 
-          'bg-white/5 text-white/50 border-white/10'
+          isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-500 dark:border-amber-500/20') :
+          item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
+          item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
+          'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
         )}>
           {isMaintenanceActive ? (isAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
         </div>
       </div>
       
       <div className="flex-1 space-y-3">
-        <h3 className="text-xl font-semibold text-white tracking-tight">{item.title}</h3>
-        <p className="text-zinc-400 text-sm leading-relaxed line-clamp-2 italic">
+        <h3 className="text-xl font-semibold text-slate-950 dark:text-white tracking-tight">{item.title}</h3>
+        <p className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 italic">
            {item.description}
         </p>
       </div>
       
-      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between group/link">
+      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link">
         <span className={cn(
-          "text-[10px] font-bold text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
-          !isBlocked && "group-hover:text-indigo-400"
+          "text-[10px] font-bold text-slate-500 dark:text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
+          !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-indigo-400"
         )}>
           {isBlocked ? 'Đang bảo trì' : 'Thực thi'} {!isBlocked && <Zap className="w-3 h-3" />}
         </span>
-        {!isBlocked && <ArrowRight className="w-4 h-4 text-zinc-700 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />}
+        {!isBlocked && <ArrowRight className="w-4 h-4 text-slate-400 dark:text-zinc-700 group-hover:text-blue-600 dark:group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />}
       </div>
     </motion.div>
   );
@@ -141,10 +148,32 @@ export default function UtilitiesPage() {
       return <AiScanner onBack={() => setActiveUtility(null)} />;
     }
 
+    if (activeUtility.id === 'gemini-chat') {
+      return (
+        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in no-scrollbar">
+          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
+            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
+          </button>
+          <GeminiChat />
+        </div>
+      );
+    }
+
+    if (activeUtility.id === 'zalo-bot') {
+      return (
+        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in no-scrollbar">
+          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
+            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
+          </button>
+          <ZaloBot />
+        </div>
+      );
+    }
+
     if (activeUtility.type === 'embed') {
       return (
         <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in">
-          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-white/5 rounded-lg border border-transparent hover:border-white/5">
+          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
             <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
           </button>
           <div className="flex-1 glass-card overflow-hidden bg-black/40 ring-1 ring-white/10 shadow-2xl">
@@ -163,6 +192,23 @@ export default function UtilitiesPage() {
   }
 
 const nativeUtilities: UtilityItem[] = [
+  {
+    id: 'gemini-chat',
+    title: 'Gemini AI Assistant',
+    description: 'Trợ lý AI vạn năng hỗ trợ giải đáp thắc mắc, viết code và sáng tạo nội dung.',
+    icon: MessageSquare,
+    type: 'tool',
+    createdAt: Date.now() + 1000
+  },
+  {
+    id: 'zalo-bot',
+    title: 'Zalo Bot Admin',
+    description: 'Trung tâm kiểm tra và quản lý Zalo Official Account Bot (Dành riêng cho Admin).',
+    icon: Bot,
+    type: 'tool',
+    adminOnly: true,
+    createdAt: Date.now() + 500
+  },
   {
     id: 'ai-scanner',
     title: 'Quét Văn Bản AI',
@@ -204,14 +250,14 @@ const nativeUtilities: UtilityItem[] = [
       <div className="space-y-10 lg:space-y-16">
         {/* Header section */}
         <header className="space-y-4 lg:space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">Workbench</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-300 uppercase tracking-widest">Workbench</span>
           </div>
           
           <div className="space-y-1 lg:space-y-2">
-            <h1 className="text-3xl lg:text-6xl font-display font-semibold tracking-tight text-white leading-none">Công Cụ</h1>
-            <p className="text-zinc-400 text-sm lg:text-base font-medium max-w-xl">
+            <h1 className="text-3xl lg:text-6xl font-display font-semibold tracking-tight text-slate-950 dark:text-white leading-none">Công Cụ</h1>
+            <p className="text-slate-600 dark:text-zinc-400 text-sm lg:text-base font-medium max-w-xl">
               Các tiện ích hiệu suất cao được thiết kế để tối ưu hóa công việc kỹ thuật số của bạn.
             </p>
           </div>
