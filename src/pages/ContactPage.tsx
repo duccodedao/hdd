@@ -71,14 +71,6 @@ export default function ContactPage() {
       url: socialConfig.github || 'https://github.com/duclsh', 
       color: 'text-zinc-500 hover:text-white',
       desc: 'Mã nguồn & quy trình'
-    },
-    { 
-      name: 'Tin nhắn nhanh', 
-      value: 'Zalo Connect', 
-      icon: MessageCircle, 
-      url: socialConfig.zalo?.startsWith('http') ? socialConfig.zalo : '#', 
-      color: 'text-sky-500',
-      desc: 'Kênh liên lạc khẩn cấp'
     }
   ];
 

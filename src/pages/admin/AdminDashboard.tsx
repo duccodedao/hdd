@@ -43,7 +43,6 @@ export default function AdminDashboard() {
     adminPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
-    zalo: '0123456789',
     youtube: 'https://youtube.com/@your-channel',
     email: 'contact@system.com'
   });
@@ -494,15 +493,6 @@ export default function AdminDashboard() {
                       type="url" 
                       value={aboutConfig.github}
                       onChange={(e) => setAboutConfig({...aboutConfig, github: e.target.value})}
-                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1 ml-1">Zalo Phone/URL</label>
-                    <input 
-                      type="text" 
-                      value={aboutConfig.zalo}
-                      onChange={(e) => setAboutConfig({...aboutConfig, zalo: e.target.value})}
                       className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
                     />
                   </div>

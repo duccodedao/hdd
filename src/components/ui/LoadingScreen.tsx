@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import AppLogo from './AppLogo';
 
 export default function LoadingScreen() {
   return (
@@ -10,13 +11,9 @@ export default function LoadingScreen() {
           initial={{ scale: 0.8, opacity: 0.5 }}
           animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="w-16 h-16 flex items-center justify-center"
+          className="w-24 h-24 flex items-center justify-center"
         >
-          <img 
-            src="https://tytpht.hdd.io.vn/img/bmassloadings.png" 
-            alt="Loading" 
-            className="w-full h-full object-contain"
-          />
+          <AppLogo className="w-full h-full" isLoading={true} />
         </motion.div>
         
         <div className="text-center space-y-2">

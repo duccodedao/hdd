@@ -57,6 +57,20 @@
         "userId": { "type": "string" }
       },
       "required": ["name", "url", "path", "size", "type", "uploadedAt", "userId"]
+    },
+    "UserAIKey": {
+      "title": "User AI Key",
+      "description": "Secondary AI API key provided by the user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastUsedAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["active", "revoked", "invalid"] }
+      },
+      "required": ["userId", "apiKey", "status"]
     }
   },
   "firestore": {
@@ -71,6 +85,10 @@
     "files": {
       "schema": "FileMetadata",
       "description": "Store metadata of all uploaded files"
+    },
+    "user_ai_keys": {
+      "schema": "UserAIKey",
+      "description": "Stores secondary AI API keys provided by users"
     }
   }
 }

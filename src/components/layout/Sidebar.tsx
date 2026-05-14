@@ -7,6 +7,7 @@ import {
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
+import AppLogo from '../ui/AppLogo';
 
 const fixedNavGroups = [
   {
@@ -41,11 +42,7 @@ export default function Sidebar({ className }: { className?: string }) {
   return (
     <aside className={cn("flex flex-col relative z-20 w-64 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
       <div className="p-8 flex items-center gap-4">
-        <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
-           <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-           <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-2" />
-           <Shield className="relative z-10 w-4 h-4 text-white" />
-        </div>
+        <AppLogo className="w-8 h-8" />
         <div className="flex flex-col">
           <h2 className="font-display font-black text-slate-900 dark:text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
           <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1 italic">NUCLEUS OS</span>

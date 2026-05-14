@@ -34,6 +34,13 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 150;
     }
 
+    function isValidUserAIKey(data) {
+      return data.keys().hasAll(['userId', 'apiKey', 'status']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.apiKey is string && data.apiKey.size() <= 200 &&
+             data.status in ['active', 'revoked', 'invalid'];
+    }
+
     // --- Collections ---
 
     // USERS
@@ -54,14 +61,21 @@ service cloud.firestore {
 
     // SETTINGS / SYSTEM
     match /settings/{docId} {
-      allow read: if isSignedIn() || docId == 'system' || docId == 'visits_stats'; 
-      allow write: if (isAdmin() && (docId != 'system' || isSuperAdmin())) || (docId == 'visits_stats');
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
 
-      // Support nested settings like /settings/zalo/config/bot
+      // Support nested settings
       match /{allSubcollections=**} {
         allow read: if isAdmin();
         allow write: if isSuperAdmin();
       }
+    }
+
+    // USER AI KEYS
+    match /user_ai_keys/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidUserAIKey(incoming());
+      allow delete: if isAdmin();
     }
 
     // PRODUCTS / UTILITIES

@@ -4,6 +4,7 @@ import { Hammer, Loader2, Sparkles, ServerCrash, ShieldCheck, Mail, Lock, X, Che
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import toast from 'react-hot-toast';
+import AppLogo from '../components/ui/AppLogo';
 
 export default function MaintenancePage({ message }: { message?: string }) {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -49,12 +50,7 @@ export default function MaintenancePage({ message }: { message?: string }) {
           className="mb-12 inline-block"
         >
           <div className="relative group">
-            <div className="absolute -inset-4 bg-indigo-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-            <img 
-              src="https://tytpht.hdd.io.vn/img/bmassloadings.png" 
-              alt="Logo" 
-              className="w-28 h-28 md:w-36 md:h-36 mx-auto relative z-10 drop-shadow-xl"
-            />
+            <AppLogo className="w-28 h-28 md:w-36 md:h-36 mx-auto relative z-10 drop-shadow-xl" isLoading={true} />
           </div>
         </motion.div>
 

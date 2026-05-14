@@ -175,6 +175,7 @@ export default function App() {
               <Route path="/dashboard" element={<TabGuard tabKey="dashboard"><AboutPage /></TabGuard>} />
               <Route path="/profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
               <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
+              <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

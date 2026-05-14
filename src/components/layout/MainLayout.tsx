@@ -8,7 +8,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
 export default function MainLayout() {
-  const { sidebarOpen, toggleSidebar } = useAppStore();
+  const { sidebarOpen, toggleSidebar, aiActive } = useAppStore();
   const { user } = useAuthStore();
   const location = useLocation();
 
@@ -23,7 +23,7 @@ export default function MainLayout() {
 
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
-        {sidebarOpen && (
+        {sidebarOpen && !aiActive && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -34,17 +34,22 @@ export default function MainLayout() {
         )}
       </AnimatePresence>
 
-      <Sidebar className={cn(
-        "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 h-full shrink-0",
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:pointer-events-none lg:overflow-hidden'
-      )} />
+      {!aiActive && (
+        <Sidebar className={cn(
+          "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 h-full shrink-0",
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:pointer-events-none lg:overflow-hidden'
+        )} />
+      )}
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10 h-screen">
         
         <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
-          <Topbar />
+          {!aiActive && <Topbar />}
           
-          <main className="flex-1 overflow-x-hidden overflow-y-auto relative z-0 no-scrollbar">
+          <main className={cn(
+            "flex-1 overflow-x-hidden relative z-0 no-scrollbar",
+            aiActive ? "overflow-hidden" : "overflow-y-auto"
+          )}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -52,19 +57,27 @@ export default function MainLayout() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="min-h-full flex flex-col pt-4 pb-12"
+                className={cn(
+                    "min-h-full flex flex-col",
+                    !aiActive && "pt-4 pb-12"
+                )}
               >
-                <div className="flex-1 px-4 md:px-8 lg:px-12 max-w-[1920px] mx-auto w-full">
+                <div className={cn(
+                    "flex-1 max-w-[1920px] mx-auto w-full",
+                    !aiActive ? "px-4 md:px-8 lg:px-12" : "px-0"
+                )}>
                   <Outlet />
                 </div>
                 
-                <footer className="mt-20 py-12 text-center flex flex-col items-center justify-center gap-4 px-6 opacity-40 hover:opacity-100 transition-opacity duration-700">
-                  <div className="flex justify-center gap-8 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-500">
-                    <Link to="/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">Legal</Link>
-                    <Link to="/privacy" className="hover:text-slate-900 dark:hover:text-white transition-colors">Privacy</Link>
-                  </div>
-                  <p className="text-[10px] text-slate-600 dark:text-zinc-600 font-medium">© 2026 Nucleus OS. Engineered for privacy.</p>
-                </footer>
+                {!aiActive && (
+                  <footer className="mt-20 py-12 text-center flex flex-col items-center justify-center gap-4 px-6 opacity-40 hover:opacity-100 transition-opacity duration-700">
+                    <div className="flex justify-center gap-8 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-500">
+                      <Link to="/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">Legal</Link>
+                      <Link to="/privacy" className="hover:text-slate-900 dark:hover:text-white transition-colors">Privacy</Link>
+                    </div>
+                    <p className="text-[10px] text-slate-600 dark:text-zinc-600 font-medium">© 2026 Nucleus OS. Engineered for privacy.</p>
+                  </footer>
+                )}
               </motion.div>
             </AnimatePresence>
           </main>

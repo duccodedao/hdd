@@ -10,11 +10,12 @@ import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
 import AiScanner from './utilities/AiScanner';
 import GeminiChat from './utilities/GeminiChat';
-import ZaloBot from './utilities/ZaloBot';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
+
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface UtilityItem {
   id: string;
@@ -120,8 +121,34 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
 };
 
 export default function UtilitiesPage() {
+  const { sessionId } = useParams();
+  const navigate = useNavigate();
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
+  const { setAiActive } = useAppStore();
+
+  useEffect(() => {
+    if (sessionId) {
+      setActiveUtility(nativeUtilities.find(u => u.id === 'gemini-chat') || null);
+    }
+  }, [sessionId]);
+
+  const handleBack = () => {
+    setActiveUtility(null);
+    if (sessionId) {
+      navigate('/utilities');
+    }
+  };
+
+  useEffect(() => {
+    if (activeUtility?.id === 'gemini-chat') {
+      setAiActive(true);
+    } else {
+      setAiActive(false);
+    }
+    
+    return () => setAiActive(false);
+  }, [activeUtility, setAiActive]);
 
   useEffect(() => {
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
@@ -131,41 +158,86 @@ export default function UtilitiesPage() {
     return () => unsubscribe();
   }, []);
 
+  const { isAdmin } = useAuthStore();
+  const { maintenanceTabs } = useAppStore();
+
   if (activeUtility) {
-    if (activeUtility.type === 'internal' && activeUtility.id === 'find-my-device') {
-      return <FindMyDeviceUtility onBack={() => setActiveUtility(null)} />;
-    }
-    
-    if (activeUtility.id === 'image-to-pdf') {
-      return <ImageToPdf onBack={() => setActiveUtility(null)} />;
-    }
+    const isMaintenanceActive = maintenanceTabs[`utility_${activeUtility.id}`];
+    const isBlocked = isMaintenanceActive && !isAdmin;
 
-    if (activeUtility.id === 'pdf-to-word') {
-      return <PdfToWord onBack={() => setActiveUtility(null)} />;
-    }
-
-    if (activeUtility.id === 'ai-scanner') {
-      return <AiScanner onBack={() => setActiveUtility(null)} />;
-    }
-
-    if (activeUtility.id === 'gemini-chat') {
+    if (isBlocked) {
       return (
-        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in no-scrollbar">
-          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
-            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-zinc-950 min-h-screen animate-fade-in">
+          <div className="w-20 h-20 rounded-3xl bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 mb-8">
+            <Lock size={40} />
+          </div>
+          <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-4">Tính năng đang bảo trì</h2>
+          <p className="text-slate-600 dark:text-zinc-400 max-w-md mx-auto mb-10 font-medium">
+            Tiện ích "{activeUtility.title}" hiện đang được nâng cấp để mang lại trải nghiệm tốt hơn. Vui lòng quay lại sau ít phút.
+          </p>
+          <button 
+            onClick={handleBack}
+            className="px-8 py-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+          >
+            Quay lại trang chủ
           </button>
-          <GeminiChat />
         </div>
       );
     }
 
-    if (activeUtility.id === 'zalo-bot') {
+    if (activeUtility.type === 'internal' && activeUtility.id === 'find-my-device') {
+      return <FindMyDeviceUtility onBack={handleBack} />;
+    }
+    
+    if (activeUtility.id === 'image-to-pdf') {
+      return <ImageToPdf onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'pdf-to-word') {
+      return <PdfToWord onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'ai-scanner') {
+      return <AiScanner onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'gemini-chat') {
       return (
-        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in no-scrollbar">
-          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
-            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
-          </button>
-          <ZaloBot />
+        <div className="fixed inset-0 z-[100] flex flex-col w-full h-full animate-fade-in overflow-hidden bg-white dark:bg-zinc-950">
+          <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 shrink-0 flex items-center justify-between bg-white dark:bg-zinc-950/80 backdrop-blur-xl z-30">
+            <div className="flex items-center gap-6">
+              <button 
+                onClick={handleBack} 
+                className="group flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-all hover:shadow-lg active:scale-95"
+              >
+                <ArrowRight className="w-5 h-5 rotate-180 transition-transform group-hover:-translate-x-1" /> Quay lại Trang trước
+              </button>
+              <div className="h-8 w-px bg-slate-200 dark:bg-white/10" />
+              <div className="hidden sm:flex items-center gap-4">
+                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <MessageSquare size={20} />
+                 </div>
+                 <div className="flex flex-col">
+                    <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white leading-none">Bmass AI 5.0</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mt-1">Hệ điều hành định danh</span>
+                 </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+               <div className="hidden md:flex flex-col items-end mr-4">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Trạng thái định danh</span>
+                  <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest">Đã kết nối</span>
+               </div>
+               <div className="px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Neural
+               </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden relative">
+            <GeminiChat />
+          </div>
         </div>
       );
     }
@@ -173,7 +245,7 @@ export default function UtilitiesPage() {
     if (activeUtility.type === 'embed') {
       return (
         <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in">
-          <button onClick={() => setActiveUtility(null)} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
+          <button onClick={handleBack} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
             <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
           </button>
           <div className="flex-1 glass-card overflow-hidden bg-black/40 ring-1 ring-white/10 shadow-2xl">
@@ -194,20 +266,11 @@ export default function UtilitiesPage() {
 const nativeUtilities: UtilityItem[] = [
   {
     id: 'gemini-chat',
-    title: 'Gemini AI Assistant',
+    title: 'Bmass AI 5.0',
     description: 'Trợ lý AI vạn năng hỗ trợ giải đáp thắc mắc, viết code và sáng tạo nội dung.',
     icon: MessageSquare,
     type: 'tool',
     createdAt: Date.now() + 1000
-  },
-  {
-    id: 'zalo-bot',
-    title: 'Zalo Bot Admin',
-    description: 'Trung tâm kiểm tra và quản lý Zalo Official Account Bot (Dành riêng cho Admin).',
-    icon: Bot,
-    type: 'tool',
-    adminOnly: true,
-    createdAt: Date.now() + 500
   },
   {
     id: 'ai-scanner',

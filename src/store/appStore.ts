@@ -18,6 +18,8 @@ interface AppState {
   toggleDarkMode: () => void;
   googleClientId: string | null;
   setGoogleClientId: (id: string | null) => void;
+  aiActive: boolean;
+  setAiActive: (active: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -72,4 +74,6 @@ export const useAppStore = create<AppState>((set) => ({
   }),
   googleClientId: null,
   setGoogleClientId: (id) => set({ googleClientId: id }),
+  aiActive: false,
+  setAiActive: (active) => set({ aiActive: active }),
 }));

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Zap, Cpu, ArrowRight, ShieldCheck, Fingerprint, Lock, Globe, Command, Sparkles, Box, CreditCard, ChevronRight, Activity, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import AppLogo from '../components/ui/AppLogo';
 
 const NavItem = ({ children, href }: { children: React.ReactNode; href: string }) => (
   <a 
@@ -48,11 +49,7 @@ export default function LandingPage() {
               className="flex items-center gap-2 lg:gap-3 cursor-pointer shrink-0" 
               onClick={() => navigate('/')}
             >
-              <div className="relative w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center">
-                 <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-                 <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-2 lg:translate-x-3" />
-                 <CreditCard className="relative z-10 w-4 h-4 lg:w-5 lg:h-5 text-white" />
-              </div>
+              <AppLogo className="w-8 h-8 lg:w-10 lg:h-10" />
               <span className="font-display font-black text-white text-xl lg:text-2xl tracking-tighter uppercase italic ml-2 lg:ml-4">BMASS.</span>
             </motion.div>
             
@@ -330,12 +327,8 @@ export default function LandingPage() {
          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-24">
             <div className="md:col-span-6 space-y-8 lg:space-y-12">
                <div className="flex items-center gap-3 lg:gap-4">
-                  <div className="relative w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center">
-                     <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-                     <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-2 lg:translate-x-3" />
-                     <CreditCard className="relative z-10 w-4 h-4 lg:w-5 lg:h-5 text-white" />
-                  </div>
-                  <span className="font-display font-black text-white text-2xl lg:text-3xl tracking-tighter uppercase italic ml-2">BMASS.</span>
+               <AppLogo className="w-8 h-8 lg:w-10 lg:h-10" />
+               <span className="font-display font-black text-white text-2xl lg:text-3xl tracking-tighter uppercase italic ml-2">BMASS.</span>
                </div>
                <p className="text-zinc-600 text-lg lg:text-xl font-medium leading-relaxed italic max-w-sm">
                   Lý tưởng được định hình từ khối óc. Bảo mật được đảm bảo bởi BMASS.

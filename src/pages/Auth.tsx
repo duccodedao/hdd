@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Helmet } from 'react-helmet-async';
 import MiniLoading from '../components/ui/MiniLoading';
+import AppLogo from '../components/ui/AppLogo';
 
 export default function Auth() {
   const location = useLocation();
@@ -25,6 +26,7 @@ export default function Auth() {
   const isRegisterRoute = location.pathname.includes('register');
   const [activeCard, setActiveCard] = useState<'login' | 'register'>(isRegisterRoute ? 'register' : 'login');
   const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Login states
   const [identifier, setIdentifier] = useState('');
@@ -90,9 +92,17 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier || !loginPassword) return toast.error('Incomplete data.');
+    const newErrors: Record<string, string> = {};
+    if (!identifier) newErrors.identifier = 'Vui lòng nhập định danh.';
+    if (!loginPassword) newErrors.password = 'Vui lòng nhập mật khẩu.';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
     
     setLoginLoading(true);
+    setErrors({});
     try {
       if (rememberMe) {
         localStorage.setItem('rememberedIdentifier', identifier);
@@ -117,10 +127,22 @@ export default function Auth() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registerName || !registerEmail || !registerPhone || !registerPassword) return toast.error('Incomplete data.');
-    if (!agreeToTerms) return toast.error('Mandatory agreement required.');
+    const newErrors: Record<string, string> = {};
+    if (!registerName) newErrors.registerName = 'Tên không được để trống.';
+    if (!registerEmail) newErrors.registerEmail = 'Email không hợp lệ.';
+    if (!registerPhone) newErrors.registerPhone = 'Số điện thoại không hợp lệ.';
+    if (!registerPassword) newErrors.registerPassword = 'Mật khẩu tối thiểu 6 ký tự.';
+    else if (registerPassword.length < 6) newErrors.registerPassword = 'Mật khẩu quá ngắn.';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    
+    if (!agreeToTerms) return toast.error('Vui lòng chấp nhận điều khoản.');
     
     setRegisterLoading(true);
+    setErrors({});
     try {
       const qPhone = query(collection(db, 'users'), where('phoneNumber', '==', registerPhone));
       const snapPhone = await getDocs(qPhone);
@@ -202,99 +224,101 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden animate-fade-in">
+    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
       <Helmet>
         <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS Dashboard</title>
         <meta name="description" content="Truy cập vào hệ điều hành quản trị bảo mật BMASS." />
       </Helmet>
       {/* Premium Mastercard-style Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-         <div className="absolute top-[-20%] right-[-10%] w-[80vw] h-[80vw] max-w-[1200px] bg-gradient-to-br from-[#eb001b]/10 to-transparent rounded-full blur-[120px] opacity-40" />
-         <div className="absolute bottom-[-20%] left-[-10%] w-[60vw] h-[60vw] max-w-[1000px] bg-gradient-to-tr from-[#f79e1b]/10 to-transparent rounded-full blur-[100px] opacity-30" />
-         <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-[1] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
+         <div className="absolute top-[-20%] right-[-10%] w-[100vw] h-[100vw] max-w-[1200px] bg-gradient-to-br from-red-600/10 via-orange-500/5 to-transparent rounded-full blur-[140px] opacity-40 dark:opacity-30" />
+         <div className="absolute bottom-[-20%] left-[-10%] w-[80vw] h-[80vw] max-w-[1000px] bg-gradient-to-tr from-indigo-600/10 via-purple-500/5 to-transparent rounded-full blur-[120px] opacity-30 dark:opacity-20" />
+         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none z-[1] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
       </div>
 
       {/* Visual Side */}
-      <div className="hidden md:flex flex-col justify-between p-16 w-1/2 relative bg-slate-100 dark:bg-zinc-950 border-r border-slate-200 dark:border-white/5 overflow-hidden">
-         <div className="absolute top-[20%] left-[-10%] w-[40vw] h-[40vw] bg-[#eb001b]/5 rounded-full blur-[100px]" />
-         <div className="absolute bottom-[-10%] right-[-10%] w-[30vw] h-[30vw] bg-[#f79e1b]/5 rounded-full blur-[100px]" />
+      <div className="hidden md:flex flex-col justify-between p-12 lg:p-20 w-1/2 relative bg-slate-50 dark:bg-zinc-950 border-r border-slate-200 dark:border-white/5 overflow-hidden">
+         <div className="absolute top-[10%] left-[-10%] w-[50vw] h-[50vw] bg-red-600/5 rounded-full blur-[120px]" />
+         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-orange-500/5 rounded-full blur-[120px]" />
          
          <div className="relative z-10">
-            <div className="flex items-center gap-6 mb-16">
-               <div className="relative w-10 h-10 flex items-center justify-center">
-                  <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-                  <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-3" />
-                  <CreditCard className="relative z-10 w-5 h-5 text-white" />
-               </div>
-               <span className="text-2xl font-display font-semibold text-white tracking-[0.3em] uppercase italic">bmass.</span>
+            <div className="flex items-center gap-6 mb-20">
+               <AppLogo className="w-12 h-12" />
+               <span className="text-2xl font-display font-bold text-slate-900 dark:text-white tracking-[0.2em] uppercase italic">nucleus.</span>
             </div>
 
-            <div className="space-y-8">
-                <h2 className="text-6xl lg:text-8xl font-serif italic font-medium text-white tracking-tighter leading-[0.85] max-w-md lowercase">
-                   Quản trị <br /> <span className="text-zinc-700">định danh.</span>
+            <div className="space-y-12">
+                <h2 className="text-6xl lg:text-8xl font-serif italic font-medium text-slate-900 dark:text-white tracking-tighter leading-[0.85] max-w-lg lowercase">
+                   Đăng ký <br /> <span className="text-slate-300 dark:text-zinc-700">tài khoản.</span>
                 </h2>
-                <p className="text-zinc-400 text-xl max-w-sm leading-relaxed font-medium italic">
-                  Trải nghiệm sự vĩ đại từ những điều nhỏ nhất. Bảo mật là một đặc quyền, không phải gánh nặng.
+                <p className="text-slate-500 dark:text-zinc-400 text-xl max-w-sm leading-relaxed font-medium italic">
+                  Khám phá sự vĩ đại từ những điều cốt lõi. Bảo mật là một đặc quyền, không phải gánh nặng.
                 </p>
             </div>
          </div>
 
-         <div className="relative z-10 flex gap-20">
+         <div className="relative z-10 flex gap-12 lg:gap-24">
             {[
-              { label: 'Uptime', val: '99.9%', color: '#eb001b' },
-              { label: 'Security', val: 'PRO', color: '#f79e1b' }
+              { label: 'Uptime', val: '99.99%', color: '#eb001b' },
+              { label: 'Security', val: 'PROTECTED', color: '#f79e1b' }
             ].map(stat => (
-              <div key={stat.label} className="space-y-2">
-                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.4em]">{stat.label}</p>
-                 <p className="text-4xl font-serif italic font-medium text-white">{stat.val}</p>
-                 <div className="h-0.5 w-8" style={{ backgroundColor: stat.color }} />
+              <div key={stat.label} className="space-y-3">
+                 <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.4em]">{stat.label}</p>
+                 <p className="text-4xl font-serif italic font-medium text-slate-900 dark:text-white leading-none">{stat.val}</p>
+                 <div className="h-0.5 w-10 mt-2" style={{ backgroundColor: stat.color }} />
               </div>
             ))}
          </div>
       </div>
 
       {/* Form Side */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
-        <div className="w-full max-w-md space-y-10">
-          <header className="space-y-4">
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 relative z-10">
+        <div className="w-full max-w-md space-y-12">
+          <header className="space-y-6">
              <div className="flex items-center justify-between">
                 <button 
                   onClick={() => navigate(-1)}
-                  className="group flex items-center gap-2 text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest transition-all"
+                  className="group flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-all"
                 >
                    <ArrowRight className="w-3.5 h-3.5 rotate-180 group-hover:-translate-x-1 transition-transform" /> 
                    Quay lại
                 </button>
                 <div className="md:hidden flex items-center gap-4">
-                   <div className="relative w-8 h-8 flex items-center justify-center">
-                      <div className="absolute inset-0 w-full h-full bg-[#eb001b] rounded-full mix-blend-screen opacity-80" />
-                      <div className="absolute inset-0 w-full h-full bg-[#f79e1b] rounded-full mix-blend-screen opacity-80 translate-x-2" />
-                      <CreditCard className="relative z-10 w-4 h-4 text-white" />
-                   </div>
+                   <AppLogo className="w-8 h-8" />
                 </div>
              </div>
 
-             <div className="space-y-2 lg:space-y-3">
-               <h3 className="text-3xl lg:text-4xl font-serif italic text-white tracking-tighter lowercase">
-                 {activeCard === 'login' ? 'Kết nối hệ thống.' : 'Thiết lập định danh.'}
+             <div className="space-y-3">
+               <h3 className="text-4xl lg:text-5xl font-serif italic text-slate-900 dark:text-white tracking-tighter lowercase leading-tight">
+                 {activeCard === 'login' ? 'Đăng nhập ứng dụng.' : 'Đăng ký tài khoản.'}
                </h3>
-               <p className="text-zinc-400 text-base lg:text-lg font-medium italic leading-tight">
-                  {activeCard === 'login' ? 'Yêu cầu xác thực để truy cập hệ thống cốt lõi.' : 'Đăng ký nhận diện kỹ thuật số của bạn vào hệ thống.'}
+               <p className="text-slate-500 dark:text-zinc-400 text-lg font-medium italic leading-relaxed">
+                  {activeCard === 'login' ? 'Yêu cầu xác thực để truy cập hệ thống bảo mật.' : 'Đăng ký nhận diện kỹ thuật số của bạn vào hệ sinh thái.'}
                </p>
              </div>
           </header>
 
-          <div className="space-y-6">
-            <div className="flex p-1 bg-white/5 border border-white/10 rounded-xl">
+          <div className="space-y-8">
+            <div className="flex p-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl">
                <button 
                  onClick={() => setActiveCard('login')}
-                 className={cn("flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all", activeCard === 'login' ? 'bg-white text-black' : 'text-zinc-500 hover:text-zinc-300')}
+                 className={cn(
+                    "flex-1 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all", 
+                    activeCard === 'login' 
+                        ? 'bg-white dark:bg-zinc-800 text-slate-950 dark:text-white shadow-xl dark:shadow-none' 
+                        : 'text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-300'
+                 )}
                >
                  Đăng Nhập
                </button>
                <button 
                  onClick={() => setActiveCard('register')}
-                 className={cn("flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all", activeCard === 'register' ? 'bg-white text-black' : 'text-zinc-500 hover:text-zinc-300')}
+                 className={cn(
+                    "flex-1 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all", 
+                    activeCard === 'register' 
+                        ? 'bg-white dark:bg-zinc-800 text-slate-950 dark:text-white shadow-xl dark:shadow-none' 
+                        : 'text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-300'
+                 )}
                >
                  Đăng Ký
                </button>
@@ -303,184 +327,307 @@ export default function Auth() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeCard}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-6"
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="space-y-8"
               >
                 {activeCard === 'login' ? (
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Định Danh / Email</label>
+                  <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-6">
+                      <div className="space-y-2.5">
+                        <label className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest ml-1 transition-colors",
+                          errors.identifier ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                        )}>
+                          Số điện thoại/Gmail
+                        </label>
                         <div className="relative group">
+                          <div className={cn(
+                            "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
+                            errors.identifier ? "text-rose-500" : "text-slate-400 dark:text-zinc-600 group-focus-within:text-blue-500"
+                          )}>
+                             <User size={18} />
+                          </div>
                           <input 
                             id="identifier"
                             type="text" 
                             autoComplete="username"
                             disabled={loginLoading}
                             value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
-                            className="h-11 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white placeholder:text-zinc-700"
+                            onChange={(e) => {
+                              setIdentifier(e.target.value);
+                              if (errors.identifier) setErrors(prev => {
+                                const n = {...prev};
+                                delete n.identifier;
+                                return n;
+                              });
+                            }}
+                            className={cn(
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-6 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              errors.identifier 
+                                ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                                : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"
+                            )}
                             placeholder="Email hoặc số điện thoại"
-                            required
                           />
                         </div>
+                        {errors.identifier && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.identifier}</p>}
                       </div>
 
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center mb-1 px-1">
-                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Mật khẩu</label>
-                          <button type="button" onClick={() => setShowForgotModal(true)} className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-300">Khôi phục mật khẩu?</button>
+                      <div className="space-y-2.5">
+                        <div className="flex justify-between items-center px-1">
+                          <label className={cn(
+                            "text-[10px] font-bold uppercase tracking-widest transition-colors",
+                            errors.password ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                          )}>Mật khẩu</label>
+                          <button type="button" onClick={() => setShowForgotModal(true)} className="text-[9px] font-bold text-blue-600 dark:text-indigo-400 uppercase tracking-widest hover:underline decoration-2 underline-offset-4">Quên mật khẩu?</button>
                         </div>
-                        <div className="relative">
+                        <div className="relative group">
+                          <div className={cn(
+                            "absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors",
+                            errors.password ? "text-rose-500" : "text-slate-400 dark:text-zinc-600 group-focus-within:text-blue-500"
+                          )}>
+                             <Lock size={18} />
+                          </div>
                           <input 
                             id="loginPassword"
                             type={showLoginPassword ? "text" : "password"} 
                             autoComplete="current-password"
                             disabled={loginLoading}
                             value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            className="h-11 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 pr-12 outline-none focus:border-white/20 transition-all text-sm font-medium text-white placeholder:text-zinc-700"
+                            onChange={(e) => {
+                              setLoginPassword(e.target.value);
+                              if (errors.password) setErrors(prev => {
+                                const n = {...prev};
+                                delete n.password;
+                                return n;
+                              });
+                            }}
+                            className={cn(
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-14 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              errors.password 
+                                ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                                : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"
+                            )}
                             placeholder="••••••••"
-                            required
                           />
                           <button 
                             type="button" 
                             onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white transition-colors"
                           >
-                            {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {showLoginPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
                         </div>
+                        {errors.password && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.password}</p>}
                       </div>
 
-                      <label className="flex items-center gap-3 cursor-pointer group pt-2">
-                        <div 
-                          onClick={() => setRememberMe(!rememberMe)}
-                          className={cn(
-                            "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
-                            rememberMe ? "bg-white border-white shadow-[0_0_10px_rgba(255,255,255,0.2)]" : "bg-zinc-900 border-white/10 group-hover:border-white/20"
-                          )}
-                        >
-                          {rememberMe && <CheckCircle2 className="w-3.5 h-3.5 text-black" />}
-                        </div>
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Giữ trạng thái đăng nhập</span>
-                      </label>
+                      <div className="flex items-center justify-between pt-2">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                           <div 
+                             onClick={() => setRememberMe(!rememberMe)}
+                             className={cn(
+                               "w-6 h-6 rounded-lg border flex items-center justify-center transition-all",
+                               rememberMe 
+                                 ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white shadow-xl" 
+                                 : "bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-white/10 group-hover:border-slate-300 dark:group-hover:border-white/20"
+                             )}
+                           >
+                             {rememberMe && <CheckCircle2 className="w-4 h-4 text-white dark:text-black" />}
+                           </div>
+                           <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-[0.1em]">Lưu đăng nhập</span>
+                        </label>
+                      </div>
                     </div>
 
                     <button 
                       type="submit" 
                       disabled={loginLoading}
-                      className="w-full h-11 bg-white text-black hover:bg-[#ff5f00] hover:text-white rounded-xl font-black text-[11px] uppercase tracking-[0.3em] transition-all shadow-xl shadow-white/5 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 group/btn"
+                      className="w-full h-14 bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-zinc-200 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all shadow-2xl shadow-slate-900/10 dark:shadow-white/5 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 group/btn"
                     >
-                      {loginLoading ? <MiniLoading className="w-4 h-4 text-black" /> : <>Access System <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                      {loginLoading ? <MiniLoading className="w-5 h-5 text-current" /> : <>Đăng nhập <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
                     </button>
                   </form>
                 ) : (
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Tên Hiển Thị</label>
+                  <form onSubmit={handleRegister} className="space-y-6">
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest ml-1 transition-colors",
+                          errors.registerName ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                        )}>Tên Hiển Thị</label>
                         <input 
                           id="registerName"
                           type="text" 
                           autoComplete="name"
                           disabled={registerLoading}
                           value={registerName}
-                          onChange={(e) => setRegisterName(e.target.value)}
-                          className="h-10 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white"
-                          required
+                          onChange={(e) => {
+                            setRegisterName(e.target.value);
+                            if (errors.registerName) setErrors(prev => {
+                              const n = {...prev};
+                              delete n.registerName;
+                              return n;
+                            });
+                          }}
+                          className={cn(
+                            "h-12 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl px-5 outline-none transition-all text-sm font-semibold text-slate-900 dark:text-white",
+                            errors.registerName 
+                              ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                              : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50"
+                          )}
+                          placeholder="Ví dụ: Nguyên Nguyễn"
                         />
+                        {errors.registerName && <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.registerName}</p>}
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email Đăng Ký</label>
+                      <div className="space-y-2">
+                        <label className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest ml-1 transition-colors",
+                          errors.registerEmail ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                        )}>Email Đăng Ký</label>
                         <input 
                           id="registerEmail"
                           type="email" 
                           autoComplete="email"
                           disabled={registerLoading}
                           value={registerEmail}
-                          onChange={(e) => setRegisterEmail(e.target.value)}
-                          className="h-10 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white"
-                          required
+                          onChange={(e) => {
+                            setRegisterEmail(e.target.value);
+                            if (errors.registerEmail) setErrors(prev => {
+                              const n = {...prev};
+                              delete n.registerEmail;
+                              return n;
+                            });
+                          }}
+                          className={cn(
+                            "h-12 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl px-5 outline-none transition-all text-sm font-semibold text-slate-900 dark:text-white",
+                            errors.registerEmail 
+                              ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                              : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50"
+                          )}
+                          placeholder="name@company.com"
                         />
+                        {errors.registerEmail && <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.registerEmail}</p>}
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Số Điện Thoại</label>
+                      <div className="space-y-2">
+                        <label className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest ml-1 transition-colors",
+                          errors.registerPhone ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                        )}>Số Điện Thoại</label>
                         <input 
                           id="registerPhone"
                           type="tel" 
                           autoComplete="tel"
                           disabled={registerLoading}
                           value={registerPhone}
-                          onChange={(e) => setRegisterPhone(e.target.value)}
-                          className="h-10 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white"
-                          required
+                          onChange={(e) => {
+                            setRegisterPhone(e.target.value);
+                            if (errors.registerPhone) setErrors(prev => {
+                              const n = {...prev};
+                              delete n.registerPhone;
+                              return n;
+                            });
+                          }}
+                          className={cn(
+                            "h-12 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl px-5 outline-none transition-all text-sm font-semibold text-slate-900 dark:text-white",
+                            errors.registerPhone 
+                              ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                              : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50"
+                          )}
+                          placeholder="Ví dụ: 0901234567"
                         />
+                        {errors.registerPhone && <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.registerPhone}</p>}
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Mật khẩu</label>
-                        <input 
-                          id="registerPassword"
-                          type="password" 
-                          autoComplete="new-password"
-                          disabled={registerLoading}
-                          value={registerPassword}
-                          onChange={(e) => setRegisterPassword(e.target.value)}
-                          className="h-10 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white"
-                          required
-                        />
+                      <div className="space-y-2">
+                        <label className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest ml-1 transition-colors",
+                          errors.registerPassword ? "text-rose-500" : "text-slate-400 dark:text-zinc-500"
+                        )}>Mật khẩu</label>
+                        <div className="relative group">
+                          <input 
+                            id="registerPassword"
+                            type={showRegisterPassword ? "text" : "password"} 
+                            autoComplete="new-password"
+                            disabled={registerLoading}
+                            value={registerPassword}
+                            onChange={(e) => {
+                              setRegisterPassword(e.target.value);
+                              if (errors.registerPassword) setErrors(prev => {
+                                const n = {...prev};
+                                delete n.registerPassword;
+                                return n;
+                              });
+                            }}
+                            className={cn(
+                              "h-12 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl px-5 pr-12 outline-none transition-all text-sm font-semibold text-slate-900 dark:text-white",
+                              errors.registerPassword 
+                                ? "border-rose-500/50 ring-4 ring-rose-500/5" 
+                                : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50"
+                            )}
+                            placeholder="••••••••"
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white transition-colors"
+                          >
+                            {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {errors.registerPassword && <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest ml-1 mt-1 animate-in fade-in slide-in-from-top-1">{errors.registerPassword}</p>}
                       </div>
 
-                      <label className="flex items-center gap-3 cursor-pointer group mt-4">
+                      <label className="flex items-start gap-3 cursor-pointer group mt-4 pt-1">
                         <div 
                           onClick={() => setAgreeToTerms(!agreeToTerms)}
                           className={cn(
-                            "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
-                            agreeToTerms ? "bg-white border-white" : "bg-zinc-900 border-white/10"
+                            "w-5 h-5 rounded-md border mt-0.5 flex items-center justify-center transition-all shrink-0",
+                            agreeToTerms ? "bg-slate-950 dark:bg-white border-slate-950 dark:border-white" : "bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-white/10"
                           )}
                         >
-                          {agreeToTerms && <CheckCircle2 className="w-3.5 h-3.5 text-black" />}
+                          {agreeToTerms && <CheckCircle2 className="w-3.5 h-3.5 text-white dark:text-black" />}
                         </div>
-                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Đồng ý với điều khoản & dịch vụ</span>
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-zinc-500 leading-tight">
+                           Tôi chấp nhận các <Link to="/terms" className="text-blue-600 dark:text-indigo-400 hover:underline">Điều khoản Dịch vụ</Link> và <Link to="/privacy" className="text-blue-600 dark:text-indigo-400 hover:underline">Chính sách Bảo mật</Link>.
+                        </span>
                       </label>
                     </div>
 
                     <button 
                       type="submit" 
                       disabled={registerLoading}
-                      className="w-full h-11 bg-white text-black hover:bg-zinc-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95 disabled:opacity-50"
+                      className="w-full h-14 bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-zinc-200 rounded-2xl font-bold text-xs uppercase tracking-[0.2em] transition-all shadow-xl dark:shadow-none active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
                     >
-                      {registerLoading ? <MiniLoading className="w-4 h-4 text-black" /> : 'Đăng Ký Danh Tính'}
+                      {registerLoading ? <MiniLoading className="w-5 h-5 text-current" /> : 'Đăng ký'}
                     </button>
                   </form>
                 )}
               </motion.div>
             </AnimatePresence>
 
-            <div className="space-y-6 pt-4">
-              <div className="flex items-center gap-4">
-                 <div className="flex-1 h-px bg-white/5"></div>
-                 <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Hoặc</span>
-                 <div className="flex-1 h-px bg-white/5"></div>
+            <div className="space-y-8 pt-4">
+              <div className="flex items-center gap-6">
+                 <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
+                 <span className="text-[10px] font-bold text-slate-300 dark:text-zinc-700 uppercase tracking-widest whitespace-nowrap">Access via secure relay</span>
+                 <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
               </div>
 
               <button 
                 type="button"
                 onClick={handleGoogleAuth}
                 disabled={loginLoading || registerLoading || googleLoading}
-                className="w-full h-12 bg-zinc-900 border border-white/5 rounded-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50 group"
+                className="w-full h-14 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-50 group shadow-sm"
               >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Đăng nhấp bằng Google</span>
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
+                <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 uppercase tracking-widest">Đăng nhấp bằng Google</span>
               </button>
 
-              <footer className="flex justify-center gap-8 pt-4">
-                 <Link to="/terms" className="text-[9px] font-bold text-zinc-600 hover:text-white uppercase tracking-widest transition-colors">Điều khoản</Link>
-                 <Link to="/privacy" className="text-[9px] font-bold text-zinc-600 hover:text-white uppercase tracking-widest transition-colors">Bảo mật</Link>
-                 <Link to="/help" className="text-[9px] font-bold text-zinc-600 hover:text-white uppercase tracking-widest transition-colors">Hỗ trợ</Link>
+              <footer className="flex justify-center gap-10 pt-4 opacity-70 hover:opacity-100 transition-opacity">
+                 <Link to="/help" className="text-[10px] font-bold text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors">Hỗ trợ</Link>
+                 <Link to="/status" className="text-[10px] font-bold text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors">Tình trạng</Link>
+                 <Link to="/legal" className="text-[10px] font-bold text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors">Pháp lý</Link>
               </footer>
             </div>
           </div>
@@ -495,42 +642,43 @@ export default function Auth() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-sm glass-card border border-white/10 p-10 rounded-[2.5rem] shadow-2xl"
+              className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 p-10 rounded-[2.5rem] shadow-2xl"
             >
               <button 
                 onClick={() => setShowForgotModal(false)}
-                className="absolute top-6 right-6 p-2 text-zinc-500 hover:text-white transition-all bg-white/5 rounded-full"
+                className="absolute top-6 right-6 p-2 text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-all bg-slate-100 dark:bg-white/5 rounded-full"
                >
                 <X className="w-4 h-4" />
               </button>
 
               <div className="space-y-6 text-center pt-4 mb-8">
-                <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Mail className="w-6 h-6 text-indigo-400" />
+                <div className="w-16 h-16 bg-blue-500/10 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto border border-blue-500/20 dark:border-indigo-500/20">
+                  <Mail className="w-8 h-8 text-blue-600 dark:text-indigo-400" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-xl font-semibold text-white tracking-tight">Khôi Phục Quyền Truy Cập</h3>
-                  <p className="text-xs text-zinc-500 font-medium">Bảo mật tài khoản liên kết qua email.</p>
+                <div className="space-y-1.5">
+                  <h3 className="text-2xl font-serif italic text-slate-900 dark:text-white tracking-tight">Khôi Phục Quyền Truy Cập</h3>
+                  <p className="text-sm text-slate-500 dark:text-zinc-500 font-medium italic">Bảo mật tài khoản liên kết qua email.</p>
                 </div>
               </div>
 
               <form onSubmit={handleForgotPassword} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email Đăng Ký</label>
+                <div className="space-y-2.5">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest ml-1">Email Đăng Ký</label>
                   <input 
                     type="text" 
                     required
                     value={forgotIdentifier}
                     onChange={(e) => setForgotIdentifier(e.target.value)}
-                    className="h-11 w-full bg-zinc-900 border border-white/5 rounded-xl px-4 outline-none focus:border-white/20 transition-all text-sm font-medium text-white"
+                    className="h-12 w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-white/5 rounded-xl px-4 outline-none focus:border-blue-500/50 dark:focus:border-indigo-500/50 transition-all text-sm font-semibold text-slate-900 dark:text-white"
+                    placeholder="name@company.com"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={forgotLoading}
-                  className="w-full h-11 bg-white text-black hover:bg-zinc-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95 disabled:opacity-50"
+                  className="w-full h-12 bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-zinc-200 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
                 >
-                  {forgotLoading ? <MiniLoading className="w-4 h-4 text-black" /> : 'Gửi Yêu Cầu'}
+                  {forgotLoading ? <MiniLoading className="w-5 h-5 text-current" /> : 'Gửi Yêu Cầu'}
                 </button>
               </form>
             </motion.div>

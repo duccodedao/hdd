@@ -14,7 +14,6 @@ interface AboutConfig {
   adminPhoto: string;
   facebook?: string;
   github?: string;
-  zalo?: string;
   youtube?: string;
   email?: string;
 }
