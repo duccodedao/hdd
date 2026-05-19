@@ -33,7 +33,7 @@ export default function AdminApiKeys() {
         const [apiSnap, sysSnap, githubSnap] = await Promise.all([
           getDoc(doc(db, 'settings', 'apiKeys')),
           getDoc(doc(db, 'settings', 'system')),
-          getDoc(doc(db, 'settings', 'github')),
+          getDoc(doc(db, 'settings', 'github_integration')),
         ]);
         
         let fetchedData: any = {};
@@ -47,7 +47,7 @@ export default function AdminApiKeys() {
           const data = githubSnap.data();
           fetchedData = { 
             ...fetchedData, 
-            githubUsername: data.username || '',
+            githubUsername: data.username || data.owner || '',
             githubRepo: data.repo || '',
             githubToken: data.token || '',
             githubBranch: data.branch || 'main',
@@ -109,8 +109,9 @@ export default function AdminApiKeys() {
       await Promise.all([
         setDoc(doc(db, 'settings', 'apiKeys'), { geminiApiKey: apiKeys.geminiApiKey }, { merge: true }),
         setDoc(doc(db, 'settings', 'system'), { googleClientId: apiKeys.googleClientId }, { merge: true }),
-        setDoc(doc(db, 'settings', 'github'), { 
+        setDoc(doc(db, 'settings', 'github_integration'), { 
           username: apiKeys.githubUsername,
+          owner: apiKeys.githubUsername, // For compatibility
           repo: apiKeys.githubRepo,
           token: apiKeys.githubToken,
           branch: apiKeys.githubBranch,

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files
+  Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
+  Zap, Info
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -11,21 +12,20 @@ import AppLogo from '../ui/AppLogo';
 
 const fixedNavGroups = [
   {
-    title: 'Tổng quan',
+    title: 'Hệ thống',
     items: [
-      { name: 'Tổng quan', path: '/dashboard', icon: Home, maintenanceKey: 'dashboard' },
-      { name: 'Tài khoản', path: '/profile', icon: UserCircle, maintenanceKey: 'profile' },
       { name: 'Tiện ích', path: '/utilities', icon: Wrench, maintenanceKey: 'utilities' },
     ]
   }
 ];
 
 export default function Sidebar({ className }: { className?: string }) {
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, userData } = useAuthStore();
   const { setSidebarOpen, maintenanceTabs } = useAppStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan']);
-
+  
   const toggleGroup = (title: string) => {
     setExpandedGroups(prev => 
       prev.includes(title) ? prev.filter(t => t !== title) : [...prev, title]
@@ -128,6 +128,8 @@ export default function Sidebar({ className }: { className?: string }) {
             </NavLink>
           </div>
         )}
+
+
       </nav>
     </aside>
   );

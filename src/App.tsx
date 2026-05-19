@@ -155,7 +155,7 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             {/* Landing Page */}
-            <Route path="/" element={user ? <Navigate to="/utilities" replace /> : <LandingPage />} />
+            <Route path="/" element={<Navigate to="/utilities" replace />} />
             
             {/* Standalone Form Page */}
             <Route path="/form/:slug" element={<FormView />} />
@@ -172,9 +172,8 @@ export default function App() {
 
             {/* Main App Routes */}
             <Route element={<DeviceGuard><LocationGuard><OnboardingGuard><MainLayout /></OnboardingGuard></LocationGuard></DeviceGuard>}>
-              <Route path="/dashboard" element={<TabGuard tabKey="dashboard"><AboutPage /></TabGuard>} />
-              <Route path="/profile" element={<RequireAuth><TabGuard tabKey="profile"><Profile /></TabGuard></RequireAuth>} />
               <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
+              <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />

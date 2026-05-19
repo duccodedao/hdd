@@ -29,6 +29,7 @@ export interface UserData {
   location?: { lat: number, lng: number, address?: string };
   ip?: string;
   twoFactorEnabled?: boolean;
+  assignedUtilities?: string[];
   notificationPreferences?: {
     system: boolean;
     security: boolean;

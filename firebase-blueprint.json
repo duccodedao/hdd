@@ -71,6 +71,34 @@
         "status": { "enum": ["active", "revoked", "invalid"] }
       },
       "required": ["userId", "apiKey", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Document category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Administrative document metadata",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "note": { "type": "string" },
+        "githubUrl": { "type": "string" },
+        "githubSha": { "type": "string" },
+        "githubPath": { "type": "string" },
+        "views": { "type": "number" },
+        "downloads": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "categoryId", "githubUrl", "githubPath"]
     }
   },
   "firestore": {
@@ -89,6 +117,31 @@
     "user_ai_keys": {
       "schema": "UserAIKey",
       "description": "Stores secondary AI API keys provided by users"
+    },
+    "document_categories": {
+      "schema": "Category",
+      "description": "Document storage categories"
+    },
+    "documents": {
+      "schema": "Document",
+      "description": "Administrative documents and forms metadata"
+    },
+    "github_config": {
+      "schema": "GitHubConfig",
+      "description": "Shared GitHub integration settings"
+    }
+  },
+  "entities": {
+    "GitHubConfig": {
+      "title": "GitHub Config",
+      "description": "Credentials for GitHub CDN storage",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "owner": { "type": "string" },
+        "repo": { "type": "string" }
+      },
+      "required": ["token", "owner", "repo"]
     }
   }
 }

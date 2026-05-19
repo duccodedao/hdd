@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { doc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useSearchParams } from 'react-router-dom';
+import { doc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { updateProfile, sendPasswordResetEmail, sendEmailVerification, signOut } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
@@ -38,7 +39,8 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { openConfirm } = useConfirmStore();
 
-  const [activeTab, setActiveTab] = useState<'account' | 'info' | 'security' | 'activity'>('account');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'account' | 'info' | 'security' | 'activity'>((searchParams.get('tab') as any) || 'account');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [passwordCooldown, setPasswordCooldown] = useState(0);
@@ -101,6 +103,13 @@ export default function Profile() {
       clearInterval(timer);
     };
   }, [user]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['account', 'info', 'security', 'activity'].includes(tab)) {
+      setActiveTab(tab as any);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (userData?.displayName) setDisplayName(userData.displayName);
@@ -273,28 +282,29 @@ export default function Profile() {
               transition={{ duration: 0.3 }}
             >
               {activeTab === 'account' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-                  <div className="lg:col-span-5 space-y-8">
-                    <div className="premium-card relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                       <div className="flex flex-col items-center text-center relative z-10">
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                    <div className="lg:col-span-5 space-y-8">
+                      <div className="premium-card relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                        <div className="flex flex-col items-center text-center relative z-10">
                           <div className="relative group/avatar cursor-pointer mb-6" onClick={() => fileInputRef.current?.click()}>
-                             <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
-                             <div className="w-32 h-32 rounded-[2rem] overflow-hidden bg-slate-100 dark:bg-zinc-900 border-2 border-slate-200 dark:border-white/10 flex items-center justify-center relative shadow-2xl transition-all duration-500 group-hover/avatar:scale-105 group-hover/avatar:rotate-3">
-                               {userData?.photoURL ? (
-                                 <img src={userData.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                               ) : (
-                                 <User className="w-12 h-12 text-slate-400 dark:text-zinc-700" />
-                               )}
-                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
-                                 <Camera className="w-8 h-8 text-white" />
-                               </div>
-                               {uploading && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md">
-                                     <Loader2 className="w-8 h-8 text-white animate-spin" />
-                                  </div>
-                               )}
-                             </div>
+                            <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
+                            <div className="w-32 h-32 rounded-[2rem] overflow-hidden bg-slate-100 dark:bg-zinc-900 border-2 border-slate-200 dark:border-white/10 flex items-center justify-center relative shadow-2xl transition-all duration-500 group-hover/avatar:scale-105 group-hover/avatar:rotate-3">
+                              {userData?.photoURL ? (
+                                <img src={userData.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-12 h-12 text-slate-400 dark:text-zinc-700" />
+                              )}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+                                <Camera className="w-8 h-8 text-white" />
+                              </div>
+                              {uploading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md">
+                                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-500/10 rounded-full border border-amber-100 dark:border-amber-500/20 text-amber-600 dark:text-amber-500 mb-4">
@@ -303,14 +313,14 @@ export default function Profile() {
                           </div>
                           <h3 className="text-3xl font-display font-bold text-slate-950 dark:text-white tracking-tight mb-2">{userData?.displayName || 'Chưa định danh'}</h3>
                           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{userData?.email}</p>
-                       </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="lg:col-span-7">
-                    <div className="premium-card h-full">
-                       <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-8 tracking-tight">Thông tin liên lạc</h3>
-                       <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    <div className="lg:col-span-7">
+                      <div className="premium-card h-full">
+                        <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-8 tracking-tight">Thông tin liên lạc</h3>
+                        <form onSubmit={handleUpdateProfile} className="space-y-6">
                           <div className="space-y-2">
                              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Định danh hiển thị</label>
                              <input 
@@ -342,9 +352,11 @@ export default function Profile() {
                                {loading ? 'Đang Xử Lý...' : 'Đồng Bộ Hóa Dữ Liệu'}
                              </button>
                           </div>
-                       </form>
+                        </form>
+                      </div>
                     </div>
                   </div>
+
                 </div>
               )}
 

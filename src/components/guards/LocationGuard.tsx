@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { MapPin, ShieldAlert, Settings, RefreshCw, Lock } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, OperationType, handleFirestoreError } from '../../lib/firebase';
 
 interface LocationGuardProps {
   children: React.ReactNode;
@@ -63,14 +63,20 @@ export default function LocationGuard({ children }: LocationGuardProps) {
             console.warn("Geocoding unvailable");
           }
           if (!mounted) return;
-          await setDoc(doc(db, 'users', user.uid), {
-            location: {
-              lat: location.lat,
-              lng: location.lng,
-              address: address,
-              updatedAt: serverTimestamp()
+          try {
+            await setDoc(doc(db, 'users', user.uid), {
+              location: {
+                lat: location.lat,
+                lng: location.lng,
+                address: address,
+                updatedAt: serverTimestamp()
+              }
+            }, { merge: true });
+          } catch (dbErr) {
+            if (mounted) {
+              console.error("Location update DB error:", dbErr);
             }
-          }, { merge: true });
+          }
         } catch (err) {
           console.error("Failed to update location in DB:", err);
         }

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Upload, Loader2, Download, ArrowLeft, FileType } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
@@ -6,18 +6,33 @@ import { saveAs } from 'file-saver';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import { GoogleGenAI } from '@google/genai';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 
 interface PdfToWordProps {
   onBack: () => void;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
 export default function PdfToWord({ onBack }: PdfToWordProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+  const [aiClient, setAiClient] = useState<GoogleGenAI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchKey = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
+        if (docSnap.exists() && docSnap.data().geminiApiKey) {
+          setAiClient(new GoogleGenAI({ apiKey: docSnap.data().geminiApiKey }));
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải Gemini API Key:", error);
+      }
+    };
+    fetchKey();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -31,6 +46,10 @@ export default function PdfToWord({ onBack }: PdfToWordProps) {
 
   const convertToWord = async () => {
     if (!file) return;
+    if (!aiClient) {
+      toast.error('Hệ thống chưa cấu hình AI.');
+      return;
+    }
     
     setIsProcessing(true);
     try {
@@ -46,7 +65,7 @@ export default function PdfToWord({ onBack }: PdfToWordProps) {
       Trả về văn bản thuần túy đã được định dạng tốt (giữ lại các tiêu đề, danh sách). 
       KHÔNG thêm các ký tự đặc biệt như Markdown (không dùng ** hay ##), chỉ trả về văn bản sạch để lưu vào file Word.`;
 
-      const response = await ai.models.generateContent({
+      const response = await aiClient.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: {
           parts: [

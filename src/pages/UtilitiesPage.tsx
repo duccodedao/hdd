@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { OfflineGuard } from '../components/OfflineGuard';
 import GuestView from '../components/ui/GuestView';
@@ -9,7 +9,7 @@ import FindMyDeviceUtility from './FindMyDeviceUtility';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
 import AiScanner from './utilities/AiScanner';
-import GeminiChat from './utilities/GeminiChat';
+import DocumentVault from './utilities/DocumentVault';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
@@ -89,14 +89,21 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
             Icon ? <Icon className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />
           )}
         </div>
-        <div className={cn(
-          "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-          isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-500 dark:border-amber-500/20') :
-          item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
-          item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
-          'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
-        )}>
-          {isMaintenanceActive ? (isAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
+        <div className="flex flex-col items-end gap-1.5">
+          <div className={cn(
+            "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
+            isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-500 dark:border-amber-500/20') :
+            item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
+            item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
+            'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
+          )}>
+            {isMaintenanceActive ? (isAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
+          </div>
+          {(item as any).internalOnly && (
+            <div className="text-[8px] font-black uppercase text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-500/20">
+              Internal
+            </div>
+          )}
         </div>
       </div>
       
@@ -120,157 +127,14 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
   );
 };
 
-export default function UtilitiesPage() {
-  const { sessionId } = useParams();
-  const navigate = useNavigate();
-  const [utilities, setUtilities] = useState<UtilityItem[]>([]);
-  const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
-  const { setAiActive } = useAppStore();
-
-  useEffect(() => {
-    if (sessionId) {
-      setActiveUtility(nativeUtilities.find(u => u.id === 'gemini-chat') || null);
-    }
-  }, [sessionId]);
-
-  const handleBack = () => {
-    setActiveUtility(null);
-    if (sessionId) {
-      navigate('/utilities');
-    }
-  };
-
-  useEffect(() => {
-    if (activeUtility?.id === 'gemini-chat') {
-      setAiActive(true);
-    } else {
-      setAiActive(false);
-    }
-    
-    return () => setAiActive(false);
-  }, [activeUtility, setAiActive]);
-
-  useEffect(() => {
-    const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const { isAdmin } = useAuthStore();
-  const { maintenanceTabs } = useAppStore();
-
-  if (activeUtility) {
-    const isMaintenanceActive = maintenanceTabs[`utility_${activeUtility.id}`];
-    const isBlocked = isMaintenanceActive && !isAdmin;
-
-    if (isBlocked) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-zinc-950 min-h-screen animate-fade-in">
-          <div className="w-20 h-20 rounded-3xl bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 mb-8">
-            <Lock size={40} />
-          </div>
-          <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-4">Tính năng đang bảo trì</h2>
-          <p className="text-slate-600 dark:text-zinc-400 max-w-md mx-auto mb-10 font-medium">
-            Tiện ích "{activeUtility.title}" hiện đang được nâng cấp để mang lại trải nghiệm tốt hơn. Vui lòng quay lại sau ít phút.
-          </p>
-          <button 
-            onClick={handleBack}
-            className="px-8 py-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
-          >
-            Quay lại trang chủ
-          </button>
-        </div>
-      );
-    }
-
-    if (activeUtility.type === 'internal' && activeUtility.id === 'find-my-device') {
-      return <FindMyDeviceUtility onBack={handleBack} />;
-    }
-    
-    if (activeUtility.id === 'image-to-pdf') {
-      return <ImageToPdf onBack={handleBack} />;
-    }
- 
-    if (activeUtility.id === 'pdf-to-word') {
-      return <PdfToWord onBack={handleBack} />;
-    }
- 
-    if (activeUtility.id === 'ai-scanner') {
-      return <AiScanner onBack={handleBack} />;
-    }
- 
-    if (activeUtility.id === 'gemini-chat') {
-      return (
-        <div className="fixed inset-0 z-[100] flex flex-col w-full h-full animate-fade-in overflow-hidden bg-white dark:bg-zinc-950">
-          <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 shrink-0 flex items-center justify-between bg-white dark:bg-zinc-950/80 backdrop-blur-xl z-30">
-            <div className="flex items-center gap-6">
-              <button 
-                onClick={handleBack} 
-                className="group flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-all hover:shadow-lg active:scale-95"
-              >
-                <ArrowRight className="w-5 h-5 rotate-180 transition-transform group-hover:-translate-x-1" /> Quay lại Trang trước
-              </button>
-              <div className="h-8 w-px bg-slate-200 dark:bg-white/10" />
-              <div className="hidden sm:flex items-center gap-4">
-                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                    <MessageSquare size={20} />
-                 </div>
-                 <div className="flex flex-col">
-                    <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white leading-none">Bmass AI 5.0</span>
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mt-1">Hệ điều hành định danh</span>
-                 </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-               <div className="hidden md:flex flex-col items-end mr-4">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Trạng thái định danh</span>
-                  <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-widest">Đã kết nối</span>
-               </div>
-               <div className="px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Neural
-               </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden relative">
-            <GeminiChat />
-          </div>
-        </div>
-      );
-    }
-
-    if (activeUtility.type === 'embed') {
-      return (
-        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in">
-          <button onClick={handleBack} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
-            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
-          </button>
-          <div className="flex-1 glass-card overflow-hidden bg-black/40 ring-1 ring-white/10 shadow-2xl">
-            <OfflineGuard message="Công cụ này yêu cầu kết nối mạng ổn định.">
-              <iframe 
-                src={activeUtility.embedUrl} 
-                className="w-full h-full border-0" 
-                title={activeUtility.title}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
-              />
-            </OfflineGuard>
-          </div>
-        </div>
-      );
-    }
-  }
-
 const nativeUtilities: UtilityItem[] = [
   {
-    id: 'gemini-chat',
-    title: 'Bmass AI 5.0',
-    description: 'Trợ lý AI vạn năng hỗ trợ giải đáp thắc mắc, viết code và sáng tạo nội dung.',
-    icon: MessageSquare,
+    id: 'kho-van-ban',
+    title: 'Kho Văn Bản',
+    description: 'Hệ thống lưu trữ và quản lý biểu mẫu hành chính, văn bản quy phạm trực tuyến.',
+    icon: FolderOpen,
     type: 'tool',
-    createdAt: Date.now() + 1000
+    createdAt: Date.now() + 2000
   },
   {
     id: 'ai-scanner',
@@ -306,7 +170,130 @@ const nativeUtilities: UtilityItem[] = [
   }
 ];
 
-  const allItems = [...nativeUtilities, ...utilities];
+export default function UtilitiesPage() {
+  const { sessionId, utilityId } = useParams();
+  const navigate = useNavigate();
+  const [utilities, setUtilities] = useState<UtilityItem[]>([]);
+  const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
+  const [systemTools, setSystemTools] = useState<any>({});
+  const { setAiActive } = useAppStore();
+  const { userData, isAdmin, isSuperAdmin } = useAuthStore();
+
+  useEffect(() => {
+    if (utilityId) {
+      const all = [...nativeUtilities, ...utilities];
+      const match = all.find(u => u.id === utilityId);
+      if (match) setActiveUtility(match);
+    } else {
+      setActiveUtility(null);
+    }
+  }, [sessionId, utilityId, utilities]);
+
+  const handleSelect = (item: UtilityItem) => {
+    // Check internal only
+    const config = systemTools[item.id];
+    const isInternal = config?.internal || (item as any).internalOnly;
+    const hasAccess = userData?.assignedUtilities?.includes(item.id) || isAdmin || isSuperAdmin;
+
+    if (isInternal && !hasAccess) {
+      toast.error('Tiện ích này chỉ dành cho người dùng nội bộ/có ủy quyền.', { icon: '🔐' });
+      return;
+    }
+    
+    navigate(`/utilities/${item.id}`);
+  };
+
+  const handleBack = () => {
+    setActiveUtility(null);
+    navigate('/utilities');
+  };
+
+  useEffect(() => {
+    // Settings for native tools
+    const unsub = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
+      if (docSnap.exists()) setSystemTools(docSnap.data());
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const { maintenanceTabs } = useAppStore();
+
+  const filteredItems = [...nativeUtilities, ...utilities];
+
+  if (activeUtility) {
+    const isMaintenanceActive = maintenanceTabs[`utility_${activeUtility.id}`];
+    const isBlocked = isMaintenanceActive && !isAdmin;
+
+    if (isBlocked) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-zinc-950 min-h-screen animate-fade-in">
+          <div className="w-20 h-20 rounded-3xl bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 mb-8">
+            <Lock size={40} />
+          </div>
+          <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-4">Tính năng đang bảo trì</h2>
+          <p className="text-slate-600 dark:text-zinc-400 max-w-md mx-auto mb-10 font-medium">
+            Tiện ích "{activeUtility.title}" hiện đang được nâng cấp để mang lại trải nghiệm tốt hơn. Vui lòng quay lại sau ít phút.
+          </p>
+          <button 
+            onClick={handleBack}
+            className="px-8 py-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+          >
+            Quay lại trang chủ
+          </button>
+        </div>
+      );
+    }
+
+    if (activeUtility.type === 'internal' && activeUtility.id === 'find-my-device') {
+      return <FindMyDeviceUtility onBack={handleBack} />;
+    }
+    
+    if (activeUtility.id === 'kho-van-ban') {
+      return <DocumentVault onBack={handleBack} />;
+    }
+    
+    if (activeUtility.id === 'image-to-pdf') {
+      return <ImageToPdf onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'pdf-to-word') {
+      return <PdfToWord onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'ai-scanner') {
+      return <AiScanner onBack={handleBack} />;
+    }
+
+    if (activeUtility.type === 'embed') {
+      return (
+        <div className="flex-1 flex flex-col w-full h-full p-4 lg:p-12 relative animate-fade-in">
+          <button onClick={handleBack} className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5">
+            <ArrowRight className="w-4 h-4 rotate-180" /> Quay Lại
+          </button>
+          <div className="flex-1 glass-card overflow-hidden bg-black/40 ring-1 ring-white/10 shadow-2xl">
+            <OfflineGuard message="Công cụ này yêu cầu kết nối mạng ổn định.">
+              <iframe 
+                src={activeUtility.embedUrl} 
+                className="w-full h-full border-0" 
+                title={activeUtility.title}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+              />
+            </OfflineGuard>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  const allItems = filteredItems;
 
   return (
     <div className="max-w-[1920px] mx-auto py-6 lg:py-20 relative min-h-screen animate-fade-in">
@@ -330,7 +317,7 @@ const nativeUtilities: UtilityItem[] = [
           <GuestView title="Khóa Truy Cập" description="Xác định danh tính để truy cập vào trung tâm xử lý.">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
               {allItems.map((item, idx) => (
-                <UtilityCard key={item.id} item={item} idx={idx} onSelect={setActiveUtility} />
+                <UtilityCard key={item.id} item={item} idx={idx} onSelect={handleSelect} />
               ))}
             </div>
           </GuestView>

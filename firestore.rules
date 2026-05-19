@@ -11,15 +11,16 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-        request.auth.token.email in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
+        request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin'])
       );
     }
     function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.email in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
+        request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'cuong.nguyen1@ghn.vn'] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin')
       );
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -43,15 +44,17 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    // TEST CONNECTION
+    match /test/connection { allow read: if true; }
+
     // USERS
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow create: if isOwner(userId);
       allow update: if (isOwner(userId) || isAdmin()) && 
-                    // Prevent users from changing their own role/status unless they are superadmin
-                    (isSuperAdmin() || (incoming().get('role', existing().get('role', 'user')) == existing().get('role', 'user') && 
-                                       incoming().get('isBanned', existing().get('isBanned', false)) == existing().get('isBanned', false) &&
-                                       incoming().get('status', existing().get('status', 'active')) == existing().get('status', 'active')));
+                    (isSuperAdmin() || 
+                     (request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'isBanned']) == false)
+                    );
       allow delete: if isSuperAdmin();
 
       match /private/security {
@@ -59,9 +62,20 @@ service cloud.firestore {
       }
     }
 
-    // SETTINGS / SYSTEM
+    // DOCUMENT VAULT & CATEGORIES
+    match /documents/{docId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'downloads']));
+    }
+    
+    match /document_categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
     match /settings/{docId} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin() || (docId != 'github' && docId != 'github_integration');
       allow write: if isAdmin();
 
       // Support nested settings
@@ -70,7 +84,14 @@ service cloud.firestore {
         allow write: if isSuperAdmin();
       }
     }
-
+    
+    // ADMIN REQUESTS
+    match /adminRequests/{reqId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == reqId;
+      allow delete: if isSuperAdmin();
+    }
+    
     // USER AI KEYS
     match /user_ai_keys/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -119,17 +140,6 @@ service cloud.firestore {
     match /apps/{appId} {
       allow read: if true;
       allow write: if isAdmin();
-    }
-    match /categories/{catId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    
-    // ADMIN REQUESTS
-    match /adminRequests/{reqId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn() && request.auth.uid == reqId;
-      allow delete: if isSuperAdmin();
     }
     
     // ACTIVITY LOGS

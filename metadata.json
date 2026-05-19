@@ -1,10 +1,12 @@
 {
-  "name": "BMASS Dashboard",
-  "description": "Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.",
+  "name": "Nucleus BMASS",
+  "description": "Hệ điều hành quản trị bảo trợ, định danh số & kho lưu trữ văn bản hành chính thế hệ mới (Powered by GitHub Storage).",
   "requestFramePermissions": [
     "camera",
     "notifications",
     "geolocation"
   ],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

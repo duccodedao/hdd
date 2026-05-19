@@ -9,7 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Smartphone, Lock, Shield, ChevronRight, CheckCircle2, 
-  ArrowLeft, Loader2, Copy, Eye, EyeOff 
+  ArrowLeft, Loader2, Copy, Eye, EyeOff, Gift, Info 
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateURI, verifySync } from 'otplib';
@@ -177,6 +177,7 @@ export default function Onboarding() {
         </div>
 
         <AnimatePresence mode="wait">
+
           {step === 1 && (
             <motion.div
               key="step1"

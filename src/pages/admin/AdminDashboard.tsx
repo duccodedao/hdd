@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -15,6 +15,7 @@ import AdminIpBlocking from './AdminIpBlocking';
 import AdminLogins from './AdminLogins';
 import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
+import AdminDocumentVault from './AdminDocumentVault';
 import { useConfirmStore } from '../../store/confirmStore';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
@@ -25,16 +26,11 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'stats' | 'apikeys' | 'forms'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
-  let [stats, setStats] = useState({
-    users: 0,
-    blockedIps: 0,
-    utilities: 0,
-    forms: 0
-  });
+  
   const [aboutConfig, setAboutConfig] = useState({
     introTitle: 'Hệ thống - Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
@@ -66,12 +62,6 @@ export default function AdminDashboard() {
     };
     fetchAbout();
 
-    // Stats listeners
-    const unsubStatsUsers = onSnapshot(collection(db, 'users'), s => setStats(prev => ({ ...prev, users: s.size })));
-    const unsubStatsIps = onSnapshot(collection(db, 'blockedIps'), s => setStats(prev => ({ ...prev, blockedIps: s.size })));
-    const unsubStatsUtils = onSnapshot(collection(db, 'utilities'), s => setStats(prev => ({ ...prev, utilities: s.size })));
-    const unsubStatsForms = onSnapshot(collection(db, 'forms'), s => setStats(prev => ({ ...prev, forms: s.size })));
-
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -79,10 +69,6 @@ export default function AdminDashboard() {
     return () => {
       unsubContacts();
       unsubSystem();
-      unsubStatsUsers();
-      unsubStatsIps();
-      unsubStatsUtils();
-      unsubStatsForms();
       unsubAllUtils();
     };
   }, []);
@@ -309,15 +295,15 @@ export default function AdminDashboard() {
         
         <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-hide">
           {[
-            { id: 'stats', label: 'Thống kê', icon: LineChart },
             { id: 'users', label: 'Người dùng', icon: Users },
+            { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
             { id: 'system', label: 'Hệ thống', icon: Settings },
             { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'about', label: 'Mạng xã hội & Giới thiệu', icon: Info }
+            { id: 'about', label: 'About Setup', icon: Info }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -330,84 +316,8 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {stats: 'Thống kê', users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'Mạng xã hội & Giới thiệu'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup'}[activeTab as any] }
         </h1>
-
-      {activeTab === 'stats' && (
-        <div className="space-y-6 lg:space-y-8 pb-10">
-           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-8">
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 lg:p-8 rounded-2xl shadow-sm">
-                 <h3 className="text-sm lg:text-lg font-medium mb-4 lg:mb-6 tracking-normal text-slate-500 dark:text-slate-400">Hoạt động hệ thống (14 ngày qua)</h3>
-                 <div className="h-[250px] lg:h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                       <AreaChart data={activityData}>
-                          <defs>
-                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                             </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                          />
-                          <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorCount)" />
-                       </AreaChart>
-                    </ResponsiveContainer>
-                 </div>
-              </div>
-
-              <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 lg:p-8 rounded-2xl shadow-sm">
-                 <h3 className="text-sm lg:text-lg font-medium mb-4 lg:mb-6 tracking-normal text-slate-500 dark:text-slate-400">Cơ cấu người dùng</h3>
-                 <div className="h-[250px] lg:h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                       <PieChart>
-                          <Pie
-                             data={roleDistribution}
-                             cx="50%"
-                             cy="50%"
-                             innerRadius={60}
-                             outerRadius={100}
-                             paddingAngle={5}
-                             dataKey="value"
-                          >
-                             {roleDistribution.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                             ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                       </PieChart>
-                    </ResponsiveContainer>
-                 </div>
-              </div>
-           </div>
-
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-8 rounded-2xl shadow-sm">
-              <h3 className="text-lg font-medium mb-6  tracking-normal text-slate-500 dark:text-slate-400">Dữ liệu tổng quát</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-5 gap-6">
-                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-normal mb-1">Tổng thành viên</p>
-                    <p className="text-3xl font-medium text-slate-900 dark:text-white">{stats.users}</p>
-                 </div>
-                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-normal mb-1">IP bị chặn</p>
-                    <p className="text-3xl font-medium text-rose-500">{stats.blockedIps}</p>
-                 </div>
-                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-normal mb-1">Hệ thống</p>
-                    <p className="text-3xl font-medium text-emerald-500">{stats.utilities}</p>
-                 </div>
-                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl">
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 tracking-normal mb-1">Folders/Form</p>
-                    <p className="text-3xl font-medium text-purple-500">{stats.forms}</p>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
 
 
       {activeTab === 'about' && (
@@ -622,6 +532,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'document_vault' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminDocumentVault />
+        </motion.div>
+      )}
+
       {activeTab === 'forms' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminForms />
@@ -775,25 +691,7 @@ export default function AdminDashboard() {
 
       {activeTab === 'system' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          {/* Quick Stats Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              {[
-                { label: 'Người dùng', value: stats.users, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                { label: 'IP Bị chặn', value: stats.blockedIps, icon: ShieldAlert, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-                { label: 'Tiện ích', value: stats.utilities, icon: Box, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-              ].map((s, i) => (
-              <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-2xl flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
-                  <s.icon className={`w-5 h-5 ${s.color}`} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-500  tracking-wider leading-none mb-1">{s.label}</p>
-                  <h4 className="text-lg font-medium text-slate-900 dark:text-white leading-none">{s.value}</h4>
-                </div>
-              </div>
-            ))}
-          </div>
-
+          
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-full flex items-center justify-center border-4 ${maintenanceMode ? 'bg-amber-500/20 text-amber-500 border-amber-500/30' : 'bg-green-500/20 text-green-500 border-green-500/30'}`}>

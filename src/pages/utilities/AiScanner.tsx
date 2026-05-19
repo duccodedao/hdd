@@ -1,15 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Scan, FileText, Upload, Loader2, Copy, Check, Sparkles, ArrowLeft, Trash2, Edit3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import { GoogleGenAI } from '@google/genai';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 
 interface AiScannerProps {
   onBack: () => void;
 }
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export default function AiScanner({ onBack }: AiScannerProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -17,7 +17,22 @@ export default function AiScanner({ onBack }: AiScannerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [aiClient, setAiClient] = useState<GoogleGenAI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchKey = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
+        if (docSnap.exists() && docSnap.data().geminiApiKey) {
+          setAiClient(new GoogleGenAI({ apiKey: docSnap.data().geminiApiKey }));
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải Gemini API Key:", error);
+      }
+    };
+    fetchKey();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -28,7 +43,6 @@ export default function AiScanner({ onBack }: AiScannerProps) {
         reader.onload = (event) => setPreview(event.target?.result as string);
         reader.readAsDataURL(selectedFile);
       } else if (selectedFile.type === 'application/pdf') {
-        // For PDF, we just set a "flag" or special string for preview
         setPreview('pdf-file');
       }
       setResult('');
@@ -37,6 +51,10 @@ export default function AiScanner({ onBack }: AiScannerProps) {
 
   const processWithAi = async () => {
     if (!file || !preview) return;
+    if (!aiClient) {
+      toast.error('Hệ thống chưa cấu hình AI.');
+      return;
+    }
     
     setIsProcessing(true);
     try {
@@ -62,7 +80,7 @@ export default function AiScanner({ onBack }: AiScannerProps) {
         mimeType = 'application/pdf';
       }
 
-      const response = await ai.models.generateContent({
+      const response = await aiClient.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: {
           parts: [
