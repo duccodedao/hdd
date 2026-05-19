@@ -1,0 +1,58 @@
+{
+  "documents": [
+    {
+      "id": "fF7FPiwgKaSrpUeSU4Ia",
+      "githubPath": "documents/ke-hoach/1779194042712-02.-giay-moi-tap-huan-ruou-bia-dtd-tha.pdf",
+      "hidden": false,
+      "categoryName": "Kế hoạch",
+      "downloads": 1,
+      "createdAt": "2026-05-19T12:34:05.906Z",
+      "views": 0,
+      "updatedAt": "2026-05-19T12:34:05.906Z",
+      "isDeleted": false,
+      "categoryId": "97JbUDaHv8iQqLnibZCG",
+      "githubUrl": "https://raw.githubusercontent.com/duccodedao/hdd/main/documents/ke-hoach/1779194042712-02.-giay-moi-tap-huan-ruou-bia-dtd-tha.pdf",
+      "originalName": "02. GIẤY MỜI TẬP HUẤN RƯỢU BIA + ĐTĐ-THA.pdf",
+      "note": "",
+      "githubSha": "1eda9810b5dfd02392e838eefeafbf2fd6f985ef",
+      "name": "02. GIẤY MỜI TẬP HUẤN RƯỢU BIA + ĐTĐ-THA"
+    },
+    {
+      "id": "gpsdG0CccgUwPK5gqaMj",
+      "githubUrl": "https://raw.githubusercontent.com/duccodedao/hdd/main/documents/khac/1779193961246-01.-ke-hoach-tac-hai-ruou-bia-2026-khoa-bkln.pdf",
+      "categoryId": "BVJ95AObPxgocnjBmOTh",
+      "isDeleted": false,
+      "updatedAt": "2026-05-19T12:32:44.116Z",
+      "views": 0,
+      "createdAt": "2026-05-19T12:32:44.116Z",
+      "name": "01. KẾ HOẠCH TÁC HẠI RƯỢU BIA 2026 - KHOA BKLN",
+      "note": "",
+      "githubSha": "a0eb9f4f33ed6b092f8c0ee9bc30832a3801ba3b",
+      "originalName": "01. KẾ HOẠCH TÁC HẠI RƯỢU BIA 2026 - KHOA BKLN.pdf",
+      "githubPath": "documents/khac/1779193961246-01.-ke-hoach-tac-hai-ruou-bia-2026-khoa-bkln.pdf",
+      "downloads": 0,
+      "categoryName": "Khác",
+      "hidden": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "97JbUDaHv8iQqLnibZCG",
+      "createdAt": {
+        "seconds": 1779194013,
+        "nanoseconds": 754000000
+      },
+      "name": "Kế hoạch",
+      "description": "Bệnh không lây"
+    },
+    {
+      "id": "BVJ95AObPxgocnjBmOTh",
+      "description": "Danh mục mặc định",
+      "name": "Khác",
+      "createdAt": {
+        "seconds": 1779193929,
+        "nanoseconds": 244000000
+      }
+    }
+  ]
+}
