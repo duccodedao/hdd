@@ -572,7 +572,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-44">Danh mục</th>
                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-48">Ngày tạo</th>
-                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-28">Thao tác</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-36">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -592,10 +592,11 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                      <td className="px-4 py-4 text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-4 py-4 text-right w-28 whitespace-nowrap">
+                     <td className="px-4 py-4 text-right w-36 whitespace-nowrap">
                        <div className="flex justify-end gap-2">
                          <button onClick={() => handlePreview(docItem)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
                          <button onClick={() => handleDownload(docItem)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                         <button onClick={() => shareLink(docItem.id)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
                          {isAdmin && <button onClick={() => handleDelete(docItem)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>}
                        </div>
                      </td>
@@ -704,6 +705,13 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
                   title="Tải xuống"
                 >
                   <Download size={16} />
+                </button>
+                <button 
+                  onClick={() => onShare(docItem.id)}
+                  className="p-2.5 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all"
+                  title="Chia sẻ"
+                >
+                  <Share2 size={16} />
                 </button>
                 {isAdmin && (
                   <button 
