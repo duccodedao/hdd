@@ -10,12 +10,13 @@ import axios from "axios";
 
 // Firebase web config (reused from src/lib/firebase.ts)
 const firebaseConfig = {
-  apiKey: "AIzaSyCLCcgaoW9gNYhKk0c0gDWC6i5mKVTN4XE",
-  authDomain: "profile-d1214.firebaseapp.com",
-  projectId: "profile-d1214",
-  storageBucket: "profile-d1214.firebasestorage.app",
-  messagingSenderId: "914980131889",
-  appId: "1:914980131889:web:72f8da15c42dbee671b110",
+  apiKey: "AIzaSyCXAxmprEv9fF-P-1lLpUzykkxG4HjDVI4",
+  authDomain: "sonlyhongduc-ca6d6.firebaseapp.com",
+  projectId: "sonlyhongduc-ca6d6",
+  storageBucket: "sonlyhongduc-ca6d6.firebasestorage.app",
+  messagingSenderId: "757658501532",
+  appId: "1:757658501532:web:08c87ad6c041e0bc140859",
+  measurementId: "G-GXHCCW2KMH"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
