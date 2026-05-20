@@ -565,34 +565,38 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       ) : (
         <div className="space-y-10">
           <div className="overflow-x-auto">
-             <table className="w-full text-left">
+             <table className="w-full text-left table-fixed">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Định dạng</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên hiển thị</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh mục</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày tạo</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-left">Định dạng</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-44">Danh mục</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-48">Ngày tạo</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-28">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                  {filteredDocs.map((docItem) => (
                    <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                     <td className="px-6 py-4">
-                       <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-widest">
+                     <td className="px-4 py-4 text-left w-24">
+                       <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-wider">
                          {docItem.githubPath.split('.').pop()?.toUpperCase()}
                        </span>
                      </td>
-                     <td className="px-6 py-4 font-bold text-sm whitespace-nowrap overflow-x-auto max-w-[200px]">{docItem.name}</td>
-                     <td className="px-6 py-4 text-sm text-slate-500">{docItem.categoryName}</td>
-                     <td className="px-6 py-4 text-xs text-slate-400">
+                     <td className="px-4 py-4 font-bold text-sm text-slate-800 dark:text-zinc-200 break-words line-clamp-2 md:line-clamp-none whitespace-normal hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer" onClick={() => handlePreview(docItem)}>
+                       {docItem.name}
+                     </td>
+                     <td className="px-4 py-4 text-sm text-slate-500 text-right w-44 truncate" title={docItem.categoryName || 'Chưa phân loại'}>
+                       {docItem.categoryName || 'Chưa phân loại'}
+                     </td>
+                     <td className="px-4 py-4 text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-6 py-4 text-right">
+                     <td className="px-4 py-4 text-right w-28 whitespace-nowrap">
                        <div className="flex justify-end gap-2">
-                         <button onClick={() => handlePreview(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></button>
-                         <button onClick={() => handleDownload(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Download size={16} /></button>
-                         {isAdmin && <button onClick={() => handleDelete(docItem)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>}
+                         <button onClick={() => handlePreview(docItem)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
+                         <button onClick={() => handleDownload(docItem)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                         {isAdmin && <button onClick={() => handleDelete(docItem)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>}
                        </div>
                      </td>
                    </tr>
