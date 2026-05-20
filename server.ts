@@ -7,19 +7,12 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
-
-// Firebase web config (reused from src/lib/firebase.ts)
-const firebaseConfig = {
-  apiKey: "AIzaSyCLCcgaoW9gNYhKk0c0gDWC6i5mKVTN4XE",
-  authDomain: "profile-d1214.firebaseapp.com",
-  projectId: "profile-d1214",
-  storageBucket: "profile-d1214.firebasestorage.app",
-  messagingSenderId: "914980131889",
-  appId: "1:914980131889:web:72f8da15c42dbee671b110",
-};
+import firebaseConfig from "./firebase-applet-config.json";
 
 const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
+const db = (firebaseConfig as any).firestoreDatabaseId 
+  ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
+  : getFirestore(firebaseApp);
 
 async function startServer() {
   const app = express();

@@ -35,19 +35,27 @@ export default function AdminUtilities() {
     };
   }, []);
 
-  const toggleSystemTool = async (id: string, field: 'public' | 'internal') => {
+  const toggleSystemTool = async (id: string) => {
     try {
       const current = systemTools[id] || { public: true, internal: false };
+      const currentlyPublic = current.public !== false;
+      const nextPublic = !currentlyPublic;
+      const nextConfig = { public: nextPublic, internal: !nextPublic };
+
       await updateDoc(doc(db, 'settings', 'tool_permissions'), {
-        [id]: { ...current, [field]: !current[field] }
+        [id]: nextConfig
       });
       toast.success('Đã cập nhật quyền hạn');
     } catch (e) {
       // Create if doesn't exist
       try {
         const current = systemTools[id] || { public: true, internal: false };
+        const currentlyPublic = current.public !== false;
+        const nextPublic = !currentlyPublic;
+        const nextConfig = { public: nextPublic, internal: !nextPublic };
+
         await setDoc(doc(db, 'settings', 'tool_permissions'), {
-          [id]: { ...current, [field]: !current[field] }
+          [id]: nextConfig
         }, { merge: true });
         toast.success('Đã cập nhật quyền hạn');
       } catch (err) {
@@ -159,8 +167,7 @@ export default function AdminUtilities() {
             <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
               <tr>
                 <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Tên công cụ</th>
-                <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Công khai</th>
-                <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Nội bộ</th>
+                <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Quyền truy cập (Mở: Công khai / Tắt: Nội bộ)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
@@ -172,30 +179,29 @@ export default function AdminUtilities() {
                 { id: 'find-my-device', name: 'Định Vị Thiết Bị' }
               ].map(tool => {
                 const config = systemTools[tool.id] || { public: true, internal: false };
+                const isPublic = config.public !== false;
                 return (
                   <tr key={tool.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
                     <td className="px-6 py-4 font-bold text-slate-600 dark:text-zinc-300">{tool.name}</td>
                     <td className="px-6 py-4">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={config.public !== false} 
-                          onChange={() => toggleSystemTool(tool.id, 'public')} 
-                        />
-                        <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
-                      </label>
-                    </td>
-                    <td className="px-6 py-4">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={config.internal === true} 
-                          onChange={() => toggleSystemTool(tool.id, 'internal')} 
-                        />
-                        <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={isPublic} 
+                            onChange={() => toggleSystemTool(tool.id)} 
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                          isPublic 
+                            ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20" 
+                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
+                        }`}>
+                          {isPublic ? 'Công khai' : 'Nội bộ'}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

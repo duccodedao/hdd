@@ -63,7 +63,7 @@ export default function GoogleOneTap() {
           email: userCred.user.email,
           displayName: userCred.user.displayName || 'Google Entity',
           photoURL: userCred.user.photoURL || '',
-          role: (userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'cuong.nguyen1@ghn.vn') ? 'superadmin' : 'user',
+          role: (userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'sonlyhongduc1@ghn.vn') ? 'superadmin' : 'user',
           status: 'active',
           createdAt: Date.now(),
           joinedAt: Date.now(),

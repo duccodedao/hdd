@@ -107,6 +107,18 @@ export default function App() {
         unsubscribeUser = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
           if (docSnap.exists()) {
             setUserData(docSnap.data() as UserData);
+          } else {
+            // Document doesn't exist yet, fallback to local user data representation based on auth
+            setUserData({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || 'User',
+              photoURL: firebaseUser.photoURL || '',
+              role: (firebaseUser.email === 'sonlyhongduc@gmail.com' || firebaseUser.email === 'sonlyhongduc1@ghn.vn') ? 'superadmin' : 'user',
+              status: 'active',
+              createdAt: Date.now(),
+              lastLoginAt: Date.now()
+            });
           }
         }, (err) => {
           console.error("Error listening to user data:", err);

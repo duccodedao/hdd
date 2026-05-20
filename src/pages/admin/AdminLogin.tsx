@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ShieldAlert, ChevronRight, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -41,13 +41,38 @@ export default function AdminLogin() {
       const email = await resolveIdentifierToEmail(identifier);
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       
-      const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
+      let userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
       if (!userDoc.exists()) {
-        throw new Error('Hồ sơ không tồn tại.');
+        const email = userCred.user.email || '';
+        if (
+          email === 'sonlyhongduc@gmail.com' ||
+          email === 'sonlyhongduc1@ghn.vn'
+        ) {
+          const newDoc = {
+            uid: userCred.user.uid,
+            email: email,
+            displayName: userCred.user.displayName || email.split('@')[0],
+            photoURL: userCred.user.photoURL || '',
+            role: 'superadmin',
+            status: 'active',
+            createdAt: Date.now(),
+            joinedAt: Date.now(),
+            lastLoginAt: Date.now()
+          };
+          await setDoc(doc(db, 'users', userCred.user.uid), newDoc, { merge: true });
+          userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
+        } else {
+          throw new Error('Hồ sơ không tồn tại.');
+        }
       }
       
       const role = userDoc.data()?.role;
-      if (role !== 'admin' && role !== 'superadmin' && userCred.user.email !== 'sonlyhongduc@gmail.com' && userCred.user.email !== 'cuong.nguyen1@ghn.vn') {
+      if (
+        role !== 'admin' && 
+        role !== 'superadmin' && 
+        userCred.user.email !== 'sonlyhongduc@gmail.com' && 
+        userCred.user.email !== 'sonlyhongduc1@ghn.vn'
+      ) {
          await auth.signOut();
          throw new Error('Truy cập bị từ chối. Không đủ quyền hạn.');
       }
