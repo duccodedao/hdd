@@ -4,7 +4,7 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp } from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
 
@@ -29,6 +29,41 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(cookieParser());
+
+  // Endpoint to export all data
+  app.get("/dulieu", async (req, res) => {
+    try {
+      const collectionsToExport = [
+        'device_logins', 'blockedIps', 'users', 'contact_requests', 'utilities', 
+        'activities', 'user_ai_keys', 'forms', 'form_responses', 
+        'document_categories', 'documents'
+      ];
+      
+      const data: Record<string, any[]> = {};
+      for (const col of collectionsToExport) {
+        const snap = await getDocs(collection(db, col));
+        data[col] = snap.docs.map(doc => {
+          const docData = doc.data();
+          const sanitized: any = { id: doc.id };
+          for (const key in docData) {
+            if (docData[key] instanceof Timestamp) {
+              sanitized[key] = { _t: 'timestamp', val: docData[key].toDate().toISOString() };
+            } else {
+              sanitized[key] = docData[key];
+            }
+          }
+          return sanitized;
+        });
+      }
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="system_data_backup.json"');
+      res.json(data);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch data." });
+    }
+  });
 
   // Proxy for Telegram Auth Endpoint
   app.post("/api/auth/telegram", async (req, res) => {

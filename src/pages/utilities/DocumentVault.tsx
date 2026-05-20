@@ -6,7 +6,7 @@ import {
   FolderOpen, FileArchive, Settings, ChevronRight, Save,
   MoreVertical, FileIcon, FileSpreadsheet, FileQuestion, 
   BookOpen, LayoutGrid, List as ListIcon, Shield, ExternalLink,
-  ArrowLeft, RefreshCw, Zap, Monitor
+  ArrowLeft, RefreshCw, Zap, Monitor, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -23,8 +23,9 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { useAuthStore } from '../../store/authStore';
+import ConfirmModal from '../../components/ConfirmModal';
 
-const DOCS_PER_PAGE = 12;
+const DOCS_PER_PAGE = 50;
 
 interface DocumentVaultProps {
   onBack: () => void;
@@ -55,8 +56,24 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [showOnlyHighlighted, setShowOnlyHighlighted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Floating Preview
-  const [previewDoc, setPreviewDoc] = useState<AdminDocument | null>(null);
+  // Confirm Modal State
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'info'
+  });
+
+  const openConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' = 'info') => {
+    setConfirmState({ isOpen: true, title, message, onConfirm, type });
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -156,28 +173,35 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   }, [documents, highlightId]);
 
   const handleDelete = async (docObj: AdminDocument) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa văn bản này?')) return;
-    const toastId = toast.loading('Đang xử lý yêu cầu xóa...');
-    try {
-      const configDoc = await getDoc(doc(db, 'settings', 'github_integration'));
-      if (configDoc.exists()) {
-        const config = configDoc.data() as import('../../types').GitHubConfig;
-        try {
-          await githubService.deleteFile(config, docObj.githubPath, docObj.githubSha);
-        } catch (githubErr: any) {
-          console.warn("GitHub deletion failed (file might be already gone):", githubErr);
-          // If file is not found on GitHub, we still want to remove from Firestore
+    openConfirm("Xóa văn bản", `Bạn có chắc chắn muốn xóa văn bản "${docObj.name}"?`, async () => {
+      const toastId = toast.loading('Đang xử lý yêu cầu xóa...');
+      try {
+        const configDoc = await getDoc(doc(db, 'settings', 'github_integration'));
+        if (configDoc.exists()) {
+          const config = configDoc.data() as import('../../types').GitHubConfig;
+          try {
+            await githubService.deleteFile(config, docObj.githubPath, docObj.githubSha);
+          } catch (githubErr: any) {
+            console.warn("GitHub deletion failed (file might be already gone):", githubErr);
+          }
         }
+        await deleteDoc(doc(db, 'documents', docObj.id));
+        toast.success('Đã xóa văn bản khỏi hệ thống', { id: toastId });
+      } catch (error: any) {
+        toast.error('Lỗi khi xóa tài liệu: ' + error.message, { id: toastId });
       }
-      await deleteDoc(doc(db, 'documents', docObj.id));
-      toast.success('Đã xóa văn bản khỏi hệ thống', { id: toastId });
-    } catch (error: any) {
-      toast.error('Lỗi khi xóa tài liệu: ' + error.message, { id: toastId });
-    }
+    }, 'danger');
   };
 
   const handlePreview = async (docObj: AdminDocument) => {
-    setPreviewDoc(docObj);
+    const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
+    const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+    const url = isOffice 
+      ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(docObj.githubUrl)}`
+      : docObj.githubUrl;
+    
+    window.open(url, '_blank');
+    
     await updateDoc(doc(db, 'documents', docObj.id), {
       views: increment(1)
     });
@@ -241,6 +265,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   };
 
   const filteredDocs = documents.filter(doc => {
+    // Sync with admin side: filter deleted
+    if (doc.isDeleted) return false;
+
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           doc.note.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || doc.categoryId === selectedCategory;
@@ -299,6 +326,14 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       </div>
 
       {/* Filter and Search Bar */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+      />
       <div 
         className={cn(
           "sticky top-0 z-50 transition-all duration-500 -mx-6 lg:-mx-12 px-6 lg:px-12",
@@ -380,27 +415,34 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       </div>
 
       {highlightId && (
-        <div className="mb-6 flex items-center justify-between bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
-           <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                 <Share2 size={20} />
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 p-6 rounded-[2rem] bg-indigo-950/5 dark:bg-indigo-500/5 border border-indigo-200/50 dark:border-indigo-500/20 shadow-xl shadow-indigo-100/50 dark:shadow-none backdrop-blur-md relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none" />
+          <div className="relative flex items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <Share2 size={24} />
               </div>
-              <div>
-                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">Chế độ xem liên kết</h4>
-                 <p className="text-xs text-slate-500 dark:text-zinc-400">Bạn đang xem một văn bản được chia sẻ cụ thể.</p>
+              <div className="space-y-0.5">
+                <h4 className="font-bold text-slate-900 dark:text-white text-base">Xem văn bản qua liên kết</h4>
+                <p className="text-xs text-indigo-700/80 dark:text-indigo-300 font-medium tracking-tight">Bạn đang truy cập tài liệu qua một đường dẫn chia sẻ cụ thể.</p>
               </div>
-           </div>
-           <div className="flex items-center gap-2">
+            </div>
+            
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => setShowOnlyHighlighted(!showOnlyHighlighted)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+                  "px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border",
                   showOnlyHighlighted 
                     ? "bg-indigo-600 text-white border-indigo-600" 
-                    : "bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-white/10"
+                    : "bg-white/50 dark:bg-zinc-900/50 text-slate-700 dark:text-zinc-300 border-indigo-200/50 dark:border-indigo-500/20"
                 )}
               >
-                {showOnlyHighlighted ? "Hiện tất cả" : "Chỉ hiện văn bản này"}
+                {showOnlyHighlighted ? "Hiện tất cả" : "Chỉ hiện này"}
               </button>
               <button 
                 onClick={() => {
@@ -409,12 +451,13 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                   const newUrl = window.location.pathname + window.location.hash;
                   window.history.replaceState({ path: newUrl }, '', newUrl);
                 }}
-                className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                className="p-3 bg-white/50 dark:bg-zinc-900/50 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-all"
               >
                 <X size={20} />
               </button>
-           </div>
-        </div>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {/* Grid / List Content */}
@@ -521,133 +564,56 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         </div>
       ) : (
         <div className="space-y-10">
-          <div className="animate-fade-in grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <AnimatePresence mode="popLayout">
-              {filteredDocs.map((docItem, idx) => (
-                <DocumentCard 
-                  key={docItem.id}
-                  docItem={docItem}
-                  idx={idx}
-                  onPreview={handlePreview}
-                  onDownload={handleDownload}
-                  onShare={shareLink}
-                  onDelete={handleDelete}
-                  isAdmin={isAdmin}
-                  getFileIcon={getFileIcon}
-                  isHighlighted={docItem.id === highlightId}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left">
+               <thead>
+                 <tr className="border-b border-slate-100 dark:border-white/5">
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Định dạng</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên hiển thị</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh mục</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày tạo</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50 dark:divide-white/5">
+                 {filteredDocs.map((docItem) => (
+                   <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                     <td className="px-6 py-4">
+                       <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-widest">
+                         {docItem.githubPath.split('.').pop()?.toUpperCase()}
+                       </span>
+                     </td>
+                     <td className="px-6 py-4 font-bold text-sm whitespace-nowrap overflow-x-auto max-w-[200px]">{docItem.name}</td>
+                     <td className="px-6 py-4 text-sm text-slate-500">{docItem.categoryName}</td>
+                     <td className="px-6 py-4 text-xs text-slate-400">
+                        {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
+                     </td>
+                     <td className="px-6 py-4 text-right">
+                       <div className="flex justify-end gap-2">
+                         <button onClick={() => handlePreview(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></button>
+                         <button onClick={() => handleDownload(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Download size={16} /></button>
+                         {isAdmin && <button onClick={() => handleDelete(docItem)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>}
+                       </div>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
 
-          {hasMore && (
+          {hasMore && documents.length < 100 && (
             <div className="flex justify-center pt-8">
               <button 
                 onClick={loadMore}
                 disabled={loadingMore}
                 className="px-8 py-3 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-white/10 transition-all flex items-center gap-3 disabled:opacity-50 shadow-sm"
               >
-                {loadingMore ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Tải Thêm Văn Bản"}
+                {loadingMore ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Tải Thêm"}
               </button>
             </div>
           )}
         </div>
       )}
-
-      {/* Document View Drawer / Modal */}
-      <AnimatePresence>
-        {previewDoc && (
-          <>
-            <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               onClick={() => setPreviewDoc(null)}
-               className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md"
-            />
-            <motion.div 
-               initial={{ y: '100%' }}
-               animate={{ y: 0 }}
-               exit={{ y: '100%' }}
-               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-               className="fixed bottom-0 left-0 right-0 z-[210] h-[94vh] lg:h-[90vh] lg:top-[5vh] lg:bottom-auto lg:left-[5vw] lg:right-[5vw] lg:rounded-[32px] bg-white dark:bg-zinc-950 rounded-t-[32px] flex flex-col overflow-hidden shadow-2xl border border-white/10"
-            >
-               <div className="px-6 py-4 md:px-8 border-b border-slate-100 dark:border-white/5 flex flex-wrap items-center justify-between shrink-0 gap-4 bg-white dark:bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-10">
-                  <div className="flex items-center gap-4 max-w-full overflow-hidden">
-                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 flex items-center justify-center shrink-0 shadow-sm">
-                        {getFileIcon(previewDoc.githubPath)}
-                     </div>
-                     <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight break-words" title={previewDoc.name}>{previewDoc.name}</h3>
-                          <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase tracking-widest rounded flex items-center gap-1 shrink-0">
-                            <Eye size={10} /> Xem trước
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                           <span className="text-[9px] font-black font-mono text-slate-500 dark:text-zinc-500 uppercase tracking-widest bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded">
-                             {previewDoc.categoryName}
-                           </span>
-                           <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-600 uppercase border-l border-slate-200 dark:border-white/10 pl-2">
-                             Size: {(previewDoc as any).fileSize || 'N/A'} • {previewDoc.githubPath.split('.').pop()?.toUpperCase()}
-                           </span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                     <button 
-                       onClick={() => shareLink(previewDoc.id)}
-                       className="p-3 bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-xl transition-all text-slate-500 dark:text-zinc-400"
-                       title="Sao chép link chia sẻ"
-                     >
-                        <Share2 size={18} />
-                     </button>
-                     <button 
-                       onClick={() => handleDownload(previewDoc)}
-                       className="flex-1 md:flex-none px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                     >
-                        <Download size={16} /> Tải Xuống
-                     </button>
-                     <button 
-                       onClick={() => setPreviewDoc(null)}
-                       className="p-3 bg-slate-100 dark:bg-zinc-900 hover:bg-rose-500/10 hover:text-rose-500 dark:hover:bg-rose-500/20 rounded-xl transition-all"
-                     >
-                        <X size={20} className="text-slate-600 dark:text-zinc-400 group-hover:text-rose-500" />
-                     </button>
-                  </div>
-               </div>
-               
-               <div className="flex-1 bg-slate-100/50 dark:bg-[#1a1a1a] relative overflow-hidden flex flex-col items-center">
-                  <div className="w-full h-full relative group">
-                     {/* Loading State Overlay */}
-                     <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm pointer-events-none z-0">
-                        <div className="flex flex-col items-center gap-3">
-                           <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Đang khởi tạo trình xem...</p>
-                        </div>
-                     </div>
-                     
-                     <iframe 
-                        src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(previewDoc.githubUrl)}`}
-                        className="w-full h-full border-0 absolute inset-0 z-10 bg-transparent transition-opacity duration-300"
-                        title="Document Preview"
-                        style={{ opacity: previewDoc.githubPath.endsWith('.pdf') ? 0 : 1 }}
-                     />
-                     
-                     {/* PDF Fallback */}
-                     {previewDoc.githubPath.endsWith('.pdf') && (
-                        <iframe 
-                           src={previewDoc.githubUrl}
-                           className="w-full h-full border-0 absolute inset-0 z-20 bg-white"
-                           title="PDF Preview"
-                        />
-                     )}
-                  </div>
-               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

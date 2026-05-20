@@ -13,6 +13,7 @@ export interface Category {
 export interface AdminDocument {
   id: string;
   name: string;
+  originalName?: string;
   categoryId: string;
   categoryName: string;
   note: string;

@@ -16,6 +16,7 @@ import AdminLogins from './AdminLogins';
 import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
+import AdminSystem from './AdminSystem';
 import { useConfirmStore } from '../../store/confirmStore';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
@@ -26,10 +27,16 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
+  const [siteStats, setSiteStats] = useState({
+    today: 0,
+    month: 0,
+    year: 0,
+    total: 0
+  });
   
   const [aboutConfig, setAboutConfig] = useState({
     introTitle: 'Hệ thống - Nền tảng công nghệ toàn diện',
@@ -66,10 +73,32 @@ export default function AdminDashboard() {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Listen to site stats
+    const now = new Date();
+    const todayId = `day_${format(now, 'yyyy-MM-dd')}`;
+    const monthId = `month_${format(now, 'yyyy-MM')}`;
+    const yearId = `year_${format(now, 'yyyy')}`;
+
+    const unsubStats = onSnapshot(collection(db, 'site_visitation_stats'), (snapshot) => {
+      const stats: any = { today: 0, month: 0, year: 0, total: 0 };
+      snapshot.docs.forEach(doc => {
+        const id = doc.id;
+        const count = doc.data().count || 0;
+        if (id === 'total') stats.total = count;
+        if (id === todayId) stats.today = count;
+        if (id === monthId) stats.month = count;
+        if (id === yearId) stats.year = count;
+      });
+      setSiteStats(stats);
+    }, (error) => {
+      console.error("Error listening to site stats:", error);
+    });
+
     return () => {
       unsubContacts();
       unsubSystem();
       unsubAllUtils();
+      unsubStats();
     };
   }, []);
 
@@ -303,7 +332,8 @@ export default function AdminDashboard() {
             { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'about', label: 'About Setup', icon: Info }
+            { id: 'about', label: 'About Setup', icon: Info },
+            { id: 'admin_system', label: 'Hệ thống (Data)', icon: Server }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -316,8 +346,48 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
         </h1>
+
+        {/* Visitor Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <Activity size={18} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hôm nay</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.today.toLocaleString()}</div>
+           </div>
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                    <Globe size={18} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tháng này</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.month.toLocaleString()}</div>
+           </div>
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                    <LineChart size={18} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Năm nay</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.year.toLocaleString()}</div>
+           </div>
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <Activity size={18} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tổng cộng</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.total.toLocaleString()}</div>
+           </div>
+        </div>
 
 
       {activeTab === 'about' && (
@@ -535,6 +605,12 @@ export default function AdminDashboard() {
       {activeTab === 'document_vault' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminDocumentVault />
+        </motion.div>
+      )}
+
+      {activeTab === 'admin_system' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminSystem />
         </motion.div>
       )}
 

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, u
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
+import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
 import { useAppStore } from './store/appStore';
 import { Toaster } from 'react-hot-toast';
@@ -52,6 +53,9 @@ export default function App() {
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
 
   useEffect(() => {
+    // Increment visit counter
+    statsService.incrementVisit().catch(console.error);
+
     // Offline status listening
     const handleOnline = () => setOnlineStatus(true);
     const handleOffline = () => setOnlineStatus(false);

@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import PwaBanner from '../pwa/PwaBanner';
 
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar, aiActive } = useAppStore();
@@ -83,6 +84,7 @@ export default function MainLayout() {
           </main>
         </div>
       </div>
+      <PwaBanner />
     </div>
   );
 }

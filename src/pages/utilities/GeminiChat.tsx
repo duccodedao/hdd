@@ -156,8 +156,12 @@ export default function GeminiChat() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    localStorage.setItem('ai_chat_sessions', JSON.stringify(sessions));
-    localStorage.setItem('ai_current_session', currentSessionId);
+    try {
+      localStorage.setItem('ai_chat_sessions', JSON.stringify(sessions));
+      localStorage.setItem('ai_current_session', currentSessionId);
+    } catch (e) {
+      console.error("Failed to save chat sessions to localStorage due to cyclic data:", e);
+    }
   }, [sessions, currentSessionId]);
 
   const createNewChat = () => {

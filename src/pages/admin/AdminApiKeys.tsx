@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, deleteDoc } f
 import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
-import { Key, Eye, EyeOff, Save, Loader2, Users, Trash2, ShieldCheck, Mail, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { Key, Eye, EyeOff, Save, Loader2, Users, Trash2, ShieldCheck, Mail, Calendar, Clock, AlertCircle, Clipboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function AdminApiKeys() {
@@ -368,6 +368,16 @@ export default function AdminApiKeys() {
                              <div className="px-2 py-1 bg-slate-100 dark:bg-white/5 rounded-md font-mono text-[11px] text-slate-600 dark:text-zinc-400 break-all">
                                 {showKeys[item.id] ? item.apiKey : '•'.repeat(30)}
                              </div>
+                             <button 
+                               onClick={() => {
+                                 navigator.clipboard.writeText(item.apiKey);
+                                 toast.success('Đã sao chép API Key');
+                               }}
+                               className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors text-slate-400"
+                               title="Sao chép Key"
+                             >
+                               <Clipboard size={12} />
+                             </button>
                              <button 
                                onClick={() => toggleShow(item.id)}
                                className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-colors text-slate-400"

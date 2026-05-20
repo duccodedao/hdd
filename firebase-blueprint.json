@@ -99,6 +99,16 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "categoryId", "githubUrl", "githubPath"]
+    },
+    "SiteStat": {
+      "title": "Site Stat",
+      "description": "Visitor statistics for the site",
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["count"]
     }
   },
   "firestore": {
@@ -109,6 +119,10 @@
     "form_responses": {
       "schema": "FormResponse",
       "description": "Store all user responses for forms"
+    },
+    "stats": {
+      "schema": "SiteStat",
+      "description": "Global, daily, monthly, and yearly site visitor statistics"
     },
     "files": {
       "schema": "FileMetadata",
