@@ -180,6 +180,14 @@ export default function UtilitiesPage() {
   const { userData, isAdmin, isSuperAdmin } = useAuthStore();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewId = params.get('view');
+    
+    if (viewId && !utilityId) {
+      navigate(`/utilities/kho-van-ban?view=${viewId}`, { replace: true });
+      return;
+    }
+
     if (utilityId) {
       const all = [...nativeUtilities, ...utilities];
       const match = all.find(u => u.id === utilityId);
@@ -187,7 +195,7 @@ export default function UtilitiesPage() {
     } else {
       setActiveUtility(null);
     }
-  }, [sessionId, utilityId, utilities]);
+  }, [sessionId, utilityId, utilities, navigate]);
 
   const handleSelect = (item: UtilityItem) => {
     // Check internal only
