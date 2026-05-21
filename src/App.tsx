@@ -26,6 +26,7 @@ import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
+import AppsPage from './pages/AppsPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -34,7 +35,6 @@ import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
 import FormView from './pages/FormView';
 import NotFoundPage from './pages/NotFoundPage';
-import { TwoFactorChallengePage } from './pages/TwoFactorChallengePage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineNotification } from './components/ui/OfflineNotification';
 import LocationGuard from './components/guards/LocationGuard';
@@ -49,7 +49,7 @@ import { OnboardingGuard } from './components/guards/OnboardingGuard';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 export default function App() {
-  const { user, userData, is2FAVerified, setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
+  const { user, userData, setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
 
   useEffect(() => {
@@ -144,10 +144,6 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  if (user && userData?.twoFactorEnabled && !is2FAVerified) {
-    return <TwoFactorChallengePage />;
-  }
-
   if (maintenanceMode && !isAdmin) {
     return <MaintenancePage />;
   }
@@ -191,6 +187,7 @@ export default function App() {
               <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
+              <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

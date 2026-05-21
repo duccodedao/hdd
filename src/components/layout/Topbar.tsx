@@ -176,17 +176,6 @@ export default function Topbar() {
                     
                     <div className="p-1.5">
                       <button 
-                        onClick={() => {
-                          navigate('/profile');
-                          setShowProfileMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-white dark:hover:bg-white/5 rounded-md transition-all text-[11px] font-medium"
-                      >
-                        <User className="w-3.5 h-3.5" />
-                        Trải nghiệm cá nhân
-                      </button>
-                      
-                      <button 
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-3 py-2 text-rose-500 dark:text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-500 dark:hover:bg-rose-500/10 rounded-md transition-all text-[11px] font-medium"
                       >

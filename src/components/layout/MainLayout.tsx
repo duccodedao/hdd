@@ -8,6 +8,8 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import PwaBanner from '../pwa/PwaBanner';
 
+import NotificationMarquee from './NotificationMarquee';
+
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar, aiActive } = useAppStore();
   const { user } = useAuthStore();
@@ -45,7 +47,12 @@ export default function MainLayout() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10 h-screen">
         
         <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
-          {!aiActive && <Topbar />}
+          {!aiActive && (
+            <>
+              <Topbar />
+              <NotificationMarquee />
+            </>
+          )}
           
           <main className={cn(
             "flex-1 overflow-x-hidden relative z-0 no-scrollbar",

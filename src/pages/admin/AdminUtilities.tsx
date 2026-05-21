@@ -172,11 +172,11 @@ export default function AdminUtilities() {
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
               {[
+                { id: 'file-manager', name: 'Quản Lý File Cá Nhân' },
                 { id: 'kho-van-ban', name: 'Kho Văn Bản' },
                 { id: 'ai-scanner', name: 'Quét Văn Bản AI' },
                 { id: 'image-to-pdf', name: 'Ảnh sang PDF' },
-                { id: 'pdf-to-word', name: 'PDF sang Word' },
-                { id: 'find-my-device', name: 'Định Vị Thiết Bị' }
+                { id: 'pdf-to-word', name: 'PDF sang Word' }
               ].map(tool => {
                 const config = systemTools[tool.id] || { public: true, internal: false };
                 const isPublic = config.public !== false;

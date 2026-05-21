@@ -44,7 +44,6 @@ export const useAppStore = create<AppState>((set) => ({
     'utility_ai-scanner': false,
     'utility_image-to-pdf': false,
     'utility_pdf-to-word': false,
-    'utility_find-my-device': false,
   },
   setMaintenanceTabs: (tabs) => set({ maintenanceTabs: tabs }),
   maintenanceDevices: {

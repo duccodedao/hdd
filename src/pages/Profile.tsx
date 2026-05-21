@@ -20,7 +20,6 @@ import { useConfirmStore } from '../store/confirmStore';
 import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
 import { KeyboardShortcutsModal } from '../components/ui/KeyboardShortcutsModal';
-import { TwoFactorSetupModal } from '../components/auth/TwoFactorSetupModal';
 import { Helmet } from 'react-helmet-async';
 
 interface ActivityLog {
@@ -42,7 +41,6 @@ export default function Profile() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'account' | 'info' | 'security' | 'activity'>((searchParams.get('tab') as any) || 'account');
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [show2FAModal, setShow2FAModal] = useState(false);
   const [passwordCooldown, setPasswordCooldown] = useState(0);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [currentLocationName, setCurrentLocationName] = useState('Đang xác định...');
@@ -235,7 +233,6 @@ export default function Profile() {
         <meta name="description" content="Quản lý thông tin định danh và bảo mật cá nhân." />
       </Helmet>
       <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
-      <TwoFactorSetupModal isOpen={show2FAModal} onClose={() => setShow2FAModal(false)} />
 
       <div className="space-y-10 lg:space-y-16">
         <header className="space-y-4 lg:space-y-6">
@@ -361,94 +358,8 @@ export default function Profile() {
               )}
 
               {activeTab === 'security' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="premium-card flex flex-col justify-between">
-                     <div>
-                        <div className="w-14 h-14 rounded-[1.5rem] bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 flex items-center justify-center mb-6">
-                           <KeyRound className="w-7 h-7 text-indigo-600 dark:text-indigo-500" />
-                        </div>
-                        <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-3">Mã khóa</h3>
-                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
-                           Cập nhật khóa mã hóa hệ thống thông qua giao thức an toàn. Liên kết khôi phục sẽ được gửi đến kênh liên lạc chính thức.
-                        </p>
-                     </div>
-                     <button 
-                       onClick={handleChangePassword}
-                       disabled={passwordCooldown > 0}
-                       className="w-full py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black rounded-2xl font-bold uppercase tracking-widest text-[11px] transition-all active:scale-95 shadow-xl disabled:opacity-50"
-                     >
-                       {passwordCooldown > 0 ? `Đóng băng (${passwordCooldown}s)` : 'Tái Thiết Lập'}
-                     </button>
-                  </div>
-
-                  <div className="premium-card flex flex-col justify-between">
-                     <div>
-                        <div className="w-14 h-14 rounded-[1.5rem] bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center mb-6">
-                           <Shield className="w-7 h-7 text-emerald-600 dark:text-emerald-500" />
-                        </div>
-                        <div className="flex items-center gap-4 mb-3">
-                           <h3 className="text-2xl font-semibold text-slate-900 dark:text-white">Bảo mật đa tầng</h3>
-                           {userData?.twoFactorEnabled ? (
-                             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 rounded-lg text-[10px] font-bold uppercase">Active</span>
-                           ) : (
-                             <span className="px-3 py-1 bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 rounded-lg text-[10px] font-bold uppercase">Offline</span>
-                           )}
-                        </div>
-                        <p className="text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
-                           Tăng cường lá chắn phòng thủ với mã xác thực luân phiên. Khuyến nghị bắt buộc đối với cấp quản trị viên.
-                        </p>
-                     </div>
-                     <button 
-                       onClick={() => setShow2FAModal(true)}
-                       className={cn(
-                         "w-full py-4 rounded-2xl font-bold uppercase tracking-widest text-[11px] transition-all active:scale-95 shadow-xl border",
-                         userData?.twoFactorEnabled 
-                           ? "bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-white border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/5" 
-                           : "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
-                       )}
-                     >
-                       {userData?.twoFactorEnabled ? 'Cấu Hình 2FA' : 'Kích Hoạt Lá Chắn'}
-                     </button>
-                  </div>
-
-                  <div className="lg:col-span-2 premium-card">
-                     <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-8 tracking-tight">Thiết lập quyền thiết bị</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {[
-                          { key: 'geolocation', label: 'Geo Location', state: permissions.geolocation, icon: MapPin },
-                          { key: 'pwa', label: 'Native App', state: 'prompt', icon: Smartphone }
-                        ].map((perm, i) => (
-                          <div key={perm.key} className="p-6 border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 rounded-[2rem] flex flex-col justify-between gap-8 h-full">
-                             <div className="flex items-start justify-between">
-                                <div className={cn(
-                                  "w-12 h-12 rounded-[1rem] flex items-center justify-center transition-colors shadow-sm",
-                                  perm.state === 'granted' ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400" : "bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400"
-                                )}>
-                                   <perm.icon className="w-5 h-5" />
-                                </div>
-                                <button 
-                                  onClick={() => perm.key === 'pwa' ? handlePWAInstall() : togglePermission(perm.key as any)}
-                                  className={cn(
-                                    "flex items-center w-14 h-7 md:w-16 md:h-8 rounded-full relative transition-all duration-300 border focus:outline-none",
-                                    perm.state === 'granted' ? "bg-blue-500 border-blue-600" : "bg-slate-200 dark:bg-zinc-800 border-slate-300 dark:border-white/10"
-                                  )}
-                                >
-                                  <div className={cn(
-                                    "absolute top-[2px] md:top-[3px] w-5 h-5 md:w-6 md:h-6 rounded-full bg-white transition-all duration-300 shadow-sm",
-                                    perm.state === 'granted' ? "translate-x-7 md:translate-x-8" : "translate-x-1"
-                                  )} />
-                                </button>
-                             </div>
-                             <div>
-                                <p className="text-base font-bold text-slate-900 dark:text-white tracking-wide">{perm.label}</p>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1.5">
-                                  {perm.key === 'pwa' ? 'Gắn ứng dụng' : perm.state === 'granted' ? 'Hợp lệ' : perm.state === 'denied' ? 'Từ chối' : 'Chưa thiết lập'}
-                                </p>
-                             </div>
-                          </div>
-                        ))}
-                     </div>
-                  </div>
+                <div className="premium-card">
+                   <p className="text-slate-500 dark:text-zinc-400">Tính năng bảo mật đã được vô hiệu hóa.</p>
                 </div>
               )}
 

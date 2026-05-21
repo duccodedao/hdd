@@ -55,6 +55,8 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [showOnlyHighlighted, setShowOnlyHighlighted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', categoryId: '', note: '', hidden: false });
 
   // Confirm Modal State
   const [confirmState, setConfirmState] = useState<{
@@ -105,7 +107,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     // Fetch Categories
     const qCats = query(collection(db, 'document_categories'));
     const unsubCats = onSnapshot(qCats, (snapshot) => {
-      setCategories(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
+      const fetchedCats = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+      fetchedCats.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' }));
+      setCategories(fetchedCats);
     }, (err: any) => {
       handleFirestoreError(err, OperationType.LIST, 'document_categories');
     });
@@ -288,6 +292,38 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     return <FileQuestion className="text-slate-400 dark:text-zinc-500" />;
   };
 
+  const getFormatBadgeColor = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return 'text-rose-600 bg-rose-100 border-rose-200 dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-500/20';
+    if (['doc', 'docx'].includes(ext!)) return 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-400 dark:bg-blue-500/10 dark:border-blue-500/20';
+    if (['xls', 'xlsx'].includes(ext!)) return 'text-emerald-600 bg-emerald-100 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20';
+    if (['png', 'jpg', 'jpeg'].includes(ext!)) return 'text-purple-600 bg-purple-100 border-purple-200 dark:text-purple-400 dark:bg-purple-500/10 dark:border-purple-500/20';
+    return 'text-slate-600 bg-slate-200 border-slate-300 dark:text-zinc-400 dark:bg-zinc-800 dark:border-white/10';
+  };
+
+  const handleEditInit = (docItem: AdminDocument) => {
+    setEditingDoc(docItem);
+    setEditForm({ name: docItem.name, categoryId: docItem.categoryId || '', note: docItem.note || '', hidden: docItem.hidden || false });
+  };
+
+  const handleUpdateDocument = async () => {
+    if (!editingDoc) return;
+    try {
+      const cat = categories.find(c => c.id === editForm.categoryId);
+      await updateDoc(doc(db, 'documents', editingDoc.id), {
+        name: editForm.name,
+        categoryId: editForm.categoryId,
+        categoryName: cat ? cat.name : '',
+        note: editForm.note,
+        hidden: editForm.hidden
+      });
+      toast.success('Đã cập nhật văn bản');
+      setEditingDoc(null);
+    } catch (e) {
+      toast.error('Lỗi khi cập nhật!');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] bg-transparent">
@@ -336,37 +372,37 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       />
       <div 
         className={cn(
-          "sticky top-0 z-50 transition-all duration-500 -mx-6 lg:-mx-12 px-6 lg:px-12",
+          "sticky top-0 z-50 transition-all duration-500",
           isScrolled 
-            ? "py-2 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-white/5 shadow-2xl shadow-indigo-500/5 mt-0" 
-            : "pt-4 pb-6 bg-transparent mt-0"
+            ? "py-2 -mx-6 lg:-mx-12 px-6 lg:px-12 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-white/5 shadow-2xl shadow-indigo-500/5 mt-0" 
+            : "py-2 lg:py-0 bg-transparent mt-0 lg:-mt-4 mb-4"
         )}
       >
         <div 
           className={cn(
             "transition-all duration-500",
-            isScrolled ? "max-w-5xl mx-auto" : "max-w-none"
+            isScrolled ? "max-w-2xl mx-auto" : "max-w-2xl mx-auto"
           )}
         >
           <div className={cn(
-            "premium-card transition-all duration-500 flex flex-col md:flex-row items-center gap-3 md:gap-4",
+            "premium-card transition-all duration-500 flex flex-col md:flex-row items-center gap-2",
             isScrolled 
               ? "p-2 bg-white/40 dark:bg-white/[0.02] border-none shadow-none rounded-2xl" 
-              : "p-3 bg-slate-50 dark:bg-zinc-900/40 rounded-[28px]"
+              : "p-2 bg-slate-50/50 dark:bg-zinc-900/20 rounded-2xl border border-slate-200/50 dark:border-white/5"
           )}>
             <div className="relative flex-1 w-full group">
               <Search className={cn(
-                "absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors",
+                "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors",
                 isScrolled ? "text-indigo-500" : "text-slate-400 dark:text-zinc-500"
               )} />
               <input 
                 type="text" 
                 placeholder="Tìm kiếm văn bản, biểu mẫu..."
                 className={cn(
-                  "w-full pl-11 pr-4 transition-all duration-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white",
+                  "w-full pl-9 pr-4 transition-all duration-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white",
                   isScrolled 
-                    ? "py-2.5 bg-transparent border-none" 
-                    : "py-3 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-2xl"
+                    ? "py-2 bg-transparent border-none" 
+                    : "py-2 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl"
                 )}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -375,16 +411,16 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
             
             <div className={cn(
               "flex items-center gap-2 w-full md:w-auto transition-all duration-500",
-              isScrolled ? "scale-95 opacity-90" : "scale-100 opacity-100"
+              isScrolled ? "opacity-90" : "opacity-100"
             )}>
-              <div className="relative flex-1 md:w-48 group">
-                <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
+              <div className="relative flex-1 md:w-40 group">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
                 <select 
                   className={cn(
-                    "w-full pl-10 pr-8 transition-all duration-500 text-xs appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider",
+                    "w-full pl-9 pr-8 transition-all duration-500 text-xs appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider",
                     isScrolled 
                       ? "py-2 bg-transparent border-none" 
-                      : "py-3 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl"
+                      : "py-2 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl"
                   )}
                   value={selectedCategory}
                   onChange={(e) => {
@@ -545,8 +581,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                     onDownload={handleDownload} 
                     onShare={shareLink} 
                     onDelete={handleDelete}
+                    onEdit={handleEditInit}
                     isAdmin={isAdmin} 
                     getFileIcon={getFileIcon}
+                    getFormatBadgeColor={getFormatBadgeColor}
                     isHighlighted={docItem.id === highlightId}
                   />
                 ))}
@@ -565,34 +603,44 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       ) : (
         <div className="space-y-10">
           <div className="overflow-x-auto">
-             <table className="w-full text-left">
+             <table className="min-w-[850px] lg:min-w-0 w-full text-left table-auto">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Định dạng</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên hiển thị</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh mục</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày tạo</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-20 md:w-24 text-left">Định dạng</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-40 md:w-44">Danh mục</th>
+                   <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-48">Ngày tạo</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-36 md:w-44">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                  {filteredDocs.map((docItem) => (
                    <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                     <td className="px-6 py-4">
-                       <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-widest">
+                     <td className="px-2 md:px-4 py-4 text-left w-20 md:w-24">
+                       <span className={cn("font-mono text-[9px] md:text-[10px] px-1.5 md:px-2 py-1 rounded uppercase tracking-wider border", getFormatBadgeColor(docItem.githubPath))}>
                          {docItem.githubPath.split('.').pop()?.toUpperCase()}
                        </span>
                      </td>
-                     <td className="px-6 py-4 font-bold text-sm whitespace-nowrap overflow-x-auto max-w-[200px]">{docItem.name}</td>
-                     <td className="px-6 py-4 text-sm text-slate-500">{docItem.categoryName}</td>
-                     <td className="px-6 py-4 text-xs text-slate-400">
+                     <td className="px-2 md:px-4 py-4 font-bold text-[13px] md:text-sm text-slate-800 dark:text-zinc-200 truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer max-w-[200px] sm:max-w-xs md:max-w-md lg:max-w-lg" onClick={() => handlePreview(docItem)} title={docItem.name}>
+                       {docItem.name}
+                     </td>
+                     <td className="px-2 md:px-4 py-4 text-[11px] md:text-sm text-slate-500 text-left w-40 md:w-44 truncate" title={docItem.categoryName || 'Chưa phân loại'}>
+                       {docItem.categoryName || 'Chưa phân loại'}
+                     </td>
+                     <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-6 py-4 text-right">
-                       <div className="flex justify-end gap-2">
-                         <button onClick={() => handlePreview(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></button>
-                         <button onClick={() => handleDownload(docItem)} className="p-2 text-slate-400 hover:text-indigo-600"><Download size={16} /></button>
-                         {isAdmin && <button onClick={() => handleDelete(docItem)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={16} /></button>}
+                     <td className="px-2 md:px-4 py-4 text-right w-36 md:w-44 whitespace-nowrap">
+                       <div className="flex justify-end gap-1 md:gap-2">
+                         <button onClick={() => handlePreview(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
+                         <button onClick={() => handleDownload(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                         <button onClick={() => shareLink(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
+                         {isAdmin && (
+                           <>
+                             <button onClick={() => handleEditInit(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
+                             <button onClick={() => handleDelete(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                           </>
+                         )}
                        </div>
                      </td>
                    </tr>
@@ -614,13 +662,68 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
           )}
         </div>
       )}
+      {editingDoc && (
+        <Modal isOpen={!!editingDoc} onClose={() => setEditingDoc(null)} title="Chỉnh sửa văn bản">
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Tên văn bản</label>
+              <input 
+                value={editForm.name} 
+                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium text-slate-900 dark:text-white" 
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Phân loại</label>
+              <select 
+                value={editForm.categoryId} 
+                onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })}
+                className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium text-slate-900 dark:text-white appearance-none"
+              >
+                <option value="">Không phân loại</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Ghi chú / Mật khẩu</label>
+              <input 
+                value={editForm.note} 
+                onChange={e => setEditForm({ ...editForm, note: e.target.value })}
+                placeholder="Ghi chú thêm... (mật khẩu giải nén v.v...)"
+                className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium text-slate-900 dark:text-white" 
+              />
+            </div>
+            <div className="flex items-center gap-3 mt-2">
+              <input 
+                type="checkbox" 
+                id="hidden" 
+                checked={editForm.hidden}
+                onChange={e => setEditForm({ ...editForm, hidden: e.target.checked })}
+                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" 
+              />
+              <label htmlFor="hidden" className="text-sm font-medium text-slate-700 dark:text-zinc-300">Ẩn văn bản này với thành viên</label>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button 
+                onClick={handleUpdateDocument}
+                className="flex-1 py-4 rounded-2xl bg-indigo-600 dark:bg-white text-white dark:text-slate-950 font-bold text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 dark:shadow-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                Cập Nhật
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 }
 
 // Minimal Components
 
-const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDelete, isAdmin, getFileIcon, isHighlighted }: any) => {
+const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDelete, onEdit, isAdmin, getFileIcon, getFormatBadgeColor, isHighlighted }: any) => {
   return (
     <motion.div
       id={`doc-${docItem.id}`}
@@ -659,7 +762,7 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
             <span className="text-[10px] font-black uppercase tracking-[0.1em] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-500/20 max-w-full truncate">
               {docItem.categoryName}
             </span>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
+            <span className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border", getFormatBadgeColor(docItem.githubPath))}>
                {docItem.githubPath.split('.').pop()?.toUpperCase()} Document
             </span>
           </div>
@@ -678,11 +781,11 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
             <div className="flex items-center gap-4">
                <div className="flex flex-col">
                  <span className="text-[8px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Views</span>
-                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.views}</span>
+                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.views || 0}</span>
                </div>
                <div className="flex flex-col">
                  <span className="text-[8px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Saves</span>
-                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.downloads}</span>
+                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.downloads || 0}</span>
                </div>
             </div>
 
@@ -701,14 +804,30 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
                 >
                   <Download size={16} />
                 </button>
+                <button 
+                  onClick={() => onShare(docItem.id)}
+                  className="p-2.5 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all"
+                  title="Chia sẻ"
+                >
+                  <Share2 size={16} />
+                </button>
                 {isAdmin && (
-                  <button 
-                    onClick={() => onDelete(docItem)}
-                    className="p-2.5 text-slate-300 hover:text-rose-500 dark:text-zinc-700 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
-                    title="Xóa tài liệu"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => onEdit(docItem)}
+                      className="p-2.5 text-slate-300 hover:text-indigo-500 dark:text-zinc-700 dark:hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all"
+                      title="Chỉnh sửa (Admin)"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => onDelete(docItem)}
+                      className="p-2.5 text-slate-300 hover:text-rose-500 dark:text-zinc-700 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
+                      title="Xóa tài liệu"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
                 )}
             </div>
           </div>

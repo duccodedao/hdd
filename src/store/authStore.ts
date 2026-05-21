@@ -7,11 +7,9 @@ interface AuthState {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   loading: boolean;
-  is2FAVerified: boolean;
   setUser: (user: User | null) => void;
   setUserData: (data: UserData | null) => void;
   setLoading: (loading: boolean) => void;
-  set2FAVerified: (verified: boolean) => void;
 }
 
 export interface UserData {
@@ -28,12 +26,17 @@ export interface UserData {
   lastLoginAt: number;
   location?: { lat: number, lng: number, address?: string };
   ip?: string;
-  twoFactorEnabled?: boolean;
   assignedUtilities?: string[];
   notificationPreferences?: {
     system: boolean;
     security: boolean;
     files: boolean;
+  };
+  personalGithubConfig?: {
+    username?: string;
+    repo?: string;
+    token?: string;
+    branch?: string;
   };
   socialLinks?: {
     google?: string;
@@ -60,23 +63,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAdmin: false,
   isSuperAdmin: false,
   loading: true,
-  is2FAVerified: sessionStorage.getItem('is2FAVerified') === 'true',
-  setUser: (user) => set((state) => {
-    if (!user) sessionStorage.removeItem('is2FAVerified');
-    return { user, is2FAVerified: !user ? false : state.is2FAVerified };
-  }),
+  setUser: (user) => set({ user }),
   setUserData: (data) => set({ 
     userData: data,
     isAdmin: data?.role === 'admin' || data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'sonlyhongduc1@ghn.vn',
     isSuperAdmin: data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'sonlyhongduc1@ghn.vn'
   }),
   setLoading: (loading) => set({ loading }),
-  set2FAVerified: (verified) => {
-    if (verified) {
-      sessionStorage.setItem('is2FAVerified', 'true');
-    } else {
-      sessionStorage.removeItem('is2FAVerified');
-    }
-    set({ is2FAVerified: verified });
-  },
 }));

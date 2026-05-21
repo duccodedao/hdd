@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { OfflineGuard } from '../components/OfflineGuard';
-import GuestView from '../components/ui/GuestView';
-import FindMyDeviceUtility from './FindMyDeviceUtility';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
 import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
+import PersonalFileManager from './utilities/PersonalFileManager';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
@@ -92,7 +91,7 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         <div className="flex flex-col items-end gap-1.5">
           <div className={cn(
             "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-            isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-500 dark:border-amber-500/20') :
+            isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-red-100 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20') :
             item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
             item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
             'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
@@ -100,8 +99,8 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
             {isMaintenanceActive ? (isAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
           </div>
           {(item as any).internalOnly && (
-            <div className="text-[8px] font-black uppercase text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-500/20">
-              Internal
+            <div className="text-[8px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">
+              Nội bộ
             </div>
           )}
         </div>
@@ -128,6 +127,14 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
 };
 
 const nativeUtilities: UtilityItem[] = [
+  {
+    id: 'file-manager',
+    title: 'Quản Lý File Cá Nhân',
+    description: 'Duyệt và xem toàn bộ tệp tin trong repository của bạn như chiếc máy tính di động cá nhân.',
+    icon: Laptop,
+    type: 'tool',
+    createdAt: Date.now() + 3000
+  },
   {
     id: 'kho-van-ban',
     title: 'Kho Văn Bản',
@@ -159,14 +166,6 @@ const nativeUtilities: UtilityItem[] = [
     icon: FileText,
     type: 'tool',
     createdAt: Date.now() - 2000
-  },
-  {
-    id: 'find-my-device',
-    title: 'Định Vị Thiết Bị',
-    description: 'Kết nối mạng lưới toàn cầu để xác định và bảo mật thiết bị di động của bạn.',
-    icon: Box,
-    type: 'internal',
-    createdAt: Date.now() - 3000
   }
 ];
 
@@ -177,9 +176,17 @@ export default function UtilitiesPage() {
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
   const { setAiActive } = useAppStore();
-  const { userData, isAdmin, isSuperAdmin } = useAuthStore();
+  const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewId = params.get('view');
+    
+    if (viewId && !utilityId) {
+      navigate(`/utilities/kho-van-ban?view=${viewId}`, { replace: true });
+      return;
+    }
+
     if (utilityId) {
       const all = [...nativeUtilities, ...utilities];
       const match = all.find(u => u.id === utilityId);
@@ -187,7 +194,7 @@ export default function UtilitiesPage() {
     } else {
       setActiveUtility(null);
     }
-  }, [sessionId, utilityId, utilities]);
+  }, [sessionId, utilityId, utilities, navigate]);
 
   const handleSelect = (item: UtilityItem) => {
     // Check internal only
@@ -252,8 +259,8 @@ export default function UtilitiesPage() {
       );
     }
 
-    if (activeUtility.type === 'internal' && activeUtility.id === 'find-my-device') {
-      return <FindMyDeviceUtility onBack={handleBack} />;
+    if (activeUtility.id === 'file-manager') {
+      return <PersonalFileManager onBack={handleBack} />;
     }
     
     if (activeUtility.id === 'kho-van-ban') {
@@ -294,33 +301,81 @@ export default function UtilitiesPage() {
   }
 
   const allItems = filteredItems;
+  const totalTools = allItems.length;
+  const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
+  const activeTools = totalTools - maintenanceTools;
+
+  let internalTools = 0;
+  let publicTools = 0;
+  if (isAdmin || isSuperAdmin) {
+    internalTools = allItems.filter(item => {
+      const config = systemTools[item.id];
+      return config?.internal || (item as any).internalOnly;
+    }).length;
+    publicTools = totalTools - internalTools;
+  }
 
   return (
     <div className="max-w-[1920px] mx-auto py-6 lg:py-20 relative min-h-screen animate-fade-in">
       <div className="space-y-10 lg:space-y-16">
         {/* Header section */}
-        <header className="space-y-4 lg:space-y-6">
+        <header className="space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-300 uppercase tracking-widest">Workbench</span>
           </div>
           
-          <div className="space-y-1 lg:space-y-2">
-            <h1 className="text-3xl lg:text-6xl font-display font-semibold tracking-tight text-slate-950 dark:text-white leading-none">Công Cụ</h1>
-            <p className="text-slate-600 dark:text-zinc-400 text-sm lg:text-base font-medium max-w-xl">
-              Các tiện ích hiệu suất cao được thiết kế để tối ưu hóa công việc kỹ thuật số của bạn.
-            </p>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+            <div className="space-y-1 lg:space-y-2">
+              <h1 className="text-3xl lg:text-6xl font-display font-semibold tracking-tight text-slate-950 dark:text-white leading-none">Công Cụ</h1>
+              <p className="text-slate-600 dark:text-zinc-400 text-sm lg:text-base font-medium max-w-xl">
+                Các tiện ích hiệu suất cao được thiết kế để tối ưu hóa công việc kỹ thuật số của bạn.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 text-[10px] sm:text-xs">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm">
+                <div className="flex flex-col min-w-[50px]">
+                  <span className="font-bold text-slate-800 dark:text-white text-base leading-none mb-1">{totalTools}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Tổng</span>
+                </div>
+                <div className="w-px h-8 bg-slate-200 dark:bg-white/10" />
+                <div className="flex flex-col min-w-[50px]">
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 text-base leading-none mb-1">{activeTools}</span>
+                  <span className="text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-500 uppercase tracking-wider">H.Động</span>
+                </div>
+                <div className="w-px h-8 bg-slate-200 dark:bg-white/10" />
+                <div className="flex flex-col min-w-[50px]">
+                  <span className="font-bold text-amber-600 dark:text-amber-400 text-base leading-none mb-1">{maintenanceTools}</span>
+                  <span className="text-[10px] font-semibold text-amber-600/70 dark:text-amber-500 uppercase tracking-wider">Bảo trì</span>
+                </div>
+              </div>
+
+              {(isAdmin || isSuperAdmin) && (
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/10 rounded-2xl shadow-sm">
+                  <div className="flex flex-col min-w-[50px]">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-base leading-none mb-1">{publicTools}</span>
+                    <span className="text-[10px] font-semibold text-indigo-600/70 dark:text-indigo-500 uppercase tracking-wider">C.Khai</span>
+                  </div>
+                  <div className="w-px h-8 bg-indigo-200 dark:bg-indigo-500/20" />
+                  <div className="flex flex-col min-w-[50px]">
+                    <span className="font-bold text-rose-600 dark:text-rose-400 text-base leading-none mb-1">{internalTools}</span>
+                    <span className="text-[10px] font-semibold text-rose-600/70 dark:text-rose-500 uppercase tracking-wider">Nội bộ</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
         <section>
-          <GuestView title="Khóa Truy Cập" description="Xác định danh tính để truy cập vào trung tâm xử lý.">
+          <div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
               {allItems.map((item, idx) => (
                 <UtilityCard key={item.id} item={item} idx={idx} onSelect={handleSelect} />
               ))}
             </div>
-          </GuestView>
+          </div>
         </section>
       </div>
     </div>

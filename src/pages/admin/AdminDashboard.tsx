@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2 } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import { vi } from 'date-fns/locale';
@@ -27,7 +28,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -50,7 +51,59 @@ export default function AdminDashboard() {
     email: 'contact@system.com'
   });
 
+  const [notificationConfig, setNotificationConfig] = useState({
+    active: false,
+    message: '',
+    isEmergency: false
+  });
+
+  const [fileManagerConfig, setFileManagerConfig] = useState({
+    username: '',
+    repo: '',
+    token: '',
+    branch: 'main'
+  });
+
+  const [githubGlobalConfig, setGithubGlobalConfig] = useState({
+    username: '',
+    token: ''
+  });
+
+  const [imageUploadConfig, setImageUploadConfig] = useState({
+    username: '',
+    repo: '',
+    token: '',
+    branch: 'main'
+  });
+
+  const [githubIntegrationConfig, setGithubIntegrationConfig] = useState({
+    username: '',
+    repo: '',
+    token: '',
+    branch: 'main',
+    path: 'assets/uploads'
+  });
+
+  const [expandedSetting, setExpandedSetting] = useState<string | null>('global');
+
+  // States for dynamic application portal setup
+  const [adminApps, setAdminApps] = useState<any[]>([]);
+  const [editingAppId, setEditingAppId] = useState<string | null>(null);
+  const [appForm, setAppForm] = useState({
+    title: '',
+    description: '',
+    logoUrl: '',
+    appUrl: ''
+  });
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [systemTools, setSystemTools] = useState<any>({});
+
   useEffect(() => {
+    const unsubToolPerms = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
+      if (docSnap.exists()) {
+        setSystemTools(docSnap.data());
+      }
+    });
 
     const unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
       setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -60,6 +113,23 @@ export default function AdminDashboard() {
       if (snap.exists()) {
         const data = snap.data();
         if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
+        if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
+        if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
+        if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
+        if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
+      }
+    });
+
+    const unsubGithubIntegration = onSnapshot(doc(db, 'settings', 'github_integration'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setGithubIntegrationConfig({
+          username: data.username || data.owner || '',
+          repo: data.repo || '',
+          token: data.token || '',
+          branch: data.branch || 'main',
+          path: data.path || 'assets/uploads'
+        });
       }
     });
 
@@ -71,6 +141,10 @@ export default function AdminDashboard() {
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     // Listen to site stats
@@ -95,9 +169,12 @@ export default function AdminDashboard() {
     });
 
     return () => {
+      unsubToolPerms();
       unsubContacts();
       unsubSystem();
+      unsubGithubIntegration();
       unsubAllUtils();
+      unsubApps();
       unsubStats();
     };
   }, []);
@@ -108,6 +185,299 @@ export default function AdminDashboard() {
       toast.success('Đã cập nhật thông tin giới thiệu');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình');
+    }
+  };
+
+  const handleSaveNotification = async () => {
+    try {
+      await updateDoc(doc(db, 'settings', 'system'), {
+        notificationConfig
+      });
+      toast.success('Đã cập nhật thông báo vòng lặp website');
+    } catch (e) {
+      toast.error('Lỗi khi lưu thiết lập thông báo');
+    }
+  };
+
+  const handleSaveFileManager = async () => {
+    try {
+      await updateDoc(doc(db, 'settings', 'system'), {
+        fileManagerConfig: {
+          ...fileManagerConfig,
+          username: githubGlobalConfig.username,
+          token: githubGlobalConfig.token
+        }
+      });
+      toast.success('Đã cập nhật cấu hình Quản lý File cá nhân');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình Quản lý File');
+    }
+  };
+
+  const handleSaveGithubGlobal = async () => {
+    try {
+      // Save global & auto sync to fileManager & imageUpload configs in standard systems doc
+      await updateDoc(doc(db, 'settings', 'system'), {
+        githubGlobalConfig,
+        fileManagerConfig: {
+          ...fileManagerConfig,
+          username: githubGlobalConfig.username,
+          token: githubGlobalConfig.token
+        },
+        imageUploadConfig: {
+          ...imageUploadConfig,
+          username: githubGlobalConfig.username,
+          token: githubGlobalConfig.token
+        }
+      });
+
+      // Synchronize key to github_integration settings as well
+      await setDoc(doc(db, 'settings', 'github_integration'), {
+        username: githubGlobalConfig.username,
+        owner: githubGlobalConfig.username,
+        token: githubGlobalConfig.token,
+      }, { merge: true });
+
+      toast.success('Đã cập nhật cấu hình GitHub trung tâm & đồng bộ tất cả phân hệ');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình GitHub trung tâm');
+    }
+  };
+
+  const handleSaveImageUploadConfig = async () => {
+    try {
+      await updateDoc(doc(db, 'settings', 'system'), {
+        imageUploadConfig: {
+          ...imageUploadConfig,
+          username: githubGlobalConfig.username,
+          token: githubGlobalConfig.token
+        }
+      });
+      toast.success('Đã cập nhật cấu hình kho lưu trữ hình ảnh');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình kho hình ảnh');
+    }
+  };
+
+  const handleSaveGithubIntegration = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'github_integration'), {
+        username: githubGlobalConfig.username,
+        owner: githubGlobalConfig.username,
+        token: githubGlobalConfig.token,
+        repo: githubIntegrationConfig.repo,
+        branch: githubIntegrationConfig.branch || 'main',
+        path: githubIntegrationConfig.path || 'assets/uploads'
+      }, { merge: true });
+      toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveApp = async () => {
+    if (!appForm.title || !appForm.appUrl) {
+      toast.error('Vui lòng nhập Tên và Link ứng dụng');
+      return;
+    }
+    try {
+      if (editingAppId) {
+        await updateDoc(doc(db, 'apps', editingAppId), {
+          ...appForm
+        });
+        toast.success('Đã cập nhật ứng dụng thành công');
+      } else {
+        await addDoc(collection(db, 'apps'), {
+          ...appForm,
+          createdAt: serverTimestamp()
+        });
+        toast.success('Đã đăng ký ứng dụng mới thành công');
+      }
+      setAppForm({ title: '', description: '', logoUrl: '', appUrl: '' });
+      setEditingAppId(null);
+    } catch (e) {
+      console.error(e);
+      toast.error('Lỗi khi lưu thông tin ứng dụng');
+    }
+  };
+
+  const handleEditApp = (app: any) => {
+    setEditingAppId(app.id);
+    setAppForm({
+      title: app.title || '',
+      description: app.description || '',
+      logoUrl: app.logoUrl || '',
+      appUrl: app.appUrl || ''
+    });
+  };
+
+  const handleDeleteApp = (id: string) => {
+    openConfirm({
+      title: 'Xóa ứng dụng liên kết',
+      message: 'Bạn có chắc chắn muốn xóa liên kết ứng dụng này không? Thao tác này không thể hoàn tác.',
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'apps', id));
+          toast.success('Xóa ứng dụng thành công');
+        } catch (e) {
+          toast.error('Lỗi khi xóa ứng dụng');
+        }
+      }
+    });
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const data = [
+        {
+          "Tên ứng dụng": "Gmail Portal",
+          "Link logo": "https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg",
+          "Link ứng dụng": "https://gmail.google.com",
+          "Mô tả": "Cổng kết nối thư điện tử Google Workspace."
+        },
+        {
+          "Tên ứng dụng": "Google Calendar",
+          "Link logo": "",
+          "Link ứng dụng": "https://calendar.google.com",
+          "Mô tả": "Lịch hẹn và quản lý thời gian biểu quốc tế."
+        }
+      ];
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "DanhSach");
+      XLSX.writeFile(workbook, "mau_import_ung_dung.xlsx");
+      toast.success("Tải tệp mẫu Excel thành công!");
+    } catch (err: any) {
+      console.error("Lỗi tạo file mẫu:", err);
+      toast.error("Lỗi khi tạo file mẫu Excel: " + err.message);
+    }
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (data.length === 0) {
+          toast.error("File Excel không có dữ liệu!");
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        const toastId = toast.loading(`Đang nhập ${data.length} ứng dụng...`);
+
+        for (const row of data) {
+          const title = row["Tên ứng dụng"] || row["title"] || row["Name"] || row["Tên"];
+          const logoUrl = row["Link logo"] || row["logoUrl"] || row["Logo"] || row["Link ảnh logo"];
+          const appUrl = row["Link ứng dụng"] || row["appUrl"] || row["Url"] || row["Đường dẫn"];
+          const description = row["Mô tả"] || row["description"] || row["Mô tả ứng dụng"] || "";
+
+          if (!title || !appUrl) {
+            failCount++;
+            continue;
+          }
+
+          try {
+            await addDoc(collection(db, 'apps'), {
+              title: String(title).trim(),
+              logoUrl: logoUrl ? String(logoUrl).trim() : '',
+              appUrl: String(appUrl).trim(),
+              description: String(description).trim(),
+              createdAt: serverTimestamp()
+            });
+            successCount++;
+          } catch (error) {
+            console.error("Lỗi import hàng:", row, error);
+            failCount++;
+          }
+        }
+
+        toast.success(`Nhập Excel hoàn tất! Đã đăng ký: ${successCount} ứng dụng. Thất bại: ${failCount}`, { id: toastId });
+        e.target.value = '';
+      } catch (error: any) {
+        console.error(error);
+        toast.error(`Lỗi đọc file Excel: ${error.message || error}`);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleUploadLogoToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = imageUploadConfig.username || githubGlobalConfig.username;
+    const token = imageUploadConfig.token || githubGlobalConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    const toastId = toast.loading('Đang xử lý tải tệp lên GitHub...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+          const path = `logos/${filename}`;
+          const url = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
+
+          const res = await fetch(url, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Token ${token}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: `Upload logo ${file.name} from admin UI`,
+              content: base64Data,
+              branch: branch
+            })
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Lỗi HTTP');
+          }
+
+          const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${path}`;
+          setAppForm(prev => ({ ...prev, logoUrl: rawUrl }));
+          toast.success('Đã tải lên logo thành công!', { id: toastId });
+        } catch (innerError: any) {
+          console.error(innerError);
+          toast.error(`GitHub Upload Failed: ${innerError.message || innerError}`, { id: toastId });
+        } finally {
+          setIsUploadingLogo(false);
+        }
+      };
+      reader.onerror = () => {
+        toast.error('Lỗi khi đọc file logo', { id: toastId });
+        setIsUploadingLogo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi: ${e.message}`, { id: toastId });
+      setIsUploadingLogo(false);
     }
   };
 
@@ -197,6 +567,32 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleQuickBanIp = async (ip: string) => {
+    if (!isSuperAdmin) {
+      toast.error('Chỉ Super Admin mới có quyền chặn IP');
+      return;
+    }
+    openConfirm({
+      title: 'Khóa IP người dùng',
+      message: `Bạn có chắc chắn muốn CHẶN TOÀN BỘ truy cập từ IP ${ip} này không?`,
+      confirmText: 'Chặn IP này',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await addDoc(collection(db, 'blockedIps'), {
+            ip,
+            reason: 'Khóa nhanh từ danh mục quản lý User',
+            blockedAt: serverTimestamp(),
+            blockedBy: userData?.displayName || 'Quản trị'
+          });
+          toast.success(`Đã chặn IP ${ip} thành công`);
+        } catch (e) {
+          toast.error('Lỗi khi chặn IP');
+        }
+      }
+    });
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (!isSuperAdmin) {
       toast.error('Bạn không có quyền xóa User');
@@ -266,6 +662,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleSystemTool = async (id: string) => {
+    try {
+      const current = systemTools[id] || { public: true, internal: false };
+      const currentlyPublic = current.public !== false;
+      const nextPublic = !currentlyPublic;
+      const nextConfig = { public: nextPublic, internal: !nextPublic };
+
+      await updateDoc(doc(db, 'settings', 'tool_permissions'), {
+        [id]: nextConfig
+      });
+      toast.success('Đã cập nhật quyền hạn');
+    } catch (e) {
+      try {
+        const current = systemTools[id] || { public: true, internal: false };
+        const currentlyPublic = current.public !== false;
+        const nextPublic = !currentlyPublic;
+        const nextConfig = { public: nextPublic, internal: !nextPublic };
+
+        await setDoc(doc(db, 'settings', 'tool_permissions'), {
+          [id]: nextConfig
+        }, { merge: true });
+        toast.success('Đã cập nhật quyền hạn');
+      } catch (err) {
+        toast.error('Lỗi khi cập nhật');
+      }
+    }
+  };
+
   const toggleDeviceMaintenance = async (deviceKey: keyof typeof maintenanceDevices) => {
     const newDevices = {
       ...maintenanceDevices,
@@ -325,6 +749,7 @@ export default function AdminDashboard() {
         <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-hide">
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
+            { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
@@ -346,7 +771,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
@@ -647,7 +1072,8 @@ export default function AdminDashboard() {
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vai trò</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Trạng thái</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">IP / Vị trí</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Địa chỉ IP</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vị trí (Location)</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right">Quản trị</th>
                   </tr>
                 </thead>
@@ -692,12 +1118,26 @@ export default function AdminDashboard() {
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[200px]">
-                        <div className="text-[11px] leading-relaxed">
-                          <div className="flex items-center gap-1.5 text-blue-500 font-bold mb-0.5">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                        <div className="text-[11px] leading-relaxed flex items-center gap-2 group/ip">
+                          <div className="flex items-center gap-1.5 font-bold mb-0.5 text-blue-500">
                             <Globe className="w-3 h-3" />
                             <span>{(u as any).lastIpAddress || 'Hidden'}</span>
                           </div>
+                          {(u as any).lastIpAddress && (
+                            <button
+                              onClick={() => handleQuickBanIp((u as any).lastIpAddress)}
+                              disabled={!isSuperAdmin}
+                              className="text-slate-400 hover:text-rose-500 opacity-20 group-hover/ip:opacity-100 transition-all hover:bg-rose-50 dark:hover:bg-rose-500/10 p-1.5 rounded-md"
+                              title="Ban IP này ngay lập tức"
+                            >
+                              <ShieldAlert className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 min-w-[180px]">
+                        <div className="text-[11px] leading-relaxed">
                           {u.location ? (
                             <a 
                               href={`https://www.google.com/maps?q=${u.location.lat},${u.location.lng}`} 
@@ -831,8 +1271,9 @@ export default function AdminDashboard() {
                 { key: 'dashboard', label: 'Trang Tổng quan', icon: Layout, page: 'Trang chủ' },
                 { key: 'profile', label: 'Hồ sơ / Tài khoản', icon: UserCircle, page: 'Hệ thống' },
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
+                { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
               ].map((tab) => (
-                <div key={tab.key} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
+                <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
                       <tab.icon className="w-5 h-5" />
@@ -842,13 +1283,28 @@ export default function AdminDashboard() {
                       <p className="text-[10px] text-slate-500 italic">{tab.page}</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => toggleTabMaintenance(tab.key)}
-                    disabled={!isSuperAdmin}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${maintenanceTabs[tab.key] ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceTabs[tab.key] ? 'translate-x-6' : 'translate-x-1'}`}/>
-                  </button>
+                  
+                  <div className="flex justify-between items-center gap-2 border-t border-slate-200 dark:border-white/5 pt-2 mt-1">
+                    <span className="text-[10px] font-bold text-slate-500">Bảo trì</span>
+                    <button 
+                      onClick={() => toggleTabMaintenance(tab.key)}
+                      disabled={!isSuperAdmin}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${maintenanceTabs[tab.key] ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[tab.key] ? 'translate-x-5' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500">Nội bộ</span>
+                    <button 
+                      onClick={() => toggleSystemTool(tab.key)}
+                      disabled={!isSuperAdmin}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${systemTools[tab.key]?.internal ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${systemTools[tab.key]?.internal ? 'translate-x-5' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -861,12 +1317,13 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {[
+                { id: 'file-manager', title: 'Quản Lý File Cá Nhân', icon: Laptop },
+                { id: 'kho-van-ban', title: 'Kho Văn Bản', icon: FolderOpen },
                 { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
                 { id: 'image-to-pdf', title: 'Ảnh sang PDF', icon: FileImage },
-                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText },
-                { id: 'find-my-device', title: 'Định Vị Thiết Bị', icon: Box }
+                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText }
               ].map((util) => (
-                <div key={util.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                       <util.icon className="w-4 h-4" />
@@ -876,13 +1333,28 @@ export default function AdminDashboard() {
                       <p className="text-[9px] text-slate-500 italic">Core Utility</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
-                    disabled={!isSuperAdmin}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                  >
-                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
-                  </button>
+                  
+                  <div className="flex items-center justify-between gap-2 border-t border-slate-200 dark:border-white/5 pt-2 mt-1">
+                    <div className="text-[9px] font-bold text-slate-500">Bảo trì</div>
+                    <button 
+                      onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
+                      disabled={!isSuperAdmin}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[9px] font-bold text-slate-500">Nội bộ</div>
+                    <button 
+                      onClick={() => toggleSystemTool(util.id)}
+                      disabled={!isSuperAdmin}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${systemTools[util.id]?.internal ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${systemTools[util.id]?.internal ? 'translate-x-5' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -897,23 +1369,63 @@ export default function AdminDashboard() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
                    {allUtilities.map((util) => (
-                      <div key={util.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                      <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
                             <Box className="w-4 h-4" />
                           </div>
                           <div className="truncate">
-                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] truncate">{util.title}</h4>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] truncate flex items-center gap-1">
+                                {util.title}
+                                {util.hidden && <span className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 text-[8px] rounded-md">Ẩn</span>}
+                            </h4>
                             <p className="text-[9px] text-slate-500 italic">ID: {util.id.slice(0, 8)}</p>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
-                          disabled={!isSuperAdmin}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                        >
-                          <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
-                        </button>
+                        <div className="flex items-center justify-between gap-2 border-t border-slate-200 dark:border-white/5 pt-2 mt-1">
+                          <div className="text-[9px] font-bold text-slate-500">Bảo trì</div>
+                          <button 
+                            onClick={() => toggleTabMaintenance(`utility_${util.id}`)}
+                            disabled={!isSuperAdmin}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${maintenanceTabs[`utility_${util.id}`] ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          >
+                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${maintenanceTabs[`utility_${util.id}`] ? 'translate-x-5' : 'translate-x-1'}`}/>
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[9px] font-bold text-slate-500">Nội bộ</div>
+                          <button 
+                            onClick={async () => {
+                                try {
+                                    await updateDoc(doc(db, 'utilities', util.id), { internalOnly: !util.internalOnly });
+                                    toast.success('Đã cập nhật trạng thái Nội bộ');
+                                } catch (e) {
+                                    toast.error('Lỗi khi thiết lập');
+                                }
+                            }}
+                            disabled={!isSuperAdmin}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${util.internalOnly ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          >
+                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${util.internalOnly ? 'translate-x-5' : 'translate-x-1'}`}/>
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[9px] font-bold text-slate-500">Đã Ẩn</div>
+                          <button 
+                            onClick={async () => {
+                                try {
+                                    await updateDoc(doc(db, 'utilities', util.id), { hidden: !util.hidden });
+                                    toast.success('Đã cập nhật trạng thái Ẩn/Hiện');
+                                } catch (e) {
+                                    toast.error('Lỗi khi thiết lập');
+                                }
+                            }}
+                            disabled={!isSuperAdmin}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 disabled:opacity-50 ${util.hidden ? 'bg-slate-800' : 'bg-slate-300 dark:bg-slate-700'}`}
+                          >
+                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${util.hidden ? 'translate-x-5' : 'translate-x-1'}`}/>
+                          </button>
+                        </div>
                       </div>
                    ))}
                 </div>
@@ -956,6 +1468,608 @@ export default function AdminDashboard() {
                 ))}
                 </div>
             </div>
+
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <Bell className="w-6 h-6 text-indigo-500" />
+                  Cấu hình Thông báo Website (Marquee)
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">Bật/Tắt Thông báo chạy vòng lặp</span>
+                    <button 
+                        onClick={() => setNotificationConfig({...notificationConfig, active: !notificationConfig.active})}
+                        disabled={!isSuperAdmin}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${notificationConfig.active ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.active ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1 text-slate-500 uppercase tracking-widest">Nội dung thông báo (hỗ trợ nhập văn bản dài)</label>
+                    <textarea 
+                      rows={3}
+                      value={notificationConfig.message}
+                      onChange={(e) => setNotificationConfig({...notificationConfig, message: e.target.value})}
+                      disabled={!isSuperAdmin}
+                      placeholder="Bảo trì hệ thống lúc 10h tối nay. Vui lòng lưu các dữ liệu..."
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none disabled:opacity-50"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">Loại Khẩn cấp (Chữ đỏ)</span>
+                    <button 
+                        onClick={() => setNotificationConfig({...notificationConfig, isEmergency: !notificationConfig.isEmergency})}
+                        disabled={!isSuperAdmin}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${notificationConfig.isEmergency ? 'bg-rose-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                    >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.isEmergency ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+                  <div className="pt-4 flex justify-end">
+                    <button 
+                      onClick={handleSaveNotification}
+                      disabled={!isSuperAdmin}
+                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                    >
+                      <Save size={14} /> Lưu Thông Báo
+                    </button>
+                  </div>
+                </div>
+            </div>
+          </div>
+
+            {/* Cấu hình Hệ thống GitHub & Lưu trữ chung (List/Accordion) */}
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm col-span-1 md:col-span-2 space-y-4">
+                 <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                   <Settings className="w-6 h-6 text-indigo-500" />
+                   Cấu hình Hệ thống GitHub &amp; Lưu trữ liên thông
+                 </h3>
+                 <p className="text-xs text-slate-500">
+                   Quản lý các tài khoản GitHub dùng chung liên thông cho các thành phần tiện ích trong hệ sinh thái của bạn (Kho văn bản, Lưu trữ File cá nhân, Lưu trữ hình ảnh). Bấm chọn phân hệ để bật mở cấu hình.
+                 </p>
+
+                 <div className="space-y-3">
+                   {/* 1. Global GitHub config */}
+                   <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                     <button
+                       type="button"
+                       onClick={() => setExpandedSetting(expandedSetting === 'global' ? null : 'global')}
+                       className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-505 flex items-center justify-center">
+                           <Github className="w-4 h-4 text-indigo-500" />
+                         </div>
+                         <div>
+                           <h4 className="font-bold text-xs text-slate-800 dark:text-white">1. Cấu hình GitHub Trung tâm (PAT Dùng Chung)</h4>
+                           <p className="text-[10px] text-slate-400 mt-0.5">
+                             {githubGlobalConfig.username ? `Tài khoản liên thông: ${githubGlobalConfig.username}` : 'Chưa cấu hình liên thông'}
+                           </p>
+                         </div>
+                       </div>
+                       <span className="text-[11px] font-bold text-slate-400">
+                         {expandedSetting === 'global' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                       </span>
+                     </button>
+                     
+                     {expandedSetting === 'global' && (
+                       <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                         <div className="p-3.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                           <Info size={16} className="shrink-0 mt-0.5" />
+                           <span><strong>Thông báo đồng bộ:</strong> Username và Token (PAT) này được sáp nhập làm 1 để liên thông cho toàn bộ 3 phân hệ bên dưới. Khi điền ở đây, bạn không cần khai báo lại token riêng ở từng phân hệ nữa.</span>
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">GitHub Username</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={githubGlobalConfig.username}
+                               onChange={(e) => setGithubGlobalConfig({...githubGlobalConfig, username: e.target.value})}
+                               placeholder="vd: octocat"
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Token (PAT) Dùng Chung</label>
+                             <input 
+                               type="password"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={githubGlobalConfig.token}
+                               onChange={(e) => setGithubGlobalConfig({...githubGlobalConfig, token: e.target.value})}
+                               placeholder="ghp_xxxxxxxxxxxx"
+                             />
+                           </div>
+                         </div>
+                         <div className="pt-2 flex justify-end">
+                           <button 
+                             onClick={handleSaveGithubGlobal}
+                             disabled={!isSuperAdmin}
+                             className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                           >
+                             <Save size={14} /> Lưu Tài Khoản &amp; Đồng bộ tất cả
+                           </button>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   {/* 2. Kho Văn Bản (Document Vault) config */}
+                   <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                     <button
+                       type="button"
+                       onClick={() => setExpandedSetting(expandedSetting === 'vault' ? null : 'vault')}
+                       className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-lg bg-green-500/10 text-green-500 flex items-center justify-center">
+                           <FolderOpen className="w-4 h-4" />
+                         </div>
+                         <div>
+                           <h4 className="font-bold text-xs text-slate-800 dark:text-white">2. Cấu hình Kho Văn Bản (Document Vault)</h4>
+                           <p className="text-[10px] text-slate-400 mt-0.5">
+                             {githubIntegrationConfig.repo ? `Repository lưu trữ: ${githubIntegrationConfig.repo}` : 'Chưa cấu hình kho'}
+                           </p>
+                         </div>
+                       </div>
+                       <span className="text-[11px] font-bold text-slate-400">
+                         {expandedSetting === 'vault' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                       </span>
+                     </button>
+                     
+                     {expandedSetting === 'vault' && (
+                       <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                         <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 dark:text-emerald-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                           <Info size={16} className="shrink-0 mt-0.5" />
+                           <span><strong>Kho dùng chung:</strong> Phân hệ này đã tự động liên thông lấy Username và token từ PAT dùng chung ở trên; ẩn ô nhập token riêng. Chỉ cần điền Repository để lưu tài liệu Kho Văn Bản.</span>
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Repository lưu văn bản</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={githubIntegrationConfig.repo}
+                               onChange={(e) => setGithubIntegrationConfig({...githubIntegrationConfig, repo: e.target.value})}
+                               placeholder="vd: documents-vault"
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Branch (Nhánh)</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={githubIntegrationConfig.branch}
+                               onChange={(e) => setGithubIntegrationConfig({...githubIntegrationConfig, branch: e.target.value})}
+                               placeholder="main"
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Đường dẫn folder lưu trữ</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={githubIntegrationConfig.path}
+                               onChange={(e) => setGithubIntegrationConfig({...githubIntegrationConfig, path: e.target.value})}
+                               placeholder="assets/uploads"
+                             />
+                           </div>
+                         </div>
+                         <div className="pt-2 flex justify-end">
+                           <button 
+                             onClick={handleSaveGithubIntegration}
+                             disabled={!isSuperAdmin}
+                             className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                           >
+                             <Save size={14} /> Lưu cấu hình Kho văn bản
+                           </button>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   {/* 3. Personal Files config */}
+                   <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                     <button
+                       type="button"
+                       onClick={() => setExpandedSetting(expandedSetting === 'personal' ? null : 'personal')}
+                       className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-550 flex items-center justify-center">
+                           <Laptop className="w-4 h-4 text-blue-500" />
+                         </div>
+                         <div>
+                           <h4 className="font-bold text-xs text-slate-800 dark:text-white">3. Cấu hình Quản Lý File Cá Nhân (File Manager)</h4>
+                           <p className="text-[10px] text-slate-400 mt-0.5">
+                             {fileManagerConfig.repo ? `Repository lưu trữ: ${fileManagerConfig.repo}` : 'Chưa cấu hình kho'}
+                           </p>
+                         </div>
+                       </div>
+                       <span className="text-[11px] font-bold text-slate-400">
+                         {expandedSetting === 'personal' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                       </span>
+                     </button>
+                     
+                     {expandedSetting === 'personal' && (
+                       <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                         <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                           <Info size={16} className="shrink-0 mt-0.5" />
+                           <span><strong>Kho dùng chung:</strong> Đã đồng bộ token &amp; tài khoản chính. Ẩn toàn bộ mục Token/Username riêng biệt để sử dụng 1 luồng dữ liệu liên thông.</span>
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Repository lưu tệp</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={fileManagerConfig.repo}
+                               onChange={(e) => setFileManagerConfig({...fileManagerConfig, repo: e.target.value})}
+                               placeholder="vd: personal-vault"
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Branch (Nhánh)</label>
+                             <input 
+                               type="text"
+                               className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                               value={fileManagerConfig.branch}
+                               onChange={(e) => setFileManagerConfig({...fileManagerConfig, branch: e.target.value})}
+                               placeholder="main"
+                             />
+                           </div>
+                         </div>
+                         <div className="pt-2 flex justify-end">
+                           <button 
+                             onClick={handleSaveFileManager}
+                             disabled={!isSuperAdmin}
+                             className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                           >
+                             <Save size={14} /> Lưu Cấu Hình File
+                           </button>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   {/* 4. Image uploads config */}
+                   <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                     <button
+                       type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'image' ? null : 'image')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                            <FileImage className="w-4 h-4 text-rose-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">4. Cấu hình Lưu trữ Hình ảnh</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {imageUploadConfig.repo ? `Repository lưu ảnh: ${imageUploadConfig.repo}` : 'Chưa cấu hình kho'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {expandedSetting === 'image' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                        </span>
+                      </button>
+
+                      {expandedSetting === 'image' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Kho dùng chung:</strong> Đã đồng bộ token &amp; tài khoản chính. Ẩn toàn bộ mục Token/Username riêng biệt để sử dụng 1 luồng dữ liệu liên thông.</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Repository chứa ảnh logo</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={imageUploadConfig.repo}
+                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, repo: e.target.value})}
+                                placeholder="vd: app-assets-vault"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Branch (Nhánh)</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={imageUploadConfig.branch}
+                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, branch: e.target.value})}
+                                placeholder="main"
+                              />
+                            </div>
+                          </div>
+                          <div className="pt-2 flex justify-end">
+                            <button 
+                              onClick={handleSaveImageUploadConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu Cấu Hình Ảnh
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+            </div>
+        </motion.div>
+
+      )}
+
+      {activeTab === 'apps' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+             {/* Left side: Đăng ký / Setup form AND Excel Import */}
+             <div className="xl:col-span-4 space-y-6">
+                {/* Standard Form */}
+                <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+                   <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <AppWindow className="w-6 h-6 text-indigo-500" />
+                        {editingAppId ? 'Cập Nhật Ứng Dụng' : 'Đăng Ký Ứng Dụng'}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">Cấu hình liên kết logo, mô tả và liên kết mở ứng dụng trực tiếp.</p>
+                   </div>
+
+                   <div className="space-y-4">
+                     <div>
+                       <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tên ứng dụng *</label>
+                       <input 
+                         type="text"
+                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                         value={appForm.title}
+                         onChange={(e) => setAppForm({...appForm, title: e.target.value})}
+                         placeholder="vd: Gmail Portal"
+                       />
+                     </div>
+
+                     <div>
+                        <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Mô tả ứng dụng (không bắt buộc)</label>
+                        <textarea 
+                          rows={2}
+                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none"
+                          value={appForm.description}
+                          onChange={(e) => setAppForm({...appForm, description: e.target.value})}
+                          placeholder="Mô tả tóm tắt tính năng chính của ứng dụng..."
+                        />
+                     </div>
+
+                     <div>
+                       <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Đường dẫn ứng dụng (App URL) *</label>
+                       <input 
+                         type="text"
+                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                         value={appForm.appUrl}
+                         onChange={(e) => setAppForm({...appForm, appUrl: e.target.value})}
+                         placeholder="vd: https://gmail.google.com"
+                       />
+                     </div>
+
+                     {/* Logo Source setup */}
+                     <div className="space-y-3">
+                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 leading-none">Logo Ứng dụng</label>
+                       
+                       {/* File upload from computer */}
+                       <div className="p-4 bg-slate-50 dark:bg-white/5 border border-dashed border-slate-300 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center text-center gap-2">
+                          <input 
+                            type="file" 
+                            id="logo-upload-input-admin"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleUploadLogoToGithub}
+                            disabled={isUploadingLogo}
+                          />
+                          <label 
+                            htmlFor="logo-upload-input-admin"
+                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-white/5 dark:hover:bg-white/10 text-indigo-600 dark:text-zinc-300 border border-indigo-200/40 dark:border-white/5 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1"
+                          >
+                            {isUploadingLogo ? 'Đang tải lên...' : 'Tải Logo lên Github'}
+                          </label>
+                          <p className="text-[9px] text-slate-400">Tự động đẩy tệp ảnh lên Git repository và sinh URL thô.</p>
+                       </div>
+
+                       <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider relative flex items-center gap-2 my-2 select-none">
+                          <span className="h-px bg-slate-200 dark:bg-white/5 flex-1" />
+                          Hoặc dùng Link trực tiếp
+                          <span className="h-px bg-slate-200 dark:bg-white/5 flex-1" />
+                       </div>
+
+                       <input 
+                         type="text"
+                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                         value={appForm.logoUrl}
+                         onChange={(e) => setAppForm({...appForm, logoUrl: e.target.value})}
+                         placeholder="https://example.com/logo.png"
+                       />
+
+                       {appForm.logoUrl && (
+                         <div className="flex items-center gap-3 p-3 bg-blue-50/20 dark:bg-white/5 rounded-xl border border-blue-500/10">
+                           <img 
+                             src={appForm.logoUrl} 
+                             alt="Logo Preview" 
+                             className="w-10 h-10 object-cover rounded-lg shrink-0 border border-slate-200 dark:border-white/10"
+                             referrerPolicy="no-referrer"
+                           />
+                           <div className="min-w-0 flex-1">
+                             <p className="text-[10px] text-slate-400 font-bold truncate">Đã kết nối logo</p>
+                             <p className="text-[9px] text-slate-500 truncate">{appForm.logoUrl}</p>
+                           </div>
+                           <button 
+                             onClick={() => setAppForm({...appForm, logoUrl: ''})}
+                             className="text-[10px] text-red-500 hover:underline"
+                           >
+                             Xóa
+                           </button>
+                         </div>
+                       )}
+                     </div>
+
+                     {/* Actions buttons */}
+                     <div className="pt-4 flex gap-2">
+                        {editingAppId && (
+                          <button
+                            onClick={() => {
+                              setEditingAppId(null);
+                              setAppForm({ title: '', description: '', logoUrl: '', appUrl: '' });
+                            }}
+                            className="flex-1 py-3 border border-slate-200 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl text-xs font-bold text-slate-500 uppercase tracking-widest transition-colors duration-150"
+                          >
+                            Hủy
+                          </button>
+                        )}
+                        <button
+                          onClick={handleSaveApp}
+                          className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:shadow-lg transition-all flex items-center justify-center gap-1"
+                        >
+                          <Save size={14} /> {editingAppId ? 'Lưu Thay Đổi' : 'Đăng Ký App'}
+                        </button>
+                     </div>
+                   </div>
+                </div>
+
+                {/* Bulk Excel Import Card */}
+                <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-4">
+                   <div>
+                     <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                       <Files className="w-5 h-5 text-emerald-500" />
+                       Nhập File Excel
+                     </h3>
+                     <p className="text-xs text-slate-400 mt-1">Nạp danh sách ứng dụng nhanh với tệp mẫu Excel có định dạng chuẩn (.xlsx).</p>
+                   </div>
+
+                   <div className="space-y-3">
+                     <button
+                       onClick={handleDownloadTemplate}
+                       className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                     >
+                       <Download size={14} /> Tải Về Mẫu Excel (.xlsx)
+                     </button>
+
+                     <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-dashed border-emerald-500/20 rounded-2xl flex flex-col items-center justify-center text-center gap-2">
+                       <input
+                         type="file"
+                         id="app-import-file-input"
+                         accept=".xlsx, .xls"
+                         className="hidden"
+                         onChange={handleImportExcel}
+                       />
+                       <label
+                         htmlFor="app-import-file-input"
+                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 shadow-md shadow-emerald-500/10"
+                       >
+                         <Upload size={14} /> Chọn Tệp Excel Tải Lên
+                       </label>
+                       <p className="text-[9px] text-slate-400">Chọn tệp cấu hình hợp lệ đã nhập liệu.</p>
+                     </div>
+                   </div>
+                </div>
+             </div>
+
+             {/* Right side: App Inventory list */}
+             <div className="xl:col-span-8 space-y-6">
+                <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm">
+                   <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">
+                     Danh Sách Link Ứng Dụng ({adminApps.length})
+                   </h3>
+
+                   {adminApps.length === 0 ? (
+                     <div className="flex flex-col items-center justify-center py-24 text-center">
+                       <AppWindow size={40} className="text-slate-300 dark:text-zinc-700 mb-4" />
+                       <p className="text-sm text-slate-500 font-bold">Chưa đăng ký ứng dụng nào</p>
+                       <p className="text-xs text-slate-400 max-w-sm mt-1">Dùng bảng bên cạnh để đăng ký ứng dụng liên kết và phân phối lên Thực đơn phía người dùng.</p>
+                     </div>
+                   ) : (
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
+                              <th className="py-3 px-2">Ứng dụng / Logo</th>
+                              <th className="py-3 px-2">Đường dẫn mở</th>
+                              <th className="py-3 px-2 text-right">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                            {adminApps.map((app) => (
+                              <tr key={app.id} className="text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                                <td className="py-4 px-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
+                                      {app.logoUrl ? (
+                                        <img src={app.logoUrl} alt={app.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                      ) : (
+                                        <span className="font-bold text-indigo-500 uppercase">{app.title.charAt(0)}</span>
+                                      )}
+                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-zinc-950 ${maintenanceTabs['app_' + app.id] ? 'bg-rose-500' : 'hidden'}`} />
+                                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-zinc-950 ${app.internalOnly ? 'bg-emerald-500' : 'hidden'}`} />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-xs">{app.title}</h4>
+                                        {app.internalOnly && <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[8px] font-bold uppercase rounded-md">Nội bộ</span>}
+                                        {maintenanceTabs[`app_${app.id}`] && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 text-[8px] font-bold uppercase rounded-md">Bảo trì</span>}
+                                      </div>
+                                      {app.description && <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{app.description}</p>}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-2 font-mono text-xs max-w-[200px] truncate select-all text-slate-500">
+                                  <a href={app.appUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1 text-indigo-500">
+                                    {app.appUrl} <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
+                                  </a>
+                                </td>
+                                <td className="py-4 px-2 text-right">
+                                  <div className="flex justify-end gap-1.5">
+                                    <button 
+                                      onClick={() => toggleTabMaintenance(`app_${app.id}`)}
+                                      title={maintenanceTabs[`app_${app.id}`] ? "Đang bảo trì" : "Bật bảo trì"}
+                                      className={`p-2 rounded-xl border transition-all ${maintenanceTabs[`app_${app.id}`] ? 'border-rose-500 text-rose-500 bg-rose-50 dark:bg-rose-500/10' : 'border-slate-200 dark:border-white/5 text-slate-400 hover:text-rose-500 hover:border-rose-500'}`}
+                                    >
+                                      <Wrench className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={async () => {
+                                        try {
+                                          await updateDoc(doc(db, 'apps', app.id), { internalOnly: !app.internalOnly });
+                                          toast.success('Đã cập nhật trạng thái Nội bộ');
+                                        } catch (e) {
+                                          toast.error('Lỗi khi thiết lập');
+                                        }
+                                      }}
+                                      title={app.internalOnly ? "Nội bộ" : "Công khai"}
+                                      className={`p-2 rounded-xl border transition-all ${app.internalOnly ? 'border-emerald-500 text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-white/5 text-slate-400 hover:text-emerald-500 hover:border-emerald-500'}`}
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </button>
+                                    <div className="w-px h-8 bg-slate-200 dark:bg-white/10 mx-1" />
+                                    <button
+                                      onClick={() => handleEditApp(app)}
+                                      className="p-2 rounded-xl border border-slate-200 dark:border-white/5 hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                                      title="Sửa ứng dụng"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteApp(app.id)}
+                                      className="p-2 rounded-xl border border-slate-200 dark:border-white/5 hover:border-rose-500 hover:text-rose-600 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                                      title="Xóa ứng dụng"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                     </div>
+                   )}
+                </div>
+             </div>
           </div>
         </motion.div>
       )}
