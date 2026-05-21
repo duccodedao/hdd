@@ -24,14 +24,18 @@ export const TabGuard = ({ children, tabKey }: TabGuardProps) => {
         setIsInternal(config?.internal || false);
       }
       setLoading(false);
-    }, () => {
+    }, (err) => {
+      console.error("TabGuard error:", err);
+      if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+        useAppStore.getState().setQuotaExceeded(true);
+      }
       setLoading(false);
     });
     
     return () => unsub();
   }, [tabKey]);
 
-  if (maintenanceTabs[tabKey] && !isAdmin) {
+  if (maintenanceTabs[tabKey] && !isSuperAdmin) {
     return <MaintenancePage />;
   }
   

@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
-  Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow
+  Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -21,7 +21,7 @@ const subUtilities = [
 ];
 
 export default function Sidebar({ className }: { className?: string }) {
-  const { isAdmin, userData } = useAuthStore();
+  const { isAdmin, isSuperAdmin, userData } = useAuthStore();
   const { setSidebarOpen, maintenanceTabs } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -34,10 +34,20 @@ export default function Sidebar({ className }: { className?: string }) {
     import('firebase/firestore').then(({ collection, doc, onSnapshot }) => {
       const unsubUtils = onSnapshot(collection(db, 'utilities'), (snap) => {
         setDynamicUtils(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((u: any) => !u.hidden || isAdmin));
+      }, (err) => {
+        console.error("Sidebar utilities error:", err);
+        if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+          useAppStore.getState().setQuotaExceeded(true);
+        }
       });
       const unsubPerms = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
         if (docSnap.exists()) {
           setSystemTools(docSnap.data());
+        }
+      }, (err) => {
+        console.error("Sidebar tool_permissions error:", err);
+        if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+          useAppStore.getState().setQuotaExceeded(true);
         }
       });
       return () => {
@@ -144,7 +154,15 @@ export default function Sidebar({ className }: { className?: string }) {
                         transition={{ duration: 0.15, ease: "easeOut" }}
                         className="overflow-hidden pl-4 space-y-1 border-l border-slate-200 dark:border-white/5 ml-5 mt-1"
                       >
-                        {allSubUtilities.map((sub: any) => {
+                        {allSubUtilities
+                          .filter((sub: any) => {
+                            const isInternal = systemTools[sub.id]?.internal || sub.internalOnly || false;
+                            if (isInternal) {
+                              return isAdmin || isSuperAdmin;
+                            }
+                            return true;
+                          })
+                          .map((sub: any) => {
                           const isSubActive = sub.id === 'all' 
                             ? location.pathname === '/utilities'
                             : location.pathname === sub.path;
@@ -198,6 +216,23 @@ export default function Sidebar({ className }: { className?: string }) {
                     <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
                   </div>
                 </NavLink>
+
+                {/* Công việc Item */}
+                <NavLink
+                  to="/tasks"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    isActive 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
+                  </div>
+                </NavLink>
               </motion.div>
             )}
           </AnimatePresence>
@@ -205,7 +240,7 @@ export default function Sidebar({ className }: { className?: string }) {
 
       </nav>
 
-      {isAdmin && (
+      {isSuperAdmin && (
         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
           <NavLink
             to="/admin"

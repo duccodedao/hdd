@@ -20,13 +20,17 @@ export default function AdminUtilities() {
     const qUtils = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubUtils = onSnapshot(qUtils, (snapshot) => {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("AdminUtilities: utilities listener error:", err);
     });
 
     // System settings listener for tool permissions
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'tool_permissions'), (doc) => {
-      if (doc.exists()) {
-        setSystemTools(doc.data());
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
+      if (docSnap.exists()) {
+        setSystemTools(docSnap.data());
       }
+    }, (err) => {
+      console.error("AdminUtilities: settings listener error:", err);
     });
 
     return () => {
@@ -155,60 +159,6 @@ export default function AdminUtilities() {
             {editingId ? 'Lưu thay đổi' : 'Thêm'}
           </button>
         </form>
-      </div>
-
-      <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden mt-8">
-        <div className="p-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Công cụ Hệ thống</h2>
-          <span className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Internal Control</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-900 dark:text-white min-w-[700px]">
-            <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
-              <tr>
-                <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Tên công cụ</th>
-                <th className="px-6 py-5 text-[10px] font-medium uppercase tracking-widest">Quyền truy cập (Mở: Công khai / Tắt: Nội bộ)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-              {[
-                { id: 'file-manager', name: 'Quản Lý File Cá Nhân' },
-                { id: 'kho-van-ban', name: 'Kho Văn Bản' },
-                { id: 'ai-scanner', name: 'Quét Văn Bản AI' },
-                { id: 'image-to-pdf', name: 'Ảnh sang PDF' },
-                { id: 'pdf-to-word', name: 'PDF sang Word' }
-              ].map(tool => {
-                const config = systemTools[tool.id] || { public: true, internal: false };
-                const isPublic = config.public !== false;
-                return (
-                  <tr key={tool.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
-                    <td className="px-6 py-4 font-bold text-slate-600 dark:text-zinc-300">{tool.name}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={isPublic} 
-                            onChange={() => toggleSystemTool(tool.id)} 
-                          />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                        </label>
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                          isPublic 
-                            ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20" 
-                            : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
-                        }`}>
-                          {isPublic ? 'Công khai' : 'Nội bộ'}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden mt-8">

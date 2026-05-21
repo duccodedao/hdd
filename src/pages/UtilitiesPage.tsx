@@ -31,7 +31,7 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
   const { maintenanceTabs } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
-  const isBlocked = isMaintenanceActive && !isAdmin;
+  const isBlocked = isMaintenanceActive && !isSuperAdmin;
   const Icon = item.icon;
 
   if (item.adminOnly && !isSuperAdmin) {
@@ -70,7 +70,7 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         <div className="absolute top-0 right-0 p-3 z-10">
            <div className={cn(
              "p-1.5 rounded-lg border",
-             isAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
+             isSuperAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
            )}>
               <Lock className="w-3.5 h-3.5" />
            </div>
@@ -91,12 +91,12 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         <div className="flex flex-col items-end gap-1.5">
           <div className={cn(
             "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-            isMaintenanceActive ? (isAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-red-100 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20') :
+            isMaintenanceActive ? (isSuperAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-red-100 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20') :
             item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
             item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
             'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
           )}>
-            {isMaintenanceActive ? (isAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
+            {isMaintenanceActive ? (isSuperAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
           </div>
           {(item as any).internalOnly && (
             <div className="text-[8px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">
@@ -219,6 +219,11 @@ export default function UtilitiesPage() {
     // Settings for native tools
     const unsub = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
       if (docSnap.exists()) setSystemTools(docSnap.data());
+    }, (err) => {
+      console.error("UtilitiesPage tool_permissions error:", err);
+      if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+        useAppStore.getState().setQuotaExceeded(true);
+      }
     });
     return () => unsub();
   }, []);
@@ -227,6 +232,11 @@ export default function UtilitiesPage() {
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
+    }, (err) => {
+      console.error("UtilitiesPage utilities listener error:", err);
+      if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+        useAppStore.getState().setQuotaExceeded(true);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -237,7 +247,7 @@ export default function UtilitiesPage() {
 
   if (activeUtility) {
     const isMaintenanceActive = maintenanceTabs[`utility_${activeUtility.id}`];
-    const isBlocked = isMaintenanceActive && !isAdmin;
+    const isBlocked = isMaintenanceActive && !isSuperAdmin;
 
     if (isBlocked) {
       return (
@@ -300,7 +310,14 @@ export default function UtilitiesPage() {
     }
   }
 
-  const allItems = filteredItems;
+  const allItems = filteredItems.filter(item => {
+    const config = systemTools[item.id];
+    const isInternal = config?.internal || (item as any).internalOnly;
+    if (isInternal) {
+      return isAdmin || isSuperAdmin;
+    }
+    return true;
+  });
   const totalTools = allItems.length;
   const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
   const activeTools = totalTools - maintenanceTools;

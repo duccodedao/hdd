@@ -7,11 +7,12 @@ import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import PwaBanner from '../pwa/PwaBanner';
+import { AlertCircle, ArrowUpRight } from 'lucide-react';
 
 import NotificationMarquee from './NotificationMarquee';
 
 export default function MainLayout() {
-  const { sidebarOpen, toggleSidebar, aiActive } = useAppStore();
+  const { sidebarOpen, toggleSidebar, aiActive, quotaExceeded, setQuotaExceeded } = useAppStore();
   const { user } = useAuthStore();
   const location = useLocation();
 
@@ -49,6 +50,35 @@ export default function MainLayout() {
         <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
           {!aiActive && (
             <>
+              {quotaExceeded && (
+                <div className="bg-rose-50 border-b border-rose-200 text-rose-900 dark:bg-rose-950/45 dark:border-rose-900 dark:text-rose-200 px-4 py-2 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 z-50 animate-fade-in shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 select-none" />
+                    <div className="flex-1">
+                      <span className="font-bold underline uppercase tracking-wider text-[9px] bg-rose-100 dark:bg-rose-500/20 px-1.5 py-0.5 rounded mr-2">Cảnh báo: Hết Quota Firestore</span>
+                      Hạn mức truy vấn Firestore miễn phí (Free Spark Plan) hôm nay của dự án đã vượt quá giới hạn. Dữ liệu sẽ tự động phục hồi khi reset bộ đếm vào ngày mai. Bạn có thể mở khóa ngay lập tức bằng việc nâng cấp ví thanh toán.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                    <a 
+                      href="https://console.firebase.google.com/project/sonlyhongduc-ca6d6/firestore/databases/main/data?openUpgradeDialog=true" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400 hover:underline hover:opacity-90 text-[11px]"
+                    >
+                      Mở bảng nâng cấp <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                    <a 
+                      href="https://firebase.google.com/pricing#cloud-firestore" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-slate-500 dark:text-zinc-400 hover:underline hover:opacity-90 text-[11px]"
+                    >
+                      Giới hạn Spark Plan <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
               <Topbar />
               <NotificationMarquee />
             </>

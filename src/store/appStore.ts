@@ -20,6 +20,8 @@ interface AppState {
   setGoogleClientId: (id: string | null) => void;
   aiActive: boolean;
   setAiActive: (active: boolean) => void;
+  quotaExceeded: boolean;
+  setQuotaExceeded: (exceeded: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -75,4 +77,6 @@ export const useAppStore = create<AppState>((set) => ({
   setGoogleClientId: (id) => set({ googleClientId: id }),
   aiActive: false,
   setAiActive: (active) => set({ aiActive: active }),
+  quotaExceeded: false,
+  setQuotaExceeded: (exceeded) => set({ quotaExceeded: exceeded }),
 }));

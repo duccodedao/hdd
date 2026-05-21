@@ -27,6 +27,7 @@ import AboutPage from './pages/AboutPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
+import TasksPage from './pages/TasksPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -49,7 +50,7 @@ import { OnboardingGuard } from './components/guards/OnboardingGuard';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 export default function App() {
-  const { user, userData, setUser, setUserData, setLoading, loading, isAdmin } = useAuthStore();
+  const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
 
   useEffect(() => {
@@ -89,6 +90,9 @@ export default function App() {
       }
     }, (err) => {
       console.error("Could not fetch system settings", err);
+      if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+        useAppStore.getState().setQuotaExceeded(true);
+      }
     });
 
     // Auth listener
@@ -122,6 +126,9 @@ export default function App() {
           }
         }, (err) => {
           console.error("Error listening to user data:", err);
+          if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+            useAppStore.getState().setQuotaExceeded(true);
+          }
         });
       } else {
         setUserData(null);
@@ -144,7 +151,7 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  if (maintenanceMode && !isAdmin) {
+  if (maintenanceMode && !isSuperAdmin) {
     return <MaintenancePage />;
   }
 
@@ -188,6 +195,7 @@ export default function App() {
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
+              <Route path="/tasks" element={<TabGuard tabKey="tasks"><TasksPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
@@ -195,7 +203,7 @@ export default function App() {
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
-              <Route path="/admin/*" element={isAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
+              <Route path="/admin/*" element={isSuperAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
               
               <Route path="/blocked" element={<BlockedPage />} />
             </Route>

@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 0. Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
@@ -149,6 +144,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    match /app_categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     
     // ACTIVITY LOGS
     match /activityLogs/{logId} {
@@ -175,5 +180,9 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // --- Safety Net ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }

@@ -19,6 +19,8 @@ export default function AdminIpBlocking() {
     const q = query(collection(db, 'blockedIps'), orderBy('blockedAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setBannedIps(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("AdminIpBlocking: blockedIps listener error:", err);
     });
     return () => unsub();
   }, []);

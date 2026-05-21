@@ -18,6 +18,7 @@ import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
+import AdminTasks from './AdminTasks';
 import { useConfirmStore } from '../../store/confirmStore';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
@@ -28,7 +29,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -88,26 +89,36 @@ export default function AdminDashboard() {
 
   // States for dynamic application portal setup
   const [adminApps, setAdminApps] = useState<any[]>([]);
+  const [appCategories, setAppCategories] = useState<any[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [editingAppId, setEditingAppId] = useState<string | null>(null);
   const [appForm, setAppForm] = useState({
     title: '',
     description: '',
     logoUrl: '',
-    appUrl: ''
+    appUrl: '',
+    categoryId: ''
   });
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [systemTools, setSystemTools] = useState<any>({});
 
   useEffect(() => {
+    if (!userData) return;
+
+    const isAdmin = userData.role === 'admin' || userData.role === 'superadmin' || userData.email === 'sonlyhongduc@gmail.com' || userData.email === 'sonlyhongduc1@ghn.vn';
+
     const unsubToolPerms = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
       if (docSnap.exists()) {
         setSystemTools(docSnap.data());
       }
-    });
+    }, (err) => console.error("Admin: tool_permissions listener error:", err));
 
-    const unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
-      setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    let unsubContacts = () => {};
+    if (isAdmin) {
+      unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
+        setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (err) => console.error("Admin: contact_requests listener error:", err));
+    }
     
     const unsubSystem = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
       if (snap.exists()) {
@@ -118,34 +129,46 @@ export default function AdminDashboard() {
         if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
         if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
       }
-    });
+    }, (err) => console.error("Admin: system settings listener error:", err));
 
-    const unsubGithubIntegration = onSnapshot(doc(db, 'settings', 'github_integration'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setGithubIntegrationConfig({
-          username: data.username || data.owner || '',
-          repo: data.repo || '',
-          token: data.token || '',
-          branch: data.branch || 'main',
-          path: data.path || 'assets/uploads'
-        });
-      }
-    });
+    let unsubGithubIntegration = () => {};
+    if (isAdmin) {
+      unsubGithubIntegration = onSnapshot(doc(db, 'settings', 'github_integration'), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setGithubIntegrationConfig({
+            username: data.username || data.owner || '',
+            repo: data.repo || '',
+            token: data.token || '',
+            branch: data.branch || 'main',
+            path: data.path || 'assets/uploads'
+          });
+        }
+      }, (err) => console.error("Admin: github_integration listener error:", err));
+    }
 
     const fetchAbout = async () => {
-      const snap = await getDoc(doc(db, 'settings', 'about'));
-      if (snap.exists()) setAboutConfig(prev => ({ ...prev, ...snap.data() }));
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'about'));
+        if (snap.exists()) setAboutConfig(prev => ({ ...prev, ...snap.data() }));
+      } catch (e) {
+        console.error("Admin: fetchAbout error:", e);
+      }
     };
     fetchAbout();
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.error("Admin: utilities listener error:", err));
 
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.error("Admin: apps listener error:", err));
+
+    const unsubCategories = onSnapshot(collection(db, 'app_categories'), (snapshot) => {
+      const cats: any = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAppCategories(cats.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis() || 0));
+    }, (err) => console.error("Admin: categories listener error:", err));
 
     // Listen to site stats
     const now = new Date();
@@ -175,9 +198,10 @@ export default function AdminDashboard() {
       unsubGithubIntegration();
       unsubAllUtils();
       unsubApps();
+      unsubCategories();
       unsubStats();
     };
-  }, []);
+  }, [userData]);
 
   const saveAboutConfig = async () => {
     try {
@@ -293,7 +317,7 @@ export default function AdminDashboard() {
         });
         toast.success('Đã đăng ký ứng dụng mới thành công');
       }
-      setAppForm({ title: '', description: '', logoUrl: '', appUrl: '' });
+      setAppForm({ title: '', description: '', logoUrl: '', appUrl: '', categoryId: '' });
       setEditingAppId(null);
     } catch (e) {
       console.error(e);
@@ -307,8 +331,44 @@ export default function AdminDashboard() {
       title: app.title || '',
       description: app.description || '',
       logoUrl: app.logoUrl || '',
-      appUrl: app.appUrl || ''
+      appUrl: app.appUrl || '',
+      categoryId: app.categoryId || ''
     });
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      await addDoc(collection(db, 'app_categories'), {
+        name: newCategoryName.trim(),
+        createdAt: serverTimestamp()
+      });
+      setNewCategoryName('');
+      toast.success('Đã thêm danh mục mới');
+    } catch (e) {
+      toast.error('Lỗi khi thêm danh mục');
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.')) return;
+    try {
+      await deleteDoc(doc(db, 'app_categories', id));
+      toast.success('Đã xóa danh mục');
+    } catch (e) {
+      toast.error('Lỗi khi xóa');
+    }
+  };
+
+  const handleEditCategory = async (id: string, currentName: string) => {
+    const newName = window.prompt('Nhập tên danh mục mới:', currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+    try {
+      await updateDoc(doc(db, 'app_categories', id), { name: newName.trim() });
+      toast.success('Đã cập nhật tên danh mục');
+    } catch (e) {
+      toast.error('Lỗi khi cập nhật danh mục');
+    }
   };
 
   const handleDeleteApp = (id: string) => {
@@ -511,6 +571,9 @@ export default function AdminDashboard() {
         usersData.push({ uid: doc.id, ...doc.data() } as UserData);
       });
       setUsers(usersData);
+      setLoading(false);
+    }, (err) => {
+      console.error("Admin: fetchUsers listener error:", err);
       setLoading(false);
     });
     return unsubscribe;
@@ -750,6 +813,7 @@ export default function AdminDashboard() {
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
+            { id: 'tasks', label: 'Công việc', icon: CheckSquare },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
@@ -771,7 +835,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
@@ -1801,6 +1865,12 @@ export default function AdminDashboard() {
 
       )}
 
+      {activeTab === 'tasks' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminTasks />
+        </motion.div>
+      )}
+
       {activeTab === 'apps' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
@@ -1840,6 +1910,18 @@ export default function AdminDashboard() {
                      </div>
 
                      <div>
+                       <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Danh mục </label>
+                       <select 
+                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white mb-4"
+                         value={appForm.categoryId}
+                         onChange={(e) => setAppForm({...appForm, categoryId: e.target.value})}
+                       >
+                         <option value="">Không có danh mục</option>
+                         {appCategories.map(cat => (
+                           <option key={cat.id} value={cat.id}>{cat.name}</option>
+                         ))}
+                       </select>
+
                        <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Đường dẫn ứng dụng (App URL) *</label>
                        <input 
                          type="text"
@@ -1915,7 +1997,7 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => {
                               setEditingAppId(null);
-                              setAppForm({ title: '', description: '', logoUrl: '', appUrl: '' });
+                              setAppForm({ title: '', description: '', logoUrl: '', appUrl: '', categoryId: '' });
                             }}
                             className="flex-1 py-3 border border-slate-200 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl text-xs font-bold text-slate-500 uppercase tracking-widest transition-colors duration-150"
                           >
@@ -1929,6 +2011,50 @@ export default function AdminDashboard() {
                           <Save size={14} /> {editingAppId ? 'Lưu Thay Đổi' : 'Đăng Ký App'}
                         </button>
                      </div>
+                   </div>
+                </div>
+
+                {/* Category Management Card */}
+                <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-4">
+                   <div>
+                     <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                       <Layout className="w-5 h-5 text-amber-500" />
+                       Quản Lý Danh Mục
+                     </h3>
+                     <p className="text-xs text-slate-400 mt-1">Tạo nhóm để phân loại ứng dụng trên trang chủ.</p>
+                   </div>
+
+                   <div className="flex gap-2">
+                     <input 
+                       type="text"
+                       placeholder="Tên danh mục mới"
+                       className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs outline-none dark:text-white"
+                       value={newCategoryName}
+                       onChange={(e) => setNewCategoryName(e.target.value)}
+                       onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                     />
+                     <button 
+                       onClick={handleAddCategory}
+                       className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                     >
+                        Thêm
+                     </button>
+                   </div>
+
+                   <div className="flex flex-wrap gap-2 pt-2">
+                      {appCategories.map(cat => (
+                        <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg group">
+                           <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-300">{cat.name}</span>
+                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                             <button onClick={() => handleEditCategory(cat.id, cat.name)} className="text-slate-400 hover:text-blue-500">
+                                <Edit2 size={12} />
+                             </button>
+                             <button onClick={() => handleDeleteCategory(cat.id)} className="text-slate-400 hover:text-red-500">
+                                <Trash2 size={12} />
+                             </button>
+                           </div>
+                        </div>
+                      ))}
                    </div>
                 </div>
 
@@ -2010,6 +2136,11 @@ export default function AdminDashboard() {
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <h4 className="font-bold text-slate-900 dark:text-white text-xs">{app.title}</h4>
+                                        {app.categoryId && (
+                                          <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 text-[8px] font-bold uppercase rounded-md">
+                                             {appCategories.find(c => c.id === app.categoryId)?.name || 'N/A'}
+                                          </span>
+                                        )}
                                         {app.internalOnly && <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[8px] font-bold uppercase rounded-md">Nội bộ</span>}
                                         {maintenanceTabs[`app_${app.id}`] && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 text-[8px] font-bold uppercase rounded-md">Bảo trì</span>}
                                       </div>

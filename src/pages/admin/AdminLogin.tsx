@@ -16,13 +16,15 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { isAdmin } = useAuthStore();
+  const { isSuperAdmin, isAdmin } = useAuthStore();
 
   React.useEffect(() => {
-    if (isAdmin) {
+    if (isSuperAdmin) {
       navigate('/admin');
+    } else if (isAdmin) {
+      navigate('/utilities');
     }
-  }, [isAdmin, navigate]);
+  }, [isSuperAdmin, isAdmin, navigate]);
 
   const resolveIdentifierToEmail = async (id: string) => {
     if (id.includes('@')) return id;
@@ -77,8 +79,15 @@ export default function AdminLogin() {
          throw new Error('Truy cập bị từ chối. Không đủ quyền hạn.');
       }
 
+      const superAdminList = ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn'];
+      const isUserSuperAdmin = role === 'superadmin' || userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'sonlyhongduc1@ghn.vn';
+
       toast.success('Xác thực quản trị thành công.');
-      navigate('/admin');
+      if (isUserSuperAdmin) {
+        navigate('/admin');
+      } else {
+        navigate('/utilities');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Xác thực thất bại.');
     } finally {

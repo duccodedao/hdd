@@ -3,6 +3,7 @@ import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { AlertCircle, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAppStore } from '../../store/appStore';
 
 export default function NotificationMarquee() {
   const [config, setConfig] = useState({
@@ -15,6 +16,12 @@ export default function NotificationMarquee() {
     const unsub = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
       if (snap.exists() && snap.data().notificationConfig) {
         setConfig(snap.data().notificationConfig);
+      }
+    }, (err) => {
+      console.error("NotificationMarquee error:", err);
+      // Let global state know if quota limits are hit
+      if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
+        useAppStore.getState().setQuotaExceeded(true);
       }
     });
     return () => unsub();

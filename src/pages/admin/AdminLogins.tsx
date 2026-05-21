@@ -14,6 +14,8 @@ export default function AdminLogins() {
     const q = query(collection(db, 'device_logins'), orderBy('timestamp', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setLogins(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error("AdminLogins: device_logins listener error:", err);
     });
     return () => unsubscribe();
   }, []);
