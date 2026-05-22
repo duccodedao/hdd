@@ -8,7 +8,7 @@ import { db } from '../lib/firebase';
 export default function HomePage() {
   const navigate = useNavigate();
   const [aboutConfig, setAboutConfig] = useState({
-    introTitle: 'Hệ thống - Nền tảng công nghệ toàn diện',
+    introTitle: 'Hệ thống',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
     adminName: 'Sơn Lý Hồng Đức',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
@@ -79,23 +79,20 @@ export default function HomePage() {
 
       <main className="flex-1 relative z-10 flex flex-col items-center justify-center px-6 py-12 md:py-20 max-w-7xl mx-auto w-full">
         <div className="text-center max-w-4xl mx-auto mb-16 space-y-10">
-           <motion.div 
-             initial={{ opacity: 0, scale: 0.9 }}
-             animate={{ opacity: 1, scale: 1 }}
-             transition={{ duration: 0.8 }}
-             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-indigo-100 bg-indigo-50/50 text-indigo-600 text-[10px] font-black tracking-widest uppercase mb-4"
-           >
-             <Zap className="w-3 h-3 fill-indigo-600" /> Nền tảng công nghệ toàn diện
-           </motion.div>
-           
            <motion.h1 
              initial={{ opacity: 0, y: 30 }}
              animate={{ opacity: 1, y: 0 }}
              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
              className="text-6xl md:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] text-slate-900"
            >
-             {aboutConfig.introTitle.split(' - ')[0]}<br/>
-             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{aboutConfig.introTitle.split(' - ')[1] || 'Hệ thống'}</span>
+             {aboutConfig.introTitle.includes(' - ') ? (
+               <>
+                 {aboutConfig.introTitle.split(' - ')[0]}<br/>
+                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{aboutConfig.introTitle.split(' - ')[1]}</span>
+               </>
+             ) : (
+               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{aboutConfig.introTitle}</span>
+             )}
            </motion.h1>
 
            <motion.p 
