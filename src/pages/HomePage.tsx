@@ -8,7 +8,7 @@ import { db } from '../lib/firebase';
 export default function HomePage() {
   const navigate = useNavigate();
   const [aboutConfig, setAboutConfig] = useState({
-    introTitle: 'Hệ thống',
+    introTitle: 'Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
     adminName: 'Sơn Lý Hồng Đức',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
@@ -57,7 +57,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl tracking-tighter text-slate-900 leading-none">BMASS</span>
-            <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-600 uppercase mt-0.5">Operating System</span>
+            <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-600 uppercase mt-0.5">Digital Platform</span>
           </div>
         </div>
         
@@ -72,67 +72,18 @@ export default function HomePage() {
             onClick={() => navigate('/utilities')}
             className="px-6 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-slate-200 active:scale-95"
           >
-            Truy cập Hệ thống
+            Truy cập
           </button>
         </div>
       </nav>
 
-      <main className="flex-1 relative z-10 flex flex-col items-center justify-center px-6 py-12 md:py-20 max-w-7xl mx-auto w-full">
-        <div className="text-center max-w-4xl mx-auto mb-16 space-y-10">
-           <motion.h1 
-             initial={{ opacity: 0, y: 30 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-             className="text-6xl md:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] text-slate-900"
-           >
-             {aboutConfig.introTitle.includes(' - ') ? (
-               <>
-                 {aboutConfig.introTitle.split(' - ')[0]}<br/>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{aboutConfig.introTitle.split(' - ')[1]}</span>
-               </>
-             ) : (
-               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">{aboutConfig.introTitle}</span>
-             )}
-           </motion.h1>
-
-           <motion.p 
-             initial={{ opacity: 0, y: 30 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-             className="text-lg md:text-2xl text-slate-500 font-medium max-w-3xl mx-auto leading-relaxed"
-           >
-             {aboutConfig.introDesc}
-           </motion.p>
-           
-           <motion.div 
-             initial={{ opacity: 0, y: 30 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-             className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
-           >
-             <button
-               onClick={() => navigate('/utilities')}
-               className="group relative inline-flex items-center gap-3 px-10 py-5 bg-indigo-600 hover:bg-slate-900 rounded-full text-white font-black text-lg transition-all shadow-2xl shadow-indigo-200 active:scale-95"
-             >
-               <span>Bắt đầu Trải nghiệm</span>
-               <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-             </button>
-             
-             <button
-               onClick={() => navigate('/about')}
-               className="px-10 py-5 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-600 font-bold text-lg transition-all border border-slate-100"
-             >
-               Tìm hiểu thêm
-             </button>
-           </motion.div>
-        </div>
-
+      <main className="flex-1 relative z-10 flex flex-col items-center px-6 py-12 md:py-20 max-w-7xl mx-auto w-full">
         {/* Admin Bio Card - Refined */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-4xl mx-auto mt-20"
+          transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-4xl mx-auto mt-10 md:mt-16"
         >
           <div className="bg-white border border-slate-100 rounded-[3rem] p-10 md:p-16 relative overflow-hidden shadow-2xl shadow-slate-200/50">
             <div className="absolute top-0 right-0 p-12 opacity-[0.02] -rotate-12 translate-x-10 -translate-y-10">
@@ -153,7 +104,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{aboutConfig.adminName || 'Sơn Lý Hồng Đức'}</h2>
-                  <p className="text-indigo-600 font-bold tracking-widest text-xs uppercase mt-2">BMASS Operating System</p>
+                  <p className="text-indigo-600 font-bold tracking-widest text-xs uppercase mt-2">BMASS Digital Platform</p>
                 </div>
                 <p className="text-slate-500 text-lg leading-relaxed max-w-xl font-medium">
                   {aboutConfig.adminBio || 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.'}
