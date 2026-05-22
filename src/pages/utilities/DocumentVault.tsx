@@ -274,7 +274,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           doc.note.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.categoryId === selectedCategory;
+    const khacCat = categories.find(c => c.name === 'Khác');
+    const matchesCategory = selectedCategory === 'all' || 
+                            doc.categoryId === selectedCategory ||
+                            (selectedCategory === khacCat?.id && (doc.categoryId === '' || !doc.categoryId));
     const matchesHighlight = showOnlyHighlighted ? doc.id === highlightId : true;
     
     // Non-admin can't see hidden files
@@ -429,10 +432,12 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                   }}
                 >
                   <option value="all">Tất cả</option>
-                  <option value="">Chưa phân loại</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
+                  {!categories.some(c => c.name === 'Khác') && (
+                    <option value="">Chưa phân loại</option>
+                  )}
                 </select>
                 <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none opacity-50" />
               </div>
@@ -551,13 +556,21 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                           <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                              <motion.div 
                                initial={{ width: 0 }}
-                               animate={{ width: `${Math.min(90, (documents.filter(d => d.categoryId === cat.id).length / Math.max(1, documents.length)) * 100)}%` }}
+                               animate={{ width: `${Math.min(90, (documents.filter(d => {
+                                 if (d.categoryId === cat.id) return true;
+                                 if (cat.name === 'Khác' && (d.categoryId === '' || !d.categoryId)) return true;
+                                 return false;
+                               }).length / Math.max(1, documents.length)) * 100)}%` }}
                                className="h-full bg-indigo-500"
                              />
                           </div>
                           <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex justify-between items-center">
                              <span>Storage</span>
-                             <span className="text-indigo-500">{documents.filter(d => d.categoryId === cat.id).length} items</span>
+                             <span className="text-indigo-500">{documents.filter(d => {
+                               if (d.categoryId === cat.id) return true;
+                               if (cat.name === 'Khác' && (d.categoryId === '' || !d.categoryId)) return true;
+                               return false;
+                             }).length} items</span>
                           </p>
                        </div>
                     </div>
@@ -572,7 +585,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
               >
-                {documents.filter(d => d.categoryId === explorerCategory).map((docItem, idx) => (
+                {documents.filter(d => {
+                  const khacCat = categories.find(c => c.name === 'Khác');
+                  return d.categoryId === explorerCategory || (explorerCategory === khacCat?.id && (d.categoryId === '' || !d.categoryId));
+                }).map((docItem, idx) => (
                   <DocumentCard 
                     key={docItem.id} 
                     docItem={docItem} 

@@ -47,7 +47,11 @@ import { DeviceGuard } from './components/guards/DeviceGuard';
 import { TabGuard } from './components/guards/TabGuard';
 import { OnboardingGuard } from './components/guards/OnboardingGuard';
 
+import CookieConsentComponent from './components/common/CookieConsent';
+import GuestTracker from './components/common/GuestTracker';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
+
+import HomePage from './pages/HomePage';
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
@@ -165,8 +169,10 @@ export default function App() {
         <meta property="og:image" content="/logo.png" />
       </Helmet>
       <BrowserRouter>
+      <GuestTracker />
       <GoogleOneTap />
       <OfflineNotification />
+      <CookieConsentComponent />
       <AuthActionRedirector />
       <Toaster position="top-right" />
       <ConfirmModal />
@@ -174,7 +180,7 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             {/* Landing Page */}
-            <Route path="/" element={<Navigate to="/utilities" replace />} />
+            <Route path="/" element={<HomePage />} />
             
             {/* Standalone Form Page */}
             <Route path="/form/:slug" element={<FormView />} />

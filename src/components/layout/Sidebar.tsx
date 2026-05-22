@@ -201,38 +201,42 @@ export default function Sidebar({ className }: { className?: string }) {
                 </div>
 
                 {/* Ứng dụng Item */}
-                <NavLink
-                  to="/apps"
-                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                    isActive 
-                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                    <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
-                  </div>
-                </NavLink>
+                {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/apps"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
+                    </div>
+                  </NavLink>
+                )}
 
                 {/* Công việc Item */}
-                <NavLink
-                  to="/tasks"
-                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                    isActive 
-                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                    <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
-                  </div>
-                </NavLink>
+                {(!systemTools['tasks']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/tasks"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
+                    </div>
+                  </NavLink>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -240,7 +244,7 @@ export default function Sidebar({ className }: { className?: string }) {
 
       </nav>
 
-      {isSuperAdmin && (
+      {isSuperAdmin ? (
         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
           <NavLink
             to="/admin"
@@ -254,6 +258,17 @@ export default function Sidebar({ className }: { className?: string }) {
           >
             <Shield className="w-4 h-4" />
             <span>Admin Center</span>
+          </NavLink>
+        </div>
+      ) : !userData && (
+        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
+          <NavLink
+            to="/login"
+            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+            className="flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-zinc-500 dark:hover:text-white dark:hover:bg-white/5"
+          >
+            <UserCircle className="w-4 h-4" />
+            <span>Đăng nhập</span>
           </NavLink>
         </div>
       )}

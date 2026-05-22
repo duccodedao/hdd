@@ -28,7 +28,9 @@ export default function AdminDashboard() {
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
+  const [guests, setGuests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userTab, setUserTab] = useState<'registered' | 'guests'>('registered');
   const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
@@ -165,6 +167,11 @@ export default function AdminDashboard() {
       setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => console.error("Admin: apps listener error:", err));
 
+    const unsubGuests = onSnapshot(collection(db, 'guests'), (snapshot) => {
+      const gData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setGuests(gData.sort((a, b) => (b.lastSeen?.toMillis() || 0) - (a.lastSeen?.toMillis() || 0)));
+    }, (err) => console.error("Admin: guests listener error:", err));
+
     const unsubCategories = onSnapshot(collection(db, 'app_categories'), (snapshot) => {
       const cats: any = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAppCategories(cats.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis() || 0));
@@ -200,6 +207,7 @@ export default function AdminDashboard() {
       unsubApps();
       unsubCategories();
       unsubStats();
+      unsubGuests();
     };
   }, [userData]);
 
@@ -1116,18 +1124,35 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === 'users' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-              <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
-            </h2>
-            <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div className="flex items-center gap-2 mb-4 bg-slate-100 dark:bg-white/5 p-1 rounded-xl w-fit">
+            <button
+              onClick={() => setUserTab('registered')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${userTab === 'registered' ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300'}`}
+            >
+              Đã Đăng Ký
+            </button>
+            <button
+              onClick={() => setUserTab('guests')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${userTab === 'guests' ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300'}`}
+            >
+              Khách (Trực Truy cập)
+            </button>
           </div>
 
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
-            ) : (
+          {userTab === 'registered' ? (
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
+                </h2>
+                <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
+                ) : (
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
@@ -1264,8 +1289,66 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
-            )}
+             )}
+            </div>
           </div>
+          ) : (
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Users className="w-5 h-5 text-indigo-500" /> Lịch sử đăng nhập Khách Truy cập
+                </h2>
+                <div className="text-sm text-slate-500 font-medium">Tổng số: {guests.length} thiết bị/khách</div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
+                  <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
+                    <tr>
+                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">ID / User Agent</th>
+                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">IP Address</th>
+                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Location</th>
+                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Số lần Truy cập</th>
+                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Lần Truy cập Cuối</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
+                    {guests.map((g) => (
+                      <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-mono text-xs text-slate-900 dark:text-white max-w-[200px] truncate" title={g.id}>{g.id}</div>
+                          <div className="text-[10px] text-slate-500 max-w-[200px] truncate mt-1" title={g.userAgent}>{g.userAgent}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-mono text-slate-600 dark:text-slate-400">
+                            {g.ip || 'Unknown'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs text-slate-600 dark:text-slate-400">
+                            {[g.city, g.region, g.country].filter(Boolean).join(', ') || 'Unknown'}
+                            {g.latitude && g.longitude && (
+                               <div className="text-[10px] font-mono text-slate-400 mt-0.5">({g.latitude}, {g.longitude})</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                           <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                             {g.visits || 1}
+                           </span>
+                        </td>
+                         <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                          <div className="text-xs">
+                            {g.lastSeen ? format(toSafeDate(g.lastSeen), 'HH:mm - dd/MM/yyyy') : 'N/A'}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 

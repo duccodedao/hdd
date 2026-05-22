@@ -2,6 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // GUESTS & STATS
+    match /guests/{id} {
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+    match /site_visitation_stats/{id} {
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
@@ -39,6 +53,8 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    // PUBLIC ACCESS COLLECTIONS
+
     // TEST CONNECTION
     match /test/connection { allow read: if true; }
 
@@ -58,11 +74,6 @@ service cloud.firestore {
       match /private/security {
         allow read, write: if isOwner(userId) || isSuperAdmin();
       }
-    }
-
-    // SITE VISITATION STATISTICS
-    match /site_visitation_stats/{statId} {
-      allow read, write: if true;
     }
 
     // DOCUMENT VAULT & CATEGORIES
