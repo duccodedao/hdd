@@ -109,6 +109,21 @@
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
       "required": ["count"]
+    },
+    "AvatarFrame": {
+      "title": "Avatar Frame",
+      "description": "Avatar frame event configurations and PNG overlays",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "active": { "type": "boolean" },
+        "githubPath": { "type": "string" },
+        "githubSha": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "imageUrl", "active"]
     }
   },
   "firestore": {
@@ -143,6 +158,10 @@
     "github_config": {
       "schema": "GitHubConfig",
       "description": "Shared GitHub integration settings"
+    },
+    "avatar_frames": {
+      "schema": "AvatarFrame",
+      "description": "Store all custom avatar frames and campaign transparent overlays"
     }
   },
   "entities": {

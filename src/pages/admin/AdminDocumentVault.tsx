@@ -75,10 +75,23 @@ export default function AdminDocumentVault() {
   };
 
   const updateDocCategory = async (docId: string, newCategoryId: string) => {
-    const category = categories.find(c => c.id === newCategoryId);
+    let categoryIdToSave = newCategoryId;
+    let categoryNameToSave = 'Khác';
+
+    if (!newCategoryId) {
+      const khacCat = categories.find(c => c.name === 'Khác');
+      if (khacCat) {
+        categoryIdToSave = khacCat.id;
+        categoryNameToSave = 'Khác';
+      }
+    } else {
+      const category = categories.find(c => c.id === newCategoryId);
+      categoryNameToSave = category?.name || 'Khác';
+    }
+
     await updateDoc(doc(db, 'documents', docId), {
-      categoryId: newCategoryId,
-      categoryName: category?.name || 'Khác'
+      categoryId: categoryIdToSave,
+      categoryName: categoryNameToSave
     });
     toast.success('Đã cập nhật danh mục cho tài liệu');
   };
@@ -592,7 +605,9 @@ export default function AdminDocumentVault() {
                           value={docItem.categoryId} 
                           onChange={(e) => updateDocCategory(docItem.id, e.target.value)}
                         >
-                          <option value="">Chưa phân loại</option>
+                          {!categories.some(c => c.id === docItem.categoryId) && (
+                            <option value="">Chưa phân loại</option>
+                          )}
                           {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                      </td>

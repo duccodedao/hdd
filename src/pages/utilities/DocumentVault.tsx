@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { useAuthStore } from '../../store/authStore';
+import { useConfirmStore } from '../../store/confirmStore';
 import ConfirmModal from '../../components/ConfirmModal';
 
 const DOCS_PER_PAGE = 50;
@@ -274,7 +275,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           doc.note.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || doc.categoryId === selectedCategory;
+    const khacCat = categories.find(c => c.name === 'Khác');
+    const matchesCategory = selectedCategory === 'all' || 
+                            doc.categoryId === selectedCategory ||
+                            (selectedCategory === khacCat?.id && (doc.categoryId === '' || !doc.categoryId));
     const matchesHighlight = showOnlyHighlighted ? doc.id === highlightId : true;
     
     // Non-admin can't see hidden files
@@ -338,9 +342,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       {/* Back Button */}
       <button 
         onClick={onBack} 
-        className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-10 transition-colors"
+        className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5 mb-10 group w-fit"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Quay lại
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay Lại
       </button>
 
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
@@ -429,10 +433,12 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                   }}
                 >
                   <option value="all">Tất cả</option>
-                  <option value="">Chưa phân loại</option>
                   {categories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
+                  {!categories.some(c => c.name === 'Khác') && (
+                    <option value="">Chưa phân loại</option>
+                  )}
                 </select>
                 <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none opacity-50" />
               </div>
@@ -518,7 +524,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                     onClick={() => setExplorerCategory(null)}
                     className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 transition-all group"
                   >
-                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Quay lại
+                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Quay Lại
                   </button>
                 </div>
               )}
@@ -551,13 +557,21 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                           <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                              <motion.div 
                                initial={{ width: 0 }}
-                               animate={{ width: `${Math.min(90, (documents.filter(d => d.categoryId === cat.id).length / Math.max(1, documents.length)) * 100)}%` }}
+                               animate={{ width: `${Math.min(90, (documents.filter(d => {
+                                 if (d.categoryId === cat.id) return true;
+                                 if (cat.name === 'Khác' && (d.categoryId === '' || !d.categoryId)) return true;
+                                 return false;
+                               }).length / Math.max(1, documents.length)) * 100)}%` }}
                                className="h-full bg-indigo-500"
                              />
                           </div>
                           <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex justify-between items-center">
                              <span>Storage</span>
-                             <span className="text-indigo-500">{documents.filter(d => d.categoryId === cat.id).length} items</span>
+                             <span className="text-indigo-500">{documents.filter(d => {
+                               if (d.categoryId === cat.id) return true;
+                               if (cat.name === 'Khác' && (d.categoryId === '' || !d.categoryId)) return true;
+                               return false;
+                             }).length} items</span>
                           </p>
                        </div>
                     </div>
@@ -572,7 +586,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
               >
-                {documents.filter(d => d.categoryId === explorerCategory).map((docItem, idx) => (
+                {documents.filter(d => {
+                  const khacCat = categories.find(c => c.name === 'Khác');
+                  return d.categoryId === explorerCategory || (explorerCategory === khacCat?.id && (d.categoryId === '' || !d.categoryId));
+                }).map((docItem, idx) => (
                   <DocumentCard 
                     key={docItem.id} 
                     docItem={docItem} 
@@ -886,6 +903,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "md:max-w-xl" }: a
 );
 
 const CategoryManagerModal = ({ isOpen, onClose, categories }: any) => {
+  const { openConfirm } = useConfirmStore();
   const [newCat, setNewCat] = useState('');
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -914,12 +932,19 @@ const CategoryManagerModal = ({ isOpen, onClose, categories }: any) => {
     } catch (e) { toast.error('Lỗi khi cập nhật danh mục'); }
   };
 
-  const handleDeleteCat = async (id: string) => {
-    if (!confirm('Xóa danh mục sẽ khiến các văn bản trong danh mục chuyển sang trạng thái tự do. Tiếp tục?')) return;
-    try {
-      await deleteDoc(doc(db, 'document_categories', id));
-      toast.success('Đã xóa bỏ danh mục');
-    } catch (e) { toast.error('Lỗi khi xóa'); }
+  const handleDeleteCat = (id: string) => {
+    openConfirm({
+      title: 'Xóa phân loại tài liệu',
+      message: 'Xóa danh mục sẽ khiến các văn bản trong danh mục chuyển sang trạng thái tự do. Tiếp tục?',
+      confirmText: 'Đồng ý xóa',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'document_categories', id));
+          toast.success('Đã xóa bỏ danh mục');
+        } catch (e) { toast.error('Lỗi khi xóa'); }
+      }
+    });
   };
 
   return (

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2 } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -13,13 +13,14 @@ import { vi } from 'date-fns/locale';
 
 import AdminUtilities from './AdminUtilities';
 import AdminIpBlocking from './AdminIpBlocking';
-import AdminLogins from './AdminLogins';
 import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
 import AdminTasks from './AdminTasks';
 import { useConfirmStore } from '../../store/confirmStore';
+import { useAudioStore } from '../../store/audioStore';
+import { githubService } from '../../services/githubService';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
 export default function AdminDashboard() {
@@ -29,7 +30,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
     adminName: 'Quản trị viên',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
-    adminPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200',
+    adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
@@ -74,7 +75,8 @@ export default function AdminDashboard() {
     username: '',
     repo: '',
     token: '',
-    branch: 'main'
+    branch: 'main',
+    path: 'assets/uploads'
   });
 
   const [githubIntegrationConfig, setGithubIntegrationConfig] = useState({
@@ -84,6 +86,17 @@ export default function AdminDashboard() {
     branch: 'main',
     path: 'assets/uploads'
   });
+
+  const [audioConfig, setAudioConfig] = useState({
+    musicUrl: '',
+    title: 'Nhạc nền hệ thống BMass',
+    repo: '',
+    branch: 'main',
+    path: 'assets/audio'
+  });
+
+  const [audioUploading, setAudioUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
   const [expandedSetting, setExpandedSetting] = useState<string | null>('global');
 
@@ -120,33 +133,53 @@ export default function AdminDashboard() {
       }, (err) => console.error("Admin: contact_requests listener error:", err));
     }
     
-    const unsubSystem = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
-        if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
-        if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
-        if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
-        if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
-      }
-    }, (err) => console.error("Admin: system settings listener error:", err));
+    // Fetch settings ONCE to avoid overwriting admin inputs while typing
+    const fetchSettings = async () => {
+      try {
+        const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+        if (sysSnap.exists()) {
+          const data = sysSnap.data();
+          if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
+          if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
+          if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
+          if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
+          if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
+        }
 
-    let unsubGithubIntegration = () => {};
-    if (isAdmin) {
-      unsubGithubIntegration = onSnapshot(doc(db, 'settings', 'github_integration'), (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
+        const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
+        if (ghSnap.exists()) {
+          const data = ghSnap.data();
+          const fetchedUsername = data.username || data.owner || '';
+          const fetchedToken = data.token || '';
           setGithubIntegrationConfig({
-            username: data.username || data.owner || '',
+            username: fetchedUsername,
             repo: data.repo || '',
-            token: data.token || '',
+            token: fetchedToken,
             branch: data.branch || 'main',
             path: data.path || 'assets/uploads'
           });
+          setGithubGlobalConfig(prev => ({
+            username: prev.username || fetchedUsername,
+            token: prev.token || fetchedToken
+          }));
         }
-      }, (err) => console.error("Admin: github_integration listener error:", err));
-    }
 
+        const audioSnap = await getDoc(doc(db, 'settings', 'audio'));
+        if (audioSnap.exists()) {
+          const data = audioSnap.data();
+          setAudioConfig({
+            musicUrl: data.musicUrl || '',
+            title: data.title || 'Nhạc nền hệ thống BMass',
+            repo: data.repo || '',
+            branch: data.branch || 'main',
+            path: data.path || 'assets/audio'
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching settings:", err);
+      }
+    };
+    
     const fetchAbout = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'about'));
@@ -155,7 +188,11 @@ export default function AdminDashboard() {
         console.error("Admin: fetchAbout error:", e);
       }
     };
-    fetchAbout();
+
+    if (isAdmin) {
+      fetchSettings();
+      fetchAbout();
+    }
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -194,14 +231,67 @@ export default function AdminDashboard() {
     return () => {
       unsubToolPerms();
       unsubContacts();
-      unsubSystem();
-      unsubGithubIntegration();
       unsubAllUtils();
       unsubApps();
       unsubCategories();
       unsubStats();
     };
-  }, [userData]);
+  }, []);
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+    const token = githubGlobalConfig.token || githubIntegrationConfig.token || '';
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setUploadProgress(prev => ({ ...prev, avatar: 0 }));
+    const toastId = toast.loading('Đang tải ảnh đại diện lên GitHub...');
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+      
+      const filename = `avatar_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const uploadPath = `avatars/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Update admin avatar ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, avatar: Math.round(progress) }))
+      );
+
+      setAboutConfig(prev => ({ ...prev, adminPhoto: result.url }));
+      toast.success('Đã tải lên ảnh đại diện thành công!', { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi tải ảnh: ${e.message}`, { id: toastId });
+    } finally {
+      setIsUploadingAvatar(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.avatar;
+        return next;
+      });
+      e.target.value = '';
+    }
+  };
 
   const saveAboutConfig = async () => {
     try {
@@ -241,7 +331,7 @@ export default function AdminDashboard() {
   const handleSaveGithubGlobal = async () => {
     try {
       // Save global & auto sync to fileManager & imageUpload configs in standard systems doc
-      await updateDoc(doc(db, 'settings', 'system'), {
+      await setDoc(doc(db, 'settings', 'system'), {
         githubGlobalConfig,
         fileManagerConfig: {
           ...fileManagerConfig,
@@ -253,7 +343,7 @@ export default function AdminDashboard() {
           username: githubGlobalConfig.username,
           token: githubGlobalConfig.token
         }
-      });
+      }, { merge: true });
 
       // Synchronize key to github_integration settings as well
       await setDoc(doc(db, 'settings', 'github_integration'), {
@@ -270,13 +360,13 @@ export default function AdminDashboard() {
 
   const handleSaveImageUploadConfig = async () => {
     try {
-      await updateDoc(doc(db, 'settings', 'system'), {
+      await setDoc(doc(db, 'settings', 'system'), {
         imageUploadConfig: {
           ...imageUploadConfig,
-          username: githubGlobalConfig.username,
-          token: githubGlobalConfig.token
+          username: githubGlobalConfig.username || imageUploadConfig.username || '',
+          token: githubGlobalConfig.token || imageUploadConfig.token || ''
         }
-      });
+      }, { merge: true });
       toast.success('Đã cập nhật cấu hình kho lưu trữ hình ảnh');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình kho hình ảnh');
@@ -285,10 +375,12 @@ export default function AdminDashboard() {
 
   const handleSaveGithubIntegration = async () => {
     try {
+      const mergedUsername = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+      const mergedToken = githubGlobalConfig.token || githubIntegrationConfig.token || '';
       await setDoc(doc(db, 'settings', 'github_integration'), {
-        username: githubGlobalConfig.username,
-        owner: githubGlobalConfig.username,
-        token: githubGlobalConfig.token,
+        username: mergedUsername,
+        owner: mergedUsername,
+        token: mergedToken,
         repo: githubIntegrationConfig.repo,
         branch: githubIntegrationConfig.branch || 'main',
         path: githubIntegrationConfig.path || 'assets/uploads'
@@ -296,6 +388,88 @@ export default function AdminDashboard() {
       toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveAudioConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'audio'), {
+        musicUrl: audioConfig.musicUrl,
+        title: audioConfig.title,
+        repo: audioConfig.repo,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      }, { merge: true });
+      toast.success('Đã lưu cấu hình Nhạc nền hệ thống thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình nhạc nền');
+    }
+  };
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!githubGlobalConfig.username || !githubGlobalConfig.token) {
+      toast.error('Vui lòng hoàn tất cấu hình GitHub trung tâm (Tài khoản và Token) trước!');
+      return;
+    }
+
+    if (!audioConfig.repo) {
+      toast.error('Vui lòng nhập tên Repository lưu trữ tệp nhạc nền!');
+      return;
+    }
+
+    setAudioUploading(true);
+    setUploadProgress(prev => ({ ...prev, audio: 0 }));
+    const originalId = toast.loading(`Đang tải lên tệp âm thanh "${file.name}" lên GitHub...`);
+    
+    try {
+      const ghConfig = {
+        owner: githubGlobalConfig.username,
+        repo: audioConfig.repo,
+        token: githubGlobalConfig.token,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `${audioConfig.path || 'assets/audio'}/${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Upload MP3 audio file: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, audio: Math.round(progress) }))
+      );
+
+      setAudioConfig(prev => ({
+        ...prev,
+        musicUrl: githubData.url
+      }));
+
+      // Auto save to settings/audio in Firestore!
+      await setDoc(doc(db, 'settings', 'audio'), {
+        musicUrl: githubData.url,
+        title: audioConfig.title || file.name.substring(0, file.name.lastIndexOf('.')),
+        repo: audioConfig.repo,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      }, { merge: true });
+
+      toast.success('Đã tải lên nhập file MP3 thành công và đồng bộ nhạc nền hệ thống!', { id: originalId });
+    } catch (err: any) {
+      console.error('Audio upload error:', err);
+      toast.error('Lỗi khi tải nhạc lên GitHub: ' + (err.message || 'Thất bại'), { id: originalId });
+    } finally {
+      setAudioUploading(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.audio;
+        return next;
+      });
+      e.target.value = '';
     }
   };
 
@@ -350,14 +524,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.')) return;
-    try {
-      await deleteDoc(doc(db, 'app_categories', id));
-      toast.success('Đã xóa danh mục');
-    } catch (e) {
-      toast.error('Lỗi khi xóa');
-    }
+  const handleDeleteCategory = (id: string) => {
+    openConfirm({
+      title: 'Xóa danh mục ứng dụng',
+      message: 'Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.',
+      confirmText: 'Xóa ngay',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'app_categories', id));
+          toast.success('Đã xóa danh mục');
+        } catch (e) {
+          toast.error('Lỗi khi xóa');
+        }
+      }
+    });
   };
 
   const handleEditCategory = async (id: string, currentName: string) => {
@@ -489,55 +670,41 @@ export default function AdminDashboard() {
     }
 
     setIsUploadingLogo(true);
+    setUploadProgress(prev => ({ ...prev, logo: 0 }));
     const toastId = toast.loading('Đang xử lý tải tệp lên GitHub...');
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = (reader.result as string).split(',')[1];
-          const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-          const path = `logos/${filename}`;
-          const url = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
-
-          const res = await fetch(url, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Token ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              message: `Upload logo ${file.name} from admin UI`,
-              content: base64Data,
-              branch: branch
-            })
-          });
-
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Lỗi HTTP');
-          }
-
-          const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${path}`;
-          setAppForm(prev => ({ ...prev, logoUrl: rawUrl }));
-          toast.success('Đã tải lên logo thành công!', { id: toastId });
-        } catch (innerError: any) {
-          console.error(innerError);
-          toast.error(`GitHub Upload Failed: ${innerError.message || innerError}`, { id: toastId });
-        } finally {
-          setIsUploadingLogo(false);
-        }
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
       };
-      reader.onerror = () => {
-        toast.error('Lỗi khi đọc file logo', { id: toastId });
-        setIsUploadingLogo(false);
-      };
-      reader.readAsDataURL(file);
+      
+      const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const uploadPath = `logos/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Upload logo ${file.name} from admin UI`,
+        (progress) => setUploadProgress(prev => ({ ...prev, logo: Math.round(progress) }))
+      );
+
+      setAppForm(prev => ({ ...prev, logoUrl: result.url }));
+      toast.success('Đã tải lên logo thành công!', { id: toastId });
     } catch (e: any) {
       console.error(e);
       toast.error(`Lỗi: ${e.message}`, { id: toastId });
+    } finally {
       setIsUploadingLogo(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.logo;
+        return next;
+      });
+      e.target.value = '';
     }
   };
 
@@ -923,13 +1090,33 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1 ml-1">Ảnh (URL)</label>
-                    <input 
-                      type="text" 
-                      value={aboutConfig.adminPhoto}
-                      onChange={(e) => setAboutConfig({...aboutConfig, adminPhoto: e.target.value})}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                    />
+                    <label className="block text-xs font-bold mb-1 ml-1 flex items-center justify-between">
+                      <span>Ảnh (URL)</span>
+                      <label className="cursor-pointer text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                        <Upload size={12} />
+                        <span className="text-[10px]">Tải lên GitHub</span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadAvatarToGithub} disabled={isUploadingAvatar} />
+                      </label>
+                    </label>
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        value={aboutConfig.adminPhoto}
+                        onChange={(e) => setAboutConfig({...aboutConfig, adminPhoto: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white pr-12"
+                        placeholder="Link ảnh đại diện..."
+                      />
+                      {aboutConfig.adminPhoto && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm pointer-events-none">
+                          <img src={aboutConfig.adminPhoto} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {isUploadingAvatar && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Bio (Giới thiệu bản thân)</label>
@@ -1116,18 +1303,19 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === 'users' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-              <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
-            </h2>
-            <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
-          </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
+                </h2>
+                <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
+              </div>
 
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
-            ) : (
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
+                ) : (
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
@@ -1264,8 +1452,9 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
+             )}
+            </div>
+           </div>
         </motion.div>
       )}
 
@@ -1381,6 +1570,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {[
+                { id: 'avatar-frame', title: 'Khung Ảnh Đại Diện', icon: ImageIcon },
                 { id: 'file-manager', title: 'Quản Lý File Cá Nhân', icon: Laptop },
                 { id: 'kho-van-ban', title: 'Kho Văn Bản', icon: FolderOpen },
                 { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
@@ -1837,23 +2027,138 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Branch (Nhánh)</label>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Đường dẫn folder lưu trữ</label>
                               <input 
                                 type="text"
                                 className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
-                                value={imageUploadConfig.branch}
-                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, branch: e.target.value})}
-                                placeholder="main"
+                                value={imageUploadConfig.path || ''}
+                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, path: e.target.value})}
+                                placeholder="assets/images"
                               />
                             </div>
                           </div>
                           <div className="pt-2 flex justify-end">
                             <button 
+                              type="button"
                               onClick={handleSaveImageUploadConfig}
                               disabled={!isSuperAdmin}
                               className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
                             >
                               <Save size={14} /> Lưu Cấu Hình Ảnh
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. Setup MP3 & Nhạc nền Hệ thống */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'audio' ? null : 'audio')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                            <Music className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">5. Setup MP3 &amp; Nhạc nền Hệ thống</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {audioConfig.musicUrl ? `Đang có: ${audioConfig.title}` : 'Chưa cấu hình nhạc nền'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {expandedSetting === 'audio' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                        </span>
+                      </button>
+
+                      {expandedSetting === 'audio' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Kho dùng chung:</strong> Phân hệ setup MP3/âm thanh sử dụng chung Token + Username từ Cấu hình GitHub trung tâm. Chỉ cần điền Tên repository, thư mục và đẩy nhạc lên GitHub trực tiếp.</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề (Yêu cầu)</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={audioConfig.title}
+                                onChange={(e) => setAudioConfig({...audioConfig, title: e.target.value})}
+                                placeholder="Tên bản nhạc nền (vd: Nhạc tết sôi động)"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Repository nhạc nền</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={audioConfig.repo}
+                                onChange={(e) => setAudioConfig({...audioConfig, repo: e.target.value})}
+                                placeholder="vd: app-audios-vault"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Thư mục chứa (Path)</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                              value={audioConfig.path}
+                              onChange={(e) => setAudioConfig({...audioConfig, path: e.target.value})}
+                              placeholder="assets/audio"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải file âm thanh (.mp3)</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="audio/*"
+                                onChange={handleAudioUpload}
+                                disabled={audioUploading || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2 animate-bounce" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {audioUploading ? `Đang tải lên... ${uploadProgress.audio || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải file nhạc mới'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Hỗ trợ file định dạng .mp3, .wav... dưới 40MB</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {audioConfig.musicUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Link nhạc nền hiện tại:</span>
+                              <div className="flex gap-2 items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={audioConfig.musicUrl}
+                                />
+                                <audio src={audioConfig.musicUrl} controls className="h-8 max-w-[150px] md:max-w-xs scale-90" />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveAudioConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập Nhạc nền
                             </button>
                           </div>
                         </div>
@@ -1950,7 +2255,7 @@ export default function AdminDashboard() {
                             htmlFor="logo-upload-input-admin"
                             className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-white/5 dark:hover:bg-white/10 text-indigo-600 dark:text-zinc-300 border border-indigo-200/40 dark:border-white/5 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1"
                           >
-                            {isUploadingLogo ? 'Đang tải lên...' : 'Tải Logo lên Github'}
+                            {isUploadingLogo ? `Đang tải lên... ${uploadProgress.logo || 0}%` : 'Tải Logo lên Github'}
                           </label>
                           <p className="text-[9px] text-slate-400">Tự động đẩy tệp ảnh lên Git repository và sinh URL thô.</p>
                        </div>

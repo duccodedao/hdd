@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -8,6 +8,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
+import { useAudioStore } from '../../store/audioStore';
 
 export default function Topbar() {
   const { toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
@@ -18,7 +19,55 @@ export default function Topbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const doc = document as any;
+      setIsFullscreen(!!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  const handleFullscreenToggle = () => {
+    const docElm = document.documentElement as any;
+    const doc = document as any;
+
+    if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+      if (docElm.requestFullscreen) {
+        docElm.requestFullscreen().catch((err: any) => console.error(`Error attempting to enable fullscreen: ${err.message}`));
+      } else if (docElm.webkitRequestFullscreen) {
+        docElm.webkitRequestFullscreen();
+      } else if (docElm.mozRequestFullScreen) {
+        docElm.mozRequestFullScreen();
+      } else if (docElm.msRequestFullscreen) {
+        docElm.msRequestFullscreen();
+      } else {
+        console.warn("Fullscreen API is not supported in this browser.");
+      }
+    } else {
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+    }
+  };
 
   const handleLogout = () => {
     signOut(auth);
@@ -123,11 +172,91 @@ export default function Topbar() {
           />
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Audio Player */}
+          {(() => {
+            const { isPlaying, currentTime, duration, toggle, seek, audioUrl, audioTitle } = useAudioStore();
+            const [showPlayerTimeline, setShowPlayerTimeline] = useState(false);
+
+            const formatTime = (secs: number) => {
+              if (isNaN(secs) || secs === Infinity) return '0:00';
+              const m = Math.floor(secs / 60);
+              const s = Math.floor(secs % 60);
+              return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+
+            if (!audioUrl) return null;
+
+            return (
+              <div 
+                className={cn(
+                  "flex items-center gap-2 p-1 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-full transition-all duration-300",
+                  showPlayerTimeline ? "max-w-[200px] md:max-w-xs pr-3" : "max-w-[36px]"
+                )}
+                onMouseEnter={() => setShowPlayerTimeline(true)}
+                onMouseLeave={() => setShowPlayerTimeline(false)}
+              >
+                <button
+                  onClick={toggle}
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-full text-white transition-all shadow-sm active:scale-90",
+                    isPlaying ? "bg-purple-600 shadow-purple-500/20" : "bg-slate-500 dark:bg-zinc-700 hover:bg-slate-600"
+                  )}
+                  title={isPlaying ? "Tạm dừng nhạc" : "Phát nhạc nền"}
+                >
+                  {isPlaying ? (
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                    >
+                      <Pause className="w-3 h-3 fill-current" />
+                    </motion.div>
+                  ) : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                </button>
+
+                <AnimatePresence>
+                  {showPlayerTimeline && (
+                    <motion.div
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="flex items-center gap-1.5 md:gap-2 overflow-hidden whitespace-nowrap"
+                    >
+                      <div className="flex flex-col text-left max-w-[60px] md:max-w-[100px] select-none leading-none">
+                        <span className="text-[9px] font-bold text-slate-800 dark:text-zinc-200 truncate capitalize">
+                          {audioTitle}
+                        </span>
+                        <span className="text-[8px] font-mono text-slate-400 dark:text-zinc-500 mt-0.5">
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                      </div>
+
+                      <input 
+                        type="range"
+                        min={0}
+                        max={duration || 100}
+                        value={currentTime}
+                        onChange={(e) => seek(parseFloat(e.target.value))}
+                        className="w-14 md:w-20 h-1 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-600 dark:accent-purple-400 outline-none"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })()}
+
+          <button
+            onClick={handleFullscreenToggle}
+            className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all"
+            title="Toggle fullscreen"
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => toggleDarkMode()}
             className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all"
-            title="Toggle theme"
+            title={darkMode ? "Vùng sáng" : "Vùng tối"}
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -193,7 +322,7 @@ export default function Topbar() {
             to="/login"
             className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-zinc-200 text-white dark:text-black rounded-md text-[10px] font-bold uppercase tracking-widest transition-all shadow-md dark:shadow-lg active:scale-95"
           >
-            Access Now
+            Đăng nhập
           </Link>
         )}
       </div>

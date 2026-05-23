@@ -6,9 +6,11 @@ import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { Key, Eye, EyeOff, Save, Loader2, Users, Trash2, ShieldCheck, Mail, Calendar, Clock, AlertCircle, Clipboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useConfirmStore } from '../../store/confirmStore';
 
 export default function AdminApiKeys() {
   const { isSuperAdmin } = useAuthStore();
+  const { openConfirm } = useConfirmStore();
   const [activeTab, setActiveTab] = useState<'system' | 'secondary'>('system');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,16 +88,22 @@ export default function AdminApiKeys() {
     }
   }, [activeTab]);
 
-  const handleDeleteSecondary = async (id: string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa API Key này không?')) return;
-    
-    try {
-      await deleteDoc(doc(db, 'user_ai_keys', id));
-      setSecondaryKeys(prev => prev.filter(k => k.id !== id));
-      toast.success('Đã xóa API Key');
-    } catch (error) {
-      toast.error('Lỗi khi xóa API Key');
-    }
+  const handleDeleteSecondary = (id: string) => {
+    openConfirm({
+      title: 'Xóa API Key phụ',
+      message: 'Bạn có chắc chắn muốn xóa API Key này không?',
+      confirmText: 'Xóa ngay',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'user_ai_keys', id));
+          setSecondaryKeys(prev => prev.filter(k => k.id !== id));
+          toast.success('Đã xóa API Key');
+        } catch (error) {
+          toast.error('Lỗi khi xóa API Key');
+        }
+      }
+    });
   };
 
   const handleSave = async () => {

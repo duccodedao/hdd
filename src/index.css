@@ -80,12 +80,44 @@
 
   /* Default to Light Mode */
   html {
-    @apply scroll-smooth bg-slate-50 text-slate-950 transition-colors duration-500;
+    @apply scroll-smooth bg-slate-50 text-slate-950 transition-colors duration-500 min-h-screen relative overflow-x-hidden;
     color-scheme: light;
   }
 
+  html::before {
+    content: "";
+    @apply fixed inset-0 bg-transparent -z-10 pointer-events-none;
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.05) 1px, transparent 0);
+    background-size: 32px 32px;
+  }
+
+  html.dark::before {
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+  }
+
+  html::after {
+    content: "";
+    @apply fixed inset-0 -z-20 pointer-events-none;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+    filter: blur(100px);
+  }
+
+  html.dark::after {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
+  }
+
   html.dark {
-    @apply bg-[#09090b] text-zinc-300;
+    @apply bg-[#030303] text-zinc-300;
     color-scheme: dark;
   }
 
@@ -155,6 +187,73 @@
     -webkit-text-fill-color: transparent;
   }
 }
+
+@utility bg-grid-pattern {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.05) 1px, transparent 0);
+  background-size: 32px 32px;
+  
+  .dark & {
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+  }
+}
+
+@utility bg-mesh {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+  filter: blur(100px);
+
+  .dark & {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
+  }
+}
+
+@utility stardust {
+  @apply fixed inset-0 -z-10 pointer-events-none opacity-[0.08] dark:opacity-[0.15];
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 90px 40px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 130px 80px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 160px 120px, #ddd, rgba(0,0,0,0));
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  animation: stardust-drift 120s linear infinite;
+  
+  .dark & {
+    filter: blur(1px) drop-shadow(0 0 2px white);
+  }
+}
+
+@utility space-grid {
+  @apply fixed inset-0 -z-10 pointer-events-none;
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+
+  .dark & {
+    background-image: 
+      linear-gradient(to right, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
+  }
+}
+
+@keyframes stardust-drift {
+  from { transform: translateY(0); }
+  to { transform: translateY(-200px); }
+}
+
 
 /* Custom scrollbar - Linear style */
 ::-webkit-scrollbar {

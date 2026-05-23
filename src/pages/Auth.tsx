@@ -224,22 +224,16 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-transparent flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
       <Helmet>
         <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS Dashboard</title>
         <meta name="description" content="Truy cập vào hệ điều hành quản trị bảo mật BMASS." />
       </Helmet>
-      {/* Premium Mastercard-style Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-         <div className="absolute top-[-20%] right-[-10%] w-[100vw] h-[100vw] max-w-[1200px] bg-gradient-to-br from-red-600/10 via-orange-500/5 to-transparent rounded-full blur-[140px] opacity-40 dark:opacity-30" />
-         <div className="absolute bottom-[-20%] left-[-10%] w-[80vw] h-[80vw] max-w-[1000px] bg-gradient-to-tr from-indigo-600/10 via-purple-500/5 to-transparent rounded-full blur-[120px] opacity-30 dark:opacity-20" />
-         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none z-[1] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
-      </div>
-
+      
       {/* Visual Side */}
-      <div className="hidden md:flex flex-col justify-between p-12 lg:p-20 w-1/2 relative bg-slate-50 dark:bg-zinc-950 border-r border-slate-200 dark:border-white/5 overflow-hidden">
-         <div className="absolute top-[10%] left-[-10%] w-[50vw] h-[50vw] bg-red-600/5 rounded-full blur-[120px]" />
-         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-orange-500/5 rounded-full blur-[120px]" />
+      <div className="hidden md:flex flex-col justify-between p-12 lg:p-20 w-1/2 relative bg-slate-50/50 dark:bg-black/20 border-r border-slate-200 dark:border-white/5 overflow-hidden">
+         <div className="absolute top-[10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/5 rounded-full blur-[120px]" />
+         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/5 rounded-full blur-[120px]" />
          
          <div className="relative z-10">
             <div className="flex items-center gap-6 mb-20">

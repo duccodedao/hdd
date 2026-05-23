@@ -47,16 +47,46 @@ import { DeviceGuard } from './components/guards/DeviceGuard';
 import { TabGuard } from './components/guards/TabGuard';
 import { OnboardingGuard } from './components/guards/OnboardingGuard';
 
+import CookieConsentComponent from './components/common/CookieConsent';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
+
+import HomePage from './pages/HomePage';
+
+import { useAudioStore } from './store/audioStore';
+
+function VisitTracker() {
+  const location = useLocation();
+  const hasIncrementedForThisPath = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Increment visit counter - runs on every access (navigation or reload)
+    // We use path check to avoid double-counting on rapid re-renders if any
+    if (hasIncrementedForThisPath.current !== location.pathname) {
+      const increment = async () => {
+        try {
+          await statsService.incrementVisit();
+          hasIncrementedForThisPath.current = location.pathname;
+        } catch (e) {
+          console.error("Failed to increment visit", e);
+        }
+      };
+      increment();
+    }
+  }, [location.pathname]);
+
+  return null;
+}
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
+  const initAudio = useAudioStore((state) => state.init);
 
   useEffect(() => {
-    // Increment visit counter
-    statsService.incrementVisit().catch(console.error);
+    initAudio();
+  }, [initAudio]);
 
+  useEffect(() => {
     // Offline status listening
     const handleOnline = () => setOnlineStatus(true);
     const handleOffline = () => setOnlineStatus(false);
@@ -162,11 +192,15 @@ export default function App() {
         <meta name="description" content="Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa." />
         <meta property="og:title" content="BMASS Dashboard" />
         <meta property="og:description" content="Hệ sinh thái quản trị bảo mật nâng cao." />
-        <meta property="og:image" content="/logo.png" />
+        <meta property="og:image" content="https://tytpht.hdd.io.vn/img/bmassloadings.png" />
       </Helmet>
       <BrowserRouter>
+      <VisitTracker />
+      <div className="space-grid" />
+      <div className="stardust" />
       <GoogleOneTap />
       <OfflineNotification />
+      <CookieConsentComponent />
       <AuthActionRedirector />
       <Toaster position="top-right" />
       <ConfirmModal />
@@ -174,7 +208,7 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             {/* Landing Page */}
-            <Route path="/" element={<Navigate to="/utilities" replace />} />
+            <Route path="/" element={<HomePage />} />
             
             {/* Standalone Form Page */}
             <Route path="/form/:slug" element={<FormView />} />

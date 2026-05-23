@@ -3,7 +3,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
-  Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare
+  Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
+  Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -13,6 +14,7 @@ import { db } from '../../lib/firebase';
 
 const subUtilities = [
   { id: 'all', name: 'Tất cả tiện ích', path: '/utilities', icon: Grid },
+  { id: 'avatar-frame', name: 'Khung Ảnh Đại Diện', path: '/utilities/avatar-frame', icon: ImageIcon, maintenanceKey: 'utility_avatar-frame' },
   { id: 'file-manager', name: 'Quản Lý File Cá Nhân', path: '/utilities/file-manager', icon: Laptop, maintenanceKey: 'utility_file-manager' },
   { id: 'kho-van-ban', name: 'Kho Văn Bản', path: '/utilities/kho-van-ban', icon: FolderOpen, maintenanceKey: 'utility_kho-van-ban' },
   { id: 'ai-scanner', name: 'Quét Văn Bản AI', path: '/utilities/ai-scanner', icon: Scan, maintenanceKey: 'utility_ai-scanner' },
@@ -25,7 +27,7 @@ export default function Sidebar({ className }: { className?: string }) {
   const { setSidebarOpen, maintenanceTabs } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Hệ thống']);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng']);
   const [utilitiesExpanded, setUtilitiesExpanded] = useState(false);
   const [dynamicUtils, setDynamicUtils] = useState<any[]>([]);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -91,23 +93,23 @@ export default function Sidebar({ className }: { className?: string }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 space-y-6 pt-4 pb-8 no-scrollbar">
-        {/* Hệ thống group */}
+        {/* Nền tảng group */}
         <div className="space-y-2">
           <button 
-            onClick={() => toggleGroup('Hệ thống')}
+            onClick={() => toggleGroup('Nền tảng')}
             className={cn(
               "flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-all",
               location.pathname.startsWith('/utilities') ? "text-slate-800 dark:text-zinc-200" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
             )}
           >
             <div className="flex items-center gap-2">
-              <span>Hệ thống</span>
+              <span>Nền tảng</span>
             </div>
-            <ChevronDown className={cn("w-3 h-3 transition-transform duration-300", expandedGroups.includes('Hệ thống') && "rotate-180")} />
+            <ChevronDown className={cn("w-3 h-3 transition-transform duration-300", expandedGroups.includes('Nền tảng') && "rotate-180")} />
           </button>
           
           <AnimatePresence initial={false}>
-            {expandedGroups.includes('Hệ thống') && (
+            {expandedGroups.includes('Nền tảng') && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
@@ -201,38 +203,42 @@ export default function Sidebar({ className }: { className?: string }) {
                 </div>
 
                 {/* Ứng dụng Item */}
-                <NavLink
-                  to="/apps"
-                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                    isActive 
-                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                    <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
-                  </div>
-                </NavLink>
+                {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/apps"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
+                    </div>
+                  </NavLink>
+                )}
 
                 {/* Công việc Item */}
-                <NavLink
-                  to="/tasks"
-                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                    isActive 
-                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                    <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
-                  </div>
-                </NavLink>
+                {(!systemTools['tasks']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/tasks"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
+                    </div>
+                  </NavLink>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -240,7 +246,7 @@ export default function Sidebar({ className }: { className?: string }) {
 
       </nav>
 
-      {isSuperAdmin && (
+      {isSuperAdmin ? (
         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
           <NavLink
             to="/admin"
@@ -254,6 +260,17 @@ export default function Sidebar({ className }: { className?: string }) {
           >
             <Shield className="w-4 h-4" />
             <span>Admin Center</span>
+          </NavLink>
+        </div>
+      ) : !userData && (
+        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
+          <NavLink
+            to="/login"
+            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+            className="flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[11px] font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-zinc-500 dark:hover:text-white dark:hover:bg-white/5"
+          >
+            <UserCircle className="w-4 h-4" />
+            <span>Đăng nhập</span>
           </NavLink>
         </div>
       )}

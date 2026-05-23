@@ -63,7 +63,7 @@ export default function NotFoundPage() {
                 transition={{ delay: 1, duration: 1 }}
                 className="text-5xl md:text-7xl font-display font-light text-slate-900 dark:text-white tracking-widest uppercase italic"
               >
-                Vùng tối <span className="font-bold text-indigo-600 dark:text-indigo-400">Hệ thống.</span>
+                Vùng tối <span className="font-bold text-indigo-600 dark:text-indigo-400">BMASS.</span>
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0 }}
@@ -71,7 +71,7 @@ export default function NotFoundPage() {
                 transition={{ delay: 1.2, duration: 1 }}
                 className="text-slate-400 dark:text-zinc-500 text-lg font-medium max-w-xl mx-auto leading-relaxed italic"
               >
-                Liên kết định danh bạn đang truy xuất đã bị ngắt kết nối hoặc không tồn tại trong cấu trúc dữ liệu của BMass Nucleus OS.
+                Liên kết định danh bạn đang truy xuất đã bị ngắt kết nối hoặc không tồn tại trong cấu trúc dữ liệu của BMASS Platform.
               </motion.p>
             </div>
           </div>

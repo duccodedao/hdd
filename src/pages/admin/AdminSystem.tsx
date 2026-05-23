@@ -10,19 +10,21 @@ export default function AdminSystem() {
   const collections = [
     'device_logins', 'blockedIps', 'users', 'contact_requests', 'utilities', 
     'activities', 'user_ai_keys', 'forms', 'form_responses', 
-    'document_categories', 'documents'
+    'document_categories', 'documents', 'avatar_frames', 'apps', 'app_categories', 'settings'
   ];
 
   const handleExport = async () => {
     setLoading(true);
+    const tid = toast.loading('Đang khởi tạo sao lưu toàn bộ bộ nhớ...', { id: 'backup_run' });
     try {
       const data: Record<string, any[]> = {};
+      let totalDocs = 0;
       for (const col of collections) {
         const snap = await getDocs(collection(db, col));
         data[col] = snap.docs.map(doc => {
           const docData = doc.data();
           // Sanitize Timestamps
-          const sanitized: any = { id: doc.id };
+          const sanitized: any = { _backup_id: doc.id };
           for (const key in docData) {
             if (docData[key] instanceof Timestamp) {
               sanitized[key] = { _t: 'timestamp', val: docData[key].toDate().toISOString() };
@@ -32,17 +34,29 @@ export default function AdminSystem() {
           }
           return sanitized;
         });
+        totalDocs += snap.docs.length;
       }
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      
+      const backupEnvelope = {
+        system: "BMass Admin Pro Ecosystem",
+        version: "3.5",
+        exportedAt: new Date().toISOString(),
+        totalCollections: collections.length,
+        totalDocumentsCount: totalDocs,
+        data: data
+      };
+
+      const blob = new Blob([JSON.stringify(backupEnvelope, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      const nowStr = new Date().toISOString().replace(/[:.]/g, '-');
       link.href = url;
-      link.download = `system_export_${new Date().toISOString()}.json`;
+      link.download = `bmass_full_backup_${nowStr}.json`;
       link.click();
-      toast.success('Đã xuất dữ liệu hệ thống.');
+      toast.success(`Đã sao lưu thành công (${totalDocs} bản ghi)!`, { id: 'backup_run' });
     } catch (e) {
       console.error(e);
-      toast.error('Lỗi khi xuất dữ liệu.');
+      toast.error('Lỗi khi xuất dữ liệu.', { id: 'backup_run' });
     } finally {
       setLoading(false);
     }
@@ -57,40 +71,21 @@ export default function AdminSystem() {
     reader.onload = async (event) => {
         try {
             console.log("Starting import...");
-            const data = JSON.parse(event.target?.result as string);
+            const backupEnvelope = JSON.parse(event.target?.result as string);
             
-            let batch = writeBatch(db);
-            let opCount = 0;
-            const BATCH_SIZE = 400; // Keep safely below 500
+            if (backupEnvelope.system !== "BMass Admin Pro Ecosystem" || !backupEnvelope.data) {
+              // Backward compatibility check for old format
+              if (typeof backupEnvelope === 'object' && !backupEnvelope.system) {
+                // simple data object
+                await processImport(backupEnvelope);
+              } else {
+                throw new Error("Định dạng tệp sao lưu không được hỗ trợ.");
+              }
+            } else {
+              await processImport(backupEnvelope.data);
+            }
             
-            for (const col of collections) {
-                if (data[col] && Array.isArray(data[col])) {
-                    for (const item of data[col]) {
-                        const { id, ...docData } = item;
-                        // Process Timestamp
-                        for (const key in docData) {
-                            if (docData[key] && docData[key]._t === 'timestamp') {
-                                docData[key] = Timestamp.fromDate(new Date(docData[key].val));
-                            }
-                        }
-                        const docRef = doc(db, col, id);
-                        batch.set(docRef, docData);
-                        opCount++;
-
-                        if (opCount >= BATCH_SIZE) {
-                            await batch.commit();
-                            console.log(`Committed batch of ${opCount} docs`);
-                            batch = writeBatch(db);
-                            opCount = 0;
-                        }
-                    }
-                }
-            }
-            if (opCount > 0) {
-                await batch.commit();
-                console.log(`Committed final batch of ${opCount} docs`);
-            }
-            toast.success('Đã import dữ liệu hệ thống thành công');
+            toast.success('Đã phục hồi dữ liệu hệ thống thành công');
         } catch (err) {
             console.error("Import error:", err);
             toast.error('Lỗi khi import dữ liệu: ' + (err as Error).message);
@@ -98,6 +93,43 @@ export default function AdminSystem() {
             setLoading(false);
             console.log("Import finished.");
         }
+    };
+
+    const processImport = async (data: any) => {
+      let batch = writeBatch(db);
+      let opCount = 0;
+      const BATCH_SIZE = 400;
+
+      for (const col of collections) {
+          if (data[col] && Array.isArray(data[col])) {
+              for (const item of data[col]) {
+                  const docId = item._backup_id || item.id;
+                  if (!docId) continue;
+
+                  const { _backup_id, id, ...docData } = item;
+                  
+                  // Process Timestamp
+                  for (const key in docData) {
+                      if (docData[key] && docData[key]._t === 'timestamp') {
+                          docData[key] = Timestamp.fromDate(new Date(docData[key].val));
+                      }
+                  }
+                  
+                  const docRef = doc(db, col, docId);
+                  batch.set(docRef, docData, { merge: true });
+                  opCount++;
+
+                  if (opCount >= BATCH_SIZE) {
+                      await batch.commit();
+                      batch = writeBatch(db);
+                      opCount = 0;
+                  }
+              }
+          }
+      }
+      if (opCount > 0) {
+          await batch.commit();
+      }
     };
     reader.onerror = (e) => {
         console.error("File reader error:", e);

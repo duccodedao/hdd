@@ -17,14 +17,8 @@ export default function MainLayout() {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen overflow-hidden relative font-sans bg-slate-50 dark:bg-zinc-950">
+    <div className="flex h-screen overflow-hidden relative font-sans bg-transparent">
       
-      {/* Dynamic Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none select-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 dark:bg-indigo-500/10 rounded-full blur-[120px] animate-blob" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-500/10 dark:bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000" />
-      </div>
-
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && !aiActive && (
@@ -90,7 +84,7 @@ export default function MainLayout() {
           )}>
             <AnimatePresence mode="wait">
               <motion.div
-                key={location.pathname}
+                key={location.pathname.startsWith('/admin') ? '/admin-portal' : location.pathname}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
