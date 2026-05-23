@@ -173,6 +173,7 @@ export default function HomePage() {
           </div>
           <div className="flex gap-8 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>
+            <button onClick={() => navigate('/policy')} className="hover:text-indigo-600 transition-colors">Policy</button>
             <button onClick={() => navigate('/terms')} className="hover:text-indigo-600 transition-colors">Điều khoản</button>
             <button onClick={() => navigate('/contact')} className="hover:text-indigo-600 transition-colors">Liên hệ</button>
           </div>
