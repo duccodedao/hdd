@@ -234,6 +234,7 @@ export default function App() {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/policy" element={<PrivacyPage />} />
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
