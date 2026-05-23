@@ -31,6 +31,7 @@ import TasksPage from './pages/TasksPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import PolicyPage from './pages/PolicyPage';
 import ReleaseNotesPage from './pages/ReleaseNotesPage';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
@@ -234,7 +235,7 @@ export default function App() {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/policy" element={<PrivacyPage />} />
+              <Route path="/policy" element={<PolicyPage />} />
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
@@ -252,3 +253,5 @@ export default function App() {
     </HelmetProvider>
   );
 }
+
+
