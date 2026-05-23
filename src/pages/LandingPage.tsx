@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Zap, Cpu, ArrowRight, ShieldCheck, Fingerprint, Lock, Globe, Command, Sparkles, Box, CreditCard, ChevronRight, Activity, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import AppLogo from '../components/ui/AppLogo';
 
@@ -326,17 +326,45 @@ export default function LandingPage() {
       <footer className="max-w-[1920px] mx-auto px-4 lg:px-16 py-20 lg:py-32 border-t border-white/5 relative z-10">
          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-24">
             <div className="md:col-span-6 space-y-8 lg:space-y-12">
-               <div className="flex items-center gap-3 lg:gap-4">
+               <div className="flex items-center gap-3 lg:gap-4 cursor-pointer" onClick={() => navigate('/')}>
                <AppLogo className="w-8 h-8 lg:w-10 lg:h-10" />
                <span className="font-display font-black text-white text-2xl lg:text-3xl tracking-tighter uppercase italic ml-2">BMASS.</span>
                </div>
-               <p className="text-zinc-600 text-lg lg:text-xl font-medium leading-relaxed italic max-w-sm">
+               <p className="text-zinc-600 text-lg lg:text-xl font-medium leading-relaxed italic max-w-sm mt-6">
                   Lý tưởng được định hình từ khối óc. Bảo mật được đảm bảo bởi BMASS.
                </p>
             </div>
 
-            <div className="md:col-span-6 space-y-6 lg:space-y-12">
-               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+            <div className="md:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-12">
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/login')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Quản trị</button></li>
+                     <li><button onClick={() => navigate('/utilities')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Tiện ích</button></li>
+                     <li><button onClick={() => navigate('/releases')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Cập nhật</button></li>
+                  </ul>
+               </div>
+
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">PHÁP LÝ</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/privacy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Bảo mật</button></li>
+                     <li><button onClick={() => navigate('/terms')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Điều khoản</button></li>
+                     <li><button onClick={() => navigate('/policy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Chính sách</button></li>
+                  </ul>
+               </div>
+
+               <div className="hidden md:block space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">KẾT NỐI</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/contact')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Hỗ trợ</button></li>
+                     <li><button onClick={() => window.open('https://github.com/sonlyhongduc', '_blank')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Github</button></li>
+                  </ul>
+               </div>
+            </div>
+
+            <div className="md:col-span-4 space-y-6 lg:space-y-12">
+               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">XÁC THỰC</h4>
                <button 
                   onClick={() => navigate('/login')}
                   className="w-full relative group overflow-hidden bg-white/5 border border-white/10 hover:border-[#eb001b]/50 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 flex items-center justify-center gap-4 transition-all duration-300 active:scale-95"

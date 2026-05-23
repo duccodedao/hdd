@@ -226,7 +226,7 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-transparent flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
       <Helmet>
-        <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS Dashboard</title>
+        <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS</title>
         <meta name="description" content="Truy cập vào hệ điều hành quản trị bảo mật BMASS." />
       </Helmet>
       

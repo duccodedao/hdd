@@ -31,6 +31,7 @@ import TasksPage from './pages/TasksPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import PolicyPage from './pages/PolicyPage';
 import ReleaseNotesPage from './pages/ReleaseNotesPage';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
@@ -188,10 +189,10 @@ export default function App() {
   return (
     <HelmetProvider>
       <Helmet>
-        <title>BMASS Dashboard | Hệ sinh thái Bảo mật</title>
+        <title>BMASS</title>
         <meta name="description" content="Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa." />
-        <meta property="og:title" content="BMASS Dashboard" />
-        <meta property="og:description" content="Hệ sinh thái quản trị bảo mật nâng cao." />
+        <meta property="og:title" content="BMASS" />
+        <meta property="og:description" content="Digital Platform" />
         <meta property="og:image" content="https://tytpht.hdd.io.vn/img/bmassloadings.png" />
       </Helmet>
       <BrowserRouter>
@@ -234,6 +235,7 @@ export default function App() {
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/policy" element={<PolicyPage />} />
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}

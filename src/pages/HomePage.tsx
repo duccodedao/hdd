@@ -1,5 +1,5 @@
 import { ArrowRight, ShieldCheck, Zap, Globe, Code } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -169,10 +169,11 @@ export default function HomePage() {
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500 cursor-pointer">
             <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Footer Logo" className="h-8 w-auto" />
-            <span className="font-black text-sm tracking-tighter">BMASS</span>
+            <span className="font-black text-sm tracking-tighter uppercase">BMASS</span>
           </div>
-          <div className="flex gap-8 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>
+            <button onClick={() => navigate('/policy')} className="hover:text-indigo-600 transition-colors">Policy</button>
             <button onClick={() => navigate('/terms')} className="hover:text-indigo-600 transition-colors">Điều khoản</button>
             <button onClick={() => navigate('/contact')} className="hover:text-indigo-600 transition-colors">Liên hệ</button>
           </div>

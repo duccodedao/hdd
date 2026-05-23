@@ -107,7 +107,7 @@ export default function AppsPage() {
   return (
     <div className="max-w-[1800px] mx-auto py-8 lg:py-12 space-y-8 animate-fade-in no-scrollbar px-4 bg-transparent min-h-screen">
       <Helmet>
-        <title>Thực đơn Ứng dụng | BMASS Dashboard</title>
+        <title>Thực đơn Ứng dụng | BMASS</title>
         <meta name="description" content="Trải nghiệm hệ sinh thái phần mềm và ứng dụng bảo mật nâng cao." />
       </Helmet>
 
