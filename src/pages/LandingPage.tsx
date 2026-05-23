@@ -335,8 +335,36 @@ export default function LandingPage() {
                </p>
             </div>
 
-            <div className="md:col-span-6 space-y-6 lg:space-y-12">
-               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+            <div className="md:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-12">
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/login')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Quản trị</button></li>
+                     <li><button onClick={() => navigate('/utilities')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Tiện ích</button></li>
+                     <li><button onClick={() => navigate('/releases')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Cập nhật</button></li>
+                  </ul>
+               </div>
+
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">PHÁP LÝ</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/privacy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Bảo mật</button></li>
+                     <li><button onClick={() => navigate('/terms')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Điều khoản</button></li>
+                     <li><button onClick={() => navigate('/policy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Chính sách</button></li>
+                  </ul>
+               </div>
+
+               <div className="hidden md:block space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">KẾT NỐI</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/contact')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Hỗ trợ</button></li>
+                     <li><button onClick={() => window.open('https://github.com/sonlyhongduc', '_blank')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Github</button></li>
+                  </ul>
+               </div>
+            </div>
+
+            <div className="md:col-span-4 space-y-6 lg:space-y-12">
+               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">XÁC THỰC</h4>
                <button 
                   onClick={() => navigate('/login')}
                   className="w-full relative group overflow-hidden bg-white/5 border border-white/10 hover:border-[#eb001b]/50 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 flex items-center justify-center gap-4 transition-all duration-300 active:scale-95"
