@@ -55,18 +55,42 @@ import HomePage from './pages/HomePage';
 
 import { useAudioStore } from './store/audioStore';
 
+let lastIncrementedPath: string | null = null;
+let lastIncrementTime: number = 0;
+
+function getStampPositionStyles(position: string): React.CSSProperties {
+  switch (position) {
+    case 'top-left':
+      return { top: '24px', left: '24px' };
+    case 'top-right':
+      return { top: '24px', right: '24px' };
+    case 'bottom-left':
+      return { bottom: '24px', left: '24px' };
+    case 'bottom-right':
+      return { bottom: '24px', right: '24px' };
+    case 'center':
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+      };
+    default:
+      return { bottom: '24px', right: '24px' };
+  }
+}
+
 function VisitTracker() {
   const location = useLocation();
-  const hasIncrementedForThisPath = useRef<string | null>(null);
 
   useEffect(() => {
-    // Increment visit counter - runs on every access (navigation or reload)
-    // We use path check to avoid double-counting on rapid re-renders if any
-    if (hasIncrementedForThisPath.current !== location.pathname) {
+    const now = Date.now();
+    // Only increment if we changed paths, or if it is a fresh page-refresh (represented by passing of time > 2000ms)
+    if (lastIncrementedPath !== location.pathname || (now - lastIncrementTime) > 2000) {
+      lastIncrementedPath = location.pathname;
+      lastIncrementTime = now;
       const increment = async () => {
         try {
-          await statsService.incrementVisit();
-          hasIncrementedForThisPath.current = location.pathname;
+          await statsService.incrementVisit(location.pathname);
         } catch (e) {
           console.error("Failed to increment visit", e);
         }
@@ -82,6 +106,20 @@ export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
+  const [seo, setSeo] = useState({
+    title: 'BMASS',
+    description: 'Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.',
+    imageUrl: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    faviconUrl: ''
+  });
+
+  const [stampConfig, setStampConfig] = useState<{
+    active: boolean;
+    imageUrl: string;
+    opacity: number;
+    position: string;
+    width: number;
+  } | null>(null);
 
   useEffect(() => {
     initAudio();
@@ -118,12 +156,32 @@ export default function App() {
         if (data.blockedDevices) {
           setBlockedDevices(data.blockedDevices);
         }
+        if (data.stampConfig) {
+          setStampConfig(data.stampConfig);
+        } else {
+          setStampConfig(null);
+        }
       }
     }, (err) => {
       console.error("Could not fetch system settings", err);
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
+    });
+
+    // Real-time SEO settings listener
+    const unsubscribeSeo = onSnapshot(doc(db, 'settings', 'seo'), (seoDoc) => {
+      if (seoDoc.exists()) {
+        const data = seoDoc.data();
+        setSeo({
+          title: data.title || 'BMASS',
+          description: data.description || 'Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.',
+          imageUrl: data.imageUrl || 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+          faviconUrl: data.faviconUrl || ''
+        });
+      }
+    }, (err) => {
+      console.error("Could not fetch SEO settings", err);
     });
 
     // Auth listener
@@ -171,6 +229,7 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeUser) unsubscribeUser();
       unsubscribeSystem();
+      unsubscribeSeo();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -189,13 +248,35 @@ export default function App() {
   return (
     <HelmetProvider>
       <Helmet>
-        <title>BMASS</title>
-        <meta name="description" content="Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa." />
-        <meta property="og:title" content="BMASS" />
-        <meta property="og:description" content="Digital Platform" />
-        <meta property="og:image" content="https://tytpht.hdd.io.vn/img/bmassloadings.png" />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:image" content={seo.imageUrl} />
+        {seo.faviconUrl && <link rel="icon" type="image/x-icon" href={seo.faviconUrl} />}
+        {seo.faviconUrl && <link rel="apple-touch-icon" href={seo.faviconUrl} />}
+        {seo.faviconUrl && <link rel="shortcut icon" href={seo.faviconUrl} />}
       </Helmet>
       <BrowserRouter>
+      {/* GLOBAL COPYRIGHT RED SEAL STAMP OVERLAY */}
+      {stampConfig && stampConfig.active && stampConfig.imageUrl && (
+        <div 
+          className="fixed pointer-events-none select-none z-[9999]"
+          style={{
+            opacity: (stampConfig.opacity || 50) / 100,
+            width: `${stampConfig.width || 120}px`,
+            height: 'auto',
+            ...getStampPositionStyles(stampConfig.position || 'bottom-right')
+          }}
+        >
+          <img 
+            src={stampConfig.imageUrl} 
+            alt="Stamp Watermark Seal" 
+            className="w-full h-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+      )}
       <VisitTracker />
       <div className="space-grid" />
       <div className="stardust" />
@@ -253,5 +334,3 @@ export default function App() {
     </HelmetProvider>
   );
 }
-
-

@@ -18,12 +18,6 @@ export default function AdminApiKeys() {
   
   const [apiKeys, setApiKeys] = useState({
     geminiApiKey: '',
-    googleClientId: '',
-    githubUsername: '',
-    githubRepo: '',
-    githubToken: '',
-    githubBranch: 'main',
-    githubPath: 'assets/uploads',
   });
 
   const [secondaryKeys, setSecondaryKeys] = useState<any[]>([]);
@@ -32,29 +26,11 @@ export default function AdminApiKeys() {
   useEffect(() => {
     const fetchKeys = async () => {
       try {
-        const [apiSnap, sysSnap, githubSnap] = await Promise.all([
-          getDoc(doc(db, 'settings', 'apiKeys')),
-          getDoc(doc(db, 'settings', 'system')),
-          getDoc(doc(db, 'settings', 'github_integration')),
-        ]);
+        const apiSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
         
         let fetchedData: any = {};
         if (apiSnap.exists()) {
-          fetchedData = { ...fetchedData, ...apiSnap.data() };
-        }
-        if (sysSnap.exists()) {
-          fetchedData = { ...fetchedData, googleClientId: sysSnap.data().googleClientId || '' };
-        }
-        if (githubSnap.exists()) {
-          const data = githubSnap.data();
-          fetchedData = { 
-            ...fetchedData, 
-            githubUsername: data.username || data.owner || '',
-            githubRepo: data.repo || '',
-            githubToken: data.token || '',
-            githubBranch: data.branch || 'main',
-            githubPath: data.path || 'assets/uploads'
-          };
+          fetchedData = apiSnap.data();
         }
         
         setApiKeys((prev) => ({ ...prev, ...fetchedData }));
@@ -114,19 +90,8 @@ export default function AdminApiKeys() {
     
     setSaving(true);
     try {
-      await Promise.all([
-        setDoc(doc(db, 'settings', 'apiKeys'), { geminiApiKey: apiKeys.geminiApiKey }, { merge: true }),
-        setDoc(doc(db, 'settings', 'system'), { googleClientId: apiKeys.googleClientId }, { merge: true }),
-        setDoc(doc(db, 'settings', 'github_integration'), { 
-          username: apiKeys.githubUsername,
-          owner: apiKeys.githubUsername, // For compatibility
-          repo: apiKeys.githubRepo,
-          token: apiKeys.githubToken,
-          branch: apiKeys.githubBranch,
-          path: apiKeys.githubPath
-        }, { merge: true }),
-      ]);
-      toast.success('Đã lưu cấu hình API Keys / Cấu hình');
+      await setDoc(doc(db, 'settings', 'apiKeys'), { geminiApiKey: apiKeys.geminiApiKey }, { merge: true });
+      toast.success('Đã lưu cấu hình API Keys thành công');
     } catch (error) {
       console.error('Failed to save API keys:', error);
       toast.error('Có lỗi xảy ra khi lưu API Keys');
@@ -227,77 +192,7 @@ export default function AdminApiKeys() {
                  </div>
               </div>
 
-              {/* Google Client ID */}
-              <div className="bg-slate-50 dark:bg-white/5 p-5 rounded-xl border border-slate-200 dark:border-white/10 relative">
-                 <label className="block text-xs font-bold mb-2 ml-1 text-slate-500 uppercase tracking-widest">
-                   Google Client ID
-                 </label>
-                 <div className="relative">
-                   <input 
-                     type={showKeys['google'] ? 'text' : 'password'}
-                     value={apiKeys.googleClientId}
-                     onChange={(e) => setApiKeys(prev => ({ ...prev, googleClientId: e.target.value }))}
-                     className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white font-mono"
-                     placeholder="xxxxxxxx-xxxxxx.apps.googleusercontent.com"
-                     disabled={!isSuperAdmin}
-                   />
-                   <button 
-                     onClick={() => toggleShow('google')}
-                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-                   >
-                     {showKeys['google'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                   </button>
-                 </div>
-              </div>
 
-              {/* GitHub Config */}
-              <div className="bg-slate-50 dark:bg-white/5 p-5 rounded-xl border border-slate-200 dark:border-white/10 relative">
-                 <label className="block text-xs font-bold mb-4 ml-1 text-slate-500 uppercase tracking-widest">
-                   Cấu hình GitHub
-                 </label>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                   <div>
-                     <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Username</label>
-                     <input 
-                       type="text" 
-                       value={apiKeys.githubUsername}
-                       onChange={(e) => setApiKeys(prev => ({ ...prev, githubUsername: e.target.value }))}
-                       className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white"
-                       disabled={!isSuperAdmin}
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Repository</label>
-                     <input 
-                       type="text" 
-                       value={apiKeys.githubRepo}
-                       onChange={(e) => setApiKeys(prev => ({ ...prev, githubRepo: e.target.value }))}
-                       className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white"
-                       disabled={!isSuperAdmin}
-                     />
-                   </div>
-                 </div>
-
-                 <div>
-                   <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-400 uppercase tracking-widest">Token</label>
-                   <div className="relative">
-                     <input 
-                       type={showKeys['githubToken'] ? 'text' : 'password'}
-                       value={apiKeys.githubToken}
-                       onChange={(e) => setApiKeys(prev => ({ ...prev, githubToken: e.target.value }))}
-                       className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 dark:text-white font-mono"
-                       disabled={!isSuperAdmin}
-                     />
-                     <button 
-                       onClick={() => toggleShow('githubToken')}
-                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                     >
-                       {showKeys['githubToken'] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                     </button>
-                   </div>
-                 </div>
-              </div>
 
               <div className="flex justify-start mt-8">
                  <button 

@@ -15,6 +15,12 @@ service cloud.firestore {
         allow read, write: if true;
       }
     }
+    match /utility_stats/{id} {
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }

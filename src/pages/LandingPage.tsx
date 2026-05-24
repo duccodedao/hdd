@@ -28,8 +28,8 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#000] text-zinc-400 font-sans selection:bg-[#ff5f00] selection:text-white overflow-x-hidden relative">
-      {/* Premium Mastercard-style Background */}
+    <div className="min-h-screen bg-transparent text-zinc-400 font-sans selection:bg-[#ff5f00] selection:text-white overflow-x-hidden relative">
+      {/* Premium Mastercard-style Background - Layered on top of global grid */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
          {/* Overlapping Circles (Mastercard Brand Identity vibe) */}
          <div className="absolute top-[-20%] right-[-10%] w-[80vw] h-[80vw] max-w-[1200px] bg-gradient-to-br from-[#eb001b]/10 to-transparent rounded-full blur-[120px] opacity-60" />
@@ -284,14 +284,14 @@ export default function LandingPage() {
       {/* Pricing section disabled */}
 
       {/* Security Call to Action */}
-      <section className="py-32 lg:py-64 px-4 lg:px-16 relative overflow-hidden bg-white rounded-[3rem] lg:rounded-[10rem] mx-4 lg:mx-8 mb-20 lg:mb-32 z-20">
+      <section className="py-32 lg:py-64 px-4 lg:px-16 relative overflow-hidden bg-white text-slate-950 rounded-[3rem] lg:rounded-[10rem] mx-4 lg:mx-8 mb-20 lg:mb-32 z-20">
          <div className="absolute top-0 right-0 w-[60%] h-[120%] bg-gradient-to-l from-zinc-100 to-transparent pointer-events-none" />
          <div className="max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-32 items-center relative z-10">
             <div className="space-y-8 lg:space-y-12">
                <div className="space-y-4 lg:space-y-6">
-                  <h2 className="text-[10px] lg:text-[12px] font-black text-zinc-400 uppercase tracking-[0.4em] lg:tracking-[0.6em]">Start Your Journey</h2>
+                  <h2 className="text-[10px] lg:text-[12px] font-black text-slate-500 uppercase tracking-[0.4em] lg:tracking-[0.6em]">Start Your Journey</h2>
                   <h3 className="text-5xl md:text-9xl font-serif italic text-black leading-[0.9] lg:leading-[0.8] tracking-tighter lowercase">Sẵn sàng để <br /> trở thành vĩ đại?</h3>
-                  <p className="text-zinc-600 text-lg lg:text-2xl font-medium max-w-xl italic leading-relaxed tracking-tight">Gia nhập cộng đồng người dùng chuyên nghiệp đang làm chủ mọi công cụ ngay hôm nay.</p>
+                  <p className="text-slate-600 text-lg lg:text-2xl font-medium max-w-xl italic leading-relaxed tracking-tight">Gia nhập cộng đồng người dùng chuyên nghiệp đang làm chủ mọi công cụ ngay hôm nay.</p>
                </div>
                
                <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-8 pt-4 lg:pt-8">

@@ -4,15 +4,52 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp } from "firebase/firestore";
+import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc } from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
+import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json";
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = (firebaseConfig as any).firestoreDatabaseId 
   ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(firebaseApp);
+
+// Cache for Gemini Client to avoid re-initializing if key hasn't changed
+let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
+
+async function getAiClient() {
+  // 1. Try to get key from Firestore (Admin UI setup)
+  try {
+    const apiKeysSnap = await getDoc(doc(db, "settings", "apiKeys"));
+    const firestoreKey = apiKeysSnap.exists() ? apiKeysSnap.data().geminiApiKey : null;
+    
+    const keyToUse = firestoreKey || process.env.GEMINI_API_KEY;
+
+    if (!keyToUse) {
+      throw new Error("Gemini API Key is not configured in Admin panel or Environment variables.");
+    }
+
+    if (cachedAiClient && cachedAiClient.key === keyToUse) {
+      return cachedAiClient.client;
+    }
+
+    const client = new GoogleGenAI({
+      apiKey: keyToUse,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    cachedAiClient = { key: keyToUse, client };
+    return client;
+  } catch (error) {
+    console.error("Error initializing Gemini client:", error);
+    throw error;
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -22,6 +59,32 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(cookieParser());
+
+  // Gemini Proxy Endpoint
+  app.post("/api/gemini/generate", async (req, res) => {
+    try {
+      const { model, contents, config } = req.body;
+      
+      if (!contents) {
+        return res.status(400).json({ error: "Missing contents" });
+      }
+
+      const ai = await getAiClient();
+      const response = await ai.models.generateContent({
+        model: model || "gemini-3.5-flash",
+        contents,
+        config: config || {}
+      });
+
+      res.json({ text: response.text });
+    } catch (error: any) {
+      console.error("Gemini API Error:", error);
+      res.status(500).json({ 
+        error: "AI processing failed", 
+        message: error.message || "Unknown error" 
+      });
+    }
+  });
 
   // Endpoint to export all data
   app.get("/dulieu", async (req, res) => {

@@ -56,7 +56,10 @@ export default function AdminDashboard() {
   const [notificationConfig, setNotificationConfig] = useState({
     active: false,
     message: '',
-    isEmergency: false
+    isEmergency: false,
+    popupActive: false,
+    popupTitle: '',
+    popupMessage: ''
   });
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
@@ -95,8 +98,26 @@ export default function AdminDashboard() {
     path: 'assets/audio'
   });
 
+  const [stampConfig, setStampConfig] = useState({
+    active: false,
+    imageUrl: '',
+    opacity: 50,
+    position: 'bottom-right',
+    width: 120,
+  });
+
   const [audioUploading, setAudioUploading] = useState(false);
+  const [isUploadingStamp, setIsUploadingStamp] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+
+  const [seoConfig, setSeoConfig] = useState({
+    title: '',
+    description: '',
+    imageUrl: '',
+    faviconUrl: ''
+  });
+  const [isUploadingSeoImg, setIsUploadingSeoImg] = useState(false);
+  const [isUploadingSeoIcon, setIsUploadingSeoIcon] = useState(false);
 
   const [expandedSetting, setExpandedSetting] = useState<string | null>('global');
 
@@ -144,6 +165,7 @@ export default function AdminDashboard() {
           if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
           if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
           if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
+          if (data.stampConfig) setStampConfig(prev => ({ ...prev, ...data.stampConfig }));
         }
 
         const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
@@ -173,6 +195,17 @@ export default function AdminDashboard() {
             repo: data.repo || '',
             branch: data.branch || 'main',
             path: data.path || 'assets/audio'
+          });
+        }
+
+        const seoSnap = await getDoc(doc(db, 'settings', 'seo'));
+        if (seoSnap.exists()) {
+          const data = seoSnap.data();
+          setSeoConfig({
+            title: data.title || '',
+            description: data.description || '',
+            imageUrl: data.imageUrl || '',
+            faviconUrl: data.faviconUrl || ''
           });
         }
       } catch (err) {
@@ -373,6 +406,71 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveStampConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        stampConfig
+      }, { merge: true });
+      toast.success('Đã cập nhật cấu hình con dấu bản quyền thành công!');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình con dấu');
+    }
+  };
+
+  const handleUploadStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Vui lòng hoàn thành Cấu hình GitHub trung tâm / Kho hình ảnh trước khi tải ảnh lên.');
+      return;
+    }
+
+    setIsUploadingStamp(true);
+    const originalId = toast.loading('Đang tải ảnh con dấu lên GitHub...');
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `system/stamp_${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload System Stamp: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, stampImage: Math.round(progress) }))
+      );
+
+      setStampConfig(prev => ({
+        ...prev,
+        imageUrl: githubData.url
+      }));
+
+      toast.success('Đã tải con dấu lên thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải con dấu: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingStamp(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.stampImage;
+        return next;
+      });
+    }
+  };
+
   const handleSaveGithubIntegration = async () => {
     try {
       const mergedUsername = githubGlobalConfig.username || githubIntegrationConfig.username || '';
@@ -403,6 +501,127 @@ export default function AdminDashboard() {
       toast.success('Đã lưu cấu hình Nhạc nền hệ thống thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình nhạc nền');
+    }
+  };
+
+  const handleSaveSeoConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'seo'), seoConfig, { merge: true });
+      toast.success('Đã lưu cấu hình SEO thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình SEO');
+    }
+  };
+
+  const handleUploadSeoImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingSeoImg(true);
+    setUploadProgress(prev => ({ ...prev, seoImage: 0 }));
+    const originalId = toast.loading(`Đang tải ảnh SEO "${file.name}" lên GitHub...`);
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `seo/${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload SEO Cover Image: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, seoImage: Math.round(progress) }))
+      );
+
+      setSeoConfig(prev => ({
+        ...prev,
+        imageUrl: githubData.url
+      }));
+
+      toast.success('Đã tải lên ảnh SEO thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải ảnh SEO: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingSeoImg(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.seoImage;
+        return next;
+      });
+    }
+  };
+
+  const handleUploadSeoIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingSeoIcon(true);
+    setUploadProgress(prev => ({ ...prev, seoIcon: 0 }));
+    const originalId = toast.loading(`Đang tải Icon/Favicon "${file.name}" lên GitHub...`);
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `seo/${Date.now()}_icon_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload SEO Favicon: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, seoIcon: Math.round(progress) }))
+      );
+
+      setSeoConfig(prev => ({
+        ...prev,
+        faviconUrl: githubData.url
+      }));
+
+      toast.success('Đã tải lên Icon/Favicon SEO thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải Icon/Favicon SEO: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingSeoIcon(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.seoIcon;
+        return next;
+      });
     }
   };
 
@@ -989,7 +1208,7 @@ export default function AdminDashboard() {
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
             { id: 'about', label: 'About Setup', icon: Info },
-            { id: 'admin_system', label: 'Hệ thống (Data)', icon: Server }
+            { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -1002,17 +1221,17 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
                     <Activity size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hôm nay</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Hôm nay</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.today.toLocaleString()}</div>
            </div>
@@ -1021,7 +1240,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                     <Globe size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tháng này</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tháng này</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.month.toLocaleString()}</div>
            </div>
@@ -1030,7 +1249,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
                     <LineChart size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Năm nay</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Năm nay</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.year.toLocaleString()}</div>
            </div>
@@ -1039,7 +1258,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                     <Activity size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tổng cộng</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tổng cộng</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.total.toLocaleString()}</div>
            </div>
@@ -1760,6 +1979,52 @@ export default function AdminDashboard() {
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.isEmergency ? 'translate-x-6' : 'translate-x-1'}`}/>
                     </button>
                   </div>
+
+                  <div className="border-t border-slate-200 dark:border-white/10 pt-6 mt-6 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest ml-1">
+                      Thông báo mở đầu trang (Popup Welcome)
+                    </h4>
+                    <p className="text-[11px] text-slate-400 ml-1 leading-relaxed">
+                      Hiển thị hộp thoại (Modal popup) thông báo mỗi khi mở hoặc tải lại website. Người dùng nhấn Đóng để không hiển thị lại cho đến lần tải trang tiếp theo.
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">Bật/Tắt Thông báo mở đầu trang</span>
+                      <button 
+                          type="button"
+                          onClick={() => setNotificationConfig({...notificationConfig, popupActive: !notificationConfig.popupActive})}
+                          disabled={!isSuperAdmin}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${notificationConfig.popupActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                      >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.popupActive ? 'translate-x-6' : 'translate-x-1'}`}/>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề thông báo popup</label>
+                      <input 
+                        type="text"
+                        value={notificationConfig.popupTitle || ''}
+                        onChange={(e) => setNotificationConfig({...notificationConfig, popupTitle: e.target.value})}
+                        disabled={!isSuperAdmin}
+                        placeholder="Chào mừng bạn đến với BMASS Ecosystem"
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-500 uppercase tracking-widest">Nội dung thông báo popup (Hỗ trợ xuống dòng)</label>
+                      <textarea 
+                        rows={4}
+                        value={notificationConfig.popupMessage || ''}
+                        onChange={(e) => setNotificationConfig({...notificationConfig, popupMessage: e.target.value})}
+                        disabled={!isSuperAdmin}
+                        placeholder="Hệ thống đã nâng cấp toàn diện phân hệ bảo mật và tối ưu hóa hiệu năng truy vấn..."
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-4 flex justify-end">
                     <button 
                       onClick={handleSaveNotification}
@@ -2159,6 +2424,304 @@ export default function AdminDashboard() {
                               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
                             >
                               <Save size={14} /> Lưu thiết lập Nhạc nền
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. Cấu hình SEO Website */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'seo' ? null : 'seo')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-550 flex items-center justify-center">
+                            <Globe className="w-4 h-4 text-indigo-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">6. Cấu hình SEO Website (Tiêu đề, Mô tả, Ảnh bài viết)</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {seoConfig.title ? `Tiêu đề SEO: ${seoConfig.title}` : 'Chưa cấu hình SEO'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {expandedSetting === 'seo' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                        </span>
+                      </button>
+
+                      {expandedSetting === 'seo' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Cấu hình SEO:</strong> Cho phép hiệu chỉnh Meta Title, Description và Ảnh bìa SEO (OpenGraph tag). Ảnh bìa được tải lên và lưu trữ trực tiếp trên GitHub qua phân hệ lưu trữ ảnh.</span>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề Website (Title)</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={seoConfig.title}
+                                onChange={(e) => setSeoConfig({...seoConfig, title: e.target.value})}
+                                placeholder="Nhập tiêu đề website SEO"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Mô tả Website (Description)</label>
+                              <textarea 
+                                rows={3}
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none"
+                                value={seoConfig.description}
+                                onChange={(e) => setSeoConfig({...seoConfig, description: e.target.value})}
+                                placeholder="Nhập mô tả website chi tiết cho công cụ tìm kiếm..."
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải Logo Icon / Web Favicon (sử dụng Github)</label>
+                              
+                              <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                                <input 
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleUploadSeoIcon}
+                                  disabled={isUploadingSeoIcon || !isSuperAdmin}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <div className="flex flex-col items-center justify-center p-2">
+                                  <Upload size={32} className="text-zinc-400 mb-2" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                    {isUploadingSeoIcon ? `Đang tải Icon/Favicon... ${uploadProgress.seoIcon || 0}%` : 'Nhấp hoặc kéo thả để tải Icon/Favicon mới'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Sử dụng làm biểu tượng Web trên thanh trình duyệt (Favicon)</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {seoConfig.faviconUrl && (
+                              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn Icon/Favicon hiện tại:</span>
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                  <input 
+                                    type="text"
+                                    readOnly
+                                    className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                    value={seoConfig.faviconUrl}
+                                  />
+                                  {seoConfig.faviconUrl && (
+                                    <img src={seoConfig.faviconUrl} alt="Favicon Preview" className="h-12 w-12 rounded-lg object-contain bg-white border border-slate-200 dark:border-white/10 shadow-sm p-1" referrerPolicy="no-referrer" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải ảnh bìa SEO (sử dụng Github)</label>
+                              
+                              <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                                <input 
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleUploadSeoImage}
+                                  disabled={isUploadingSeoImg || !isSuperAdmin}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <div className="flex flex-col items-center justify-center p-2">
+                                  <Upload size={32} className="text-zinc-400 mb-2" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                    {isUploadingSeoImg ? `Đang tải ảnh SEO... ${uploadProgress.seoImage || 0}%` : 'Nhấp hoặc kéo thả để tải ảnh bìa SEO mới'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Hỗ trợ các tệp ảnh tiêu chuẩn qua GitHub</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {seoConfig.imageUrl && (
+                              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn ảnh bìa SEO hiện tại:</span>
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                  <input 
+                                    type="text"
+                                    readOnly
+                                    className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                    value={seoConfig.imageUrl}
+                                  />
+                                  {seoConfig.imageUrl && (
+                                    <img src={seoConfig.imageUrl} alt="SEO Preview" className="h-16 rounded-lg object-cover border border-slate-200 dark:border-white/10 shadow-sm" referrerPolicy="no-referrer" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="pt-2 flex justify-end gap-3">
+                              <button 
+                                type="button"
+                                onClick={handleSaveSeoConfig}
+                                disabled={!isSuperAdmin}
+                                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                              >
+                                <Save size={14} /> Lưu thiết lập SEO
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 7. Cấu hình Con Dấu Bản Quyền (Dấu Mọc Đỏ) */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'stamp' ? null : 'stamp')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
+                            <Shield className="w-4 h-4 text-red-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">7. Cấu hình Con Dấu Toàn Trang (Dấu mọc đỏ)</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {stampConfig.imageUrl ? 'Đã tải lên ảnh con dấu bản quyền' : 'Chưa cấu hình con dấu'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          {expandedSetting === 'stamp' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
+                        </span>
+                      </button>
+
+                      {expandedSetting === 'stamp' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Con dấu mọc đỏ:</strong> Cho phép hiển thị một con dấu (mọc đỏ) đè mờ ở một góc trên toàn bộ các trang của hệ thống, điều khiển độ mờ và kích thước linh hoạt. </span>
+                          </div>
+
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">Kích hoạt hiển thị con con dấu toàn trang</span>
+                            <button 
+                              type="button"
+                              onClick={() => setStampConfig({...stampConfig, active: !stampConfig.active})}
+                              disabled={!isSuperAdmin}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${stampConfig.active ? 'bg-red-650' : 'bg-slate-300 dark:bg-slate-700'}`}
+                            >
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${stampConfig.active ? 'translate-x-6' : 'translate-x-1'}`}/>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Góc hiển thị (Vị trí)</label>
+                              <select
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={stampConfig.position}
+                                onChange={(e) => setStampConfig({...stampConfig, position: e.target.value})}
+                                disabled={!isSuperAdmin}
+                              >
+                                <option value="top-left">Góc trên - bên trái (Top-Left)</option>
+                                <option value="top-right">Góc trên - bên phải (Top-Right)</option>
+                                <option value="bottom-left">Góc dưới - bên trái (Bottom-Left)</option>
+                                <option value="bottom-right">Góc dưới - bên phải (Bottom-Right)</option>
+                                <option value="center">Giữa màn hình (Center / Watermark)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Kích thước con dấu (pixel)</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={stampConfig.width}
+                                onChange={(e) => setStampConfig({...stampConfig, width: parseInt(e.target.value) || 120})}
+                                placeholder="120"
+                                min={40}
+                                max={500}
+                                disabled={!isSuperAdmin}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="block text-[10px] font-bold ml-1 text-slate-500 uppercase tracking-widest">Độ hiển thị mờ/rõ nét (%): {stampConfig.opacity || 50}%</label>
+                            </div>
+                            <input 
+                              type="range"
+                              min="5"
+                              max="100"
+                              value={stampConfig.opacity || 50}
+                              onChange={(e) => setStampConfig({...stampConfig, opacity: parseInt(e.target.value)})}
+                              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-red-650"
+                              disabled={!isSuperAdmin}
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                              <span>Mờ ảo nhất (5%)</span>
+                              <span>Mặc định (50%)</span>
+                              <span>Rõ nét nhất (100%)</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải lên Con dấu mọc đỏ của bạn (qua GitHub)</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-red-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="image/*"
+                                onChange={handleUploadStamp}
+                                disabled={isUploadingStamp || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {isUploadingStamp ? `Đang tải con dấu lên... ${uploadProgress.stampImage || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải ảnh con dấu'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Khuyên dùng hình ảnh nền trong suốt (PNG/WebP dạng tròn mọc đỏ)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {stampConfig.imageUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn con dấu hiện tại:</span>
+                              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={stampConfig.imageUrl}
+                                />
+                                {stampConfig.imageUrl && (
+                                  <div className="relative p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-white/10 rounded-lg shrink-0">
+                                    <img 
+                                      src={stampConfig.imageUrl} 
+                                      alt="Stamp Preview" 
+                                      className="h-16 w-16 object-contain" 
+                                      style={{ opacity: (stampConfig.opacity || 50) / 100 }}
+                                      referrerPolicy="no-referrer" 
+                                    />
+                                    <div className="absolute inset-0 border border-red-500/20 pointer-events-none rounded-lg" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveStampConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập con dấu
                             </button>
                           </div>
                         </div>

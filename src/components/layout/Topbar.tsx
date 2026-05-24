@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2 } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -11,7 +11,7 @@ import { signOut } from 'firebase/auth';
 import { useAudioStore } from '../../store/audioStore';
 
 export default function Topbar() {
-  const { toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
+  const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
   const { user, userData } = useAuthStore();
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
@@ -75,6 +75,27 @@ export default function Topbar() {
     navigate('/login');
   };
 
+  const handleResetVersion = () => {
+    if (window.confirm("Làm mới phiên bản hệ thống?\n\nThao tác này sẽ xóa cache trình duyệt, giải phóng các thiết lập chạy ẩn của phiên bản cũ và đồng bộ ứng dụng mới nhất.")) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(keys => {
+          keys.forEach(key => caches.delete(key));
+        });
+      }
+      sessionStorage.clear();
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -126,9 +147,20 @@ export default function Topbar() {
       <div className="flex items-center gap-4">
         <button 
           onClick={toggleSidebar}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 transition-all border border-slate-200 dark:border-white/5 shadow-sm active:scale-95"
+          className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border shadow-md active:scale-95 relative ${
+            !sidebarOpen 
+              ? 'bg-indigo-600 dark:bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 animate-pulse shadow-[0_0_15px_rgba(99,102,241,0.55)]' 
+              : 'bg-slate-100 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-white/5'
+          }`}
+          title="Mở thanh trình đơn"
         >
           <Menu className="w-5 h-5" />
+          {!sidebarOpen && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+          )}
         </button>
 
         <div className="hidden md:flex items-center gap-6 pl-4 border-l border-slate-200 dark:border-white/5">
@@ -252,6 +284,13 @@ export default function Topbar() {
             title="Toggle fullscreen"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={handleResetVersion}
+            className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all group"
+            title="Làm mới phiên bản (Xóa Cache)"
+          >
+            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </button>
           <button
             onClick={() => toggleDarkMode()}

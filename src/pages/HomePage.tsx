@@ -69,15 +69,15 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden font-sans text-slate-900">
+    <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden font-sans text-zinc-300">
       <nav className="relative z-10 w-full max-w-7xl mx-auto px-6 py-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-2xl shadow-indigo-100 border border-white p-2 bg-white ring-1 ring-slate-100">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/10 border border-white/5 p-2 bg-white/10 backdrop-blur-xl ring-1 ring-white/10">
              <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="font-black text-xl tracking-tighter text-slate-900 leading-none">BMASS</span>
-            <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-600 uppercase mt-0.5">Digital Platform</span>
+            <span className="font-black text-xl tracking-tighter text-white leading-none">BMASS</span>
+            <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-400 uppercase mt-0.5">Digital Platform</span>
           </div>
         </div>
         
@@ -85,14 +85,14 @@ export default function HomePage() {
           {!user && (
             <button 
               onClick={() => navigate('/login')}
-              className="hidden md:block px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
+              className="hidden md:block px-6 py-2.5 text-sm font-bold text-zinc-500 hover:text-white transition-colors"
             >
               Đăng nhập
             </button>
           )}
           <button 
             onClick={() => navigate('/utilities')}
-            className="px-6 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-slate-200 active:scale-95"
+            className="px-6 py-2.5 bg-white text-slate-950 hover:bg-indigo-500 hover:text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-indigo-500/10 active:scale-95"
           >
             Truy cập
           </button>
@@ -128,33 +128,33 @@ export default function HomePage() {
                   <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{aboutConfig.adminName || 'Sơn Lý Hồng Đức'}</h2>
                   <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs uppercase mt-2">BMASS Digital Platform</p>
                 </div>
-                <p className="text-slate-500 dark:text-zinc-400 text-lg leading-relaxed max-w-xl font-medium">
+                <p className="text-slate-600 dark:text-zinc-400 text-lg leading-relaxed max-w-xl font-medium">
                   {aboutConfig.adminBio || 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.'}
                 </p>
 
                 {/* Site Stats Display */}
-                <div className="pt-6 grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-slate-50 dark:border-white/5 mt-8">
+                <div className="pt-6 grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-slate-100 dark:border-white/5 mt-8">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Hôm nay</span>
-                    <span className="text-xl font-black text-indigo-600">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Hôm nay</span>
+                    <span className="text-xl font-black text-indigo-600 dark:text-indigo-400">
                       <Counter value={siteStats.today} />
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tháng này</span>
-                    <span className="text-xl font-black text-slate-900">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Tháng này</span>
+                    <span className="text-xl font-black text-slate-900 dark:text-zinc-100">
                       <Counter value={siteStats.month} />
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Năm nay</span>
-                    <span className="text-xl font-black text-slate-900">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Năm nay</span>
+                    <span className="text-xl font-black text-slate-900 dark:text-zinc-100">
                       <Counter value={siteStats.year} />
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng cộng</span>
-                    <span className="text-xl font-black text-indigo-600 group-hover:animate-pulse transition-all">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Tổng cộng</span>
+                    <span className="text-xl font-black text-indigo-600 dark:text-indigo-400 group-hover:animate-pulse transition-all">
                       <Counter value={siteStats.total} />
                     </span>
                   </div>
@@ -171,7 +171,7 @@ export default function HomePage() {
             <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Footer Logo" className="h-8 w-auto" />
             <span className="font-black text-sm tracking-tighter uppercase">BMASS</span>
           </div>
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
             <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>
             <button onClick={() => navigate('/policy')} className="hover:text-indigo-600 transition-colors">Policy</button>
             <button onClick={() => navigate('/terms')} className="hover:text-indigo-600 transition-colors">Điều khoản</button>

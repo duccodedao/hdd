@@ -2,12 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from '@google/genai';
-import { MessageSquare, X, Send, Bot, User, Settings2, Loader2, Maximize2, Minimize2, Trash2, KeyRound } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Settings2, Loader2, Maximize2, Minimize2, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
 
 interface Message {
@@ -32,27 +29,14 @@ export function GeminiChatBox() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash');
   
-  const [aiClient, setAiClient] = useState<GoogleGenAI | null>(null);
-  const [checkingKey, setCheckingKey] = useState(true);
+  const [checkingKey, setCheckingKey] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchKey = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
-        if (docSnap.exists() && docSnap.data().geminiApiKey) {
-          setAiClient(new GoogleGenAI({ apiKey: docSnap.data().geminiApiKey }));
-        }
-      } catch (error) {
-        console.error("Lỗi khi tải Gemini API Key:", error);
-      } finally {
-        setCheckingKey(false);
-      }
-    };
-    fetchKey();
+    setCheckingKey(false);
   }, []);
 
   const scrollToBottom = () => {
@@ -67,10 +51,6 @@ export function GeminiChatBox() {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    if (!aiClient) {
-      toast.error('Chưa cấu hình API Key. Vui lòng liên hệ Admin.');
-      return;
-    }
 
     const userText = input.trim();
     setInput('');
@@ -87,14 +67,27 @@ export function GeminiChatBox() {
          historyText = userText;
       }
 
-      const response = await aiClient.models.generateContent({
-        model: selectedModel,
-        contents: historyText,
+      const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: selectedModel,
+          contents: {
+            parts: [{ text: historyText }]
+          }
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Lỗi xử lý AI');
+      }
+
+      const data = await response.json();
 
       setMessages(prev => [
         ...prev,
-        { id: (Date.now() + 1).toString(), role: 'model', text: response.text || '' }
+        { id: (Date.now() + 1).toString(), role: 'model', text: data.text || '' }
       ]);
     } catch (error: any) {
       console.error('Gemini error:', error);
@@ -187,52 +180,35 @@ export function GeminiChatBox() {
 
               {/* Chat Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                {!aiClient ? (
-                   <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500 mb-2">
-                        <KeyRound size={32} strokeWidth={1.5} />
+                {messages.map(msg => (
+                  <div key={msg.id} className={cn("flex max-w-[85%]", msg.role === 'user' ? "ml-auto" : "mr-auto")}>
+                    <div className={cn(
+                      "px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
+                      msg.role === 'user' 
+                        ? "bg-blue-600 dark:bg-indigo-600 text-white rounded-br-sm" 
+                        : "bg-slate-100 dark:bg-zinc-800/80 text-slate-900 dark:text-zinc-200 border border-slate-200 dark:border-white/5 rounded-bl-sm"
+                    )}>
+                      <div className={cn(
+                        "prose prose-sm max-w-none break-words",
+                        msg.role === 'user' 
+                          ? "prose-invert text-white marker:text-white prose-p:text-white prose-headings:text-white prose-strong:text-white" 
+                          : "prose-slate dark:prose-invert prose-p:leading-relaxed prose-pre:bg-slate-800 dark:prose-pre:bg-zinc-900 prose-zinc"
+                      )}>
+                         <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
                       </div>
-                      <h4 className="text-slate-900 dark:text-white font-medium">Chưa cấu hình AI</h4>
-                      <p className="text-sm text-slate-500 dark:text-zinc-400">Trợ lý Gemini cần API Key để hoạt động.</p>
-                      {isSuperAdmin ? (
-                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-4 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">Vui lòng vào Dashboard &gt; API Keys để thêm Gemini API Key.</p>
-                      ) : (
-                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-4">Vui lòng đợi Quản trị viên hệ thống thiết lập.</p>
-                      )}
-                   </div>
-                ) : (
-                  <>
-                    {messages.map(msg => (
-                      <div key={msg.id} className={cn("flex max-w-[85%]", msg.role === 'user' ? "ml-auto" : "mr-auto")}>
-                        <div className={cn(
-                          "px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
-                          msg.role === 'user' 
-                            ? "bg-blue-600 dark:bg-indigo-600 text-white rounded-br-sm" 
-                            : "bg-slate-100 dark:bg-zinc-800/80 text-slate-900 dark:text-zinc-200 border border-slate-200 dark:border-white/5 rounded-bl-sm"
-                        )}>
-                          <div className={cn(
-                            "prose prose-sm max-w-none break-words",
-                            msg.role === 'user' 
-                              ? "prose-invert text-white marker:text-white prose-p:text-white prose-headings:text-white prose-strong:text-white" 
-                              : "prose-slate dark:prose-invert prose-p:leading-relaxed prose-pre:bg-slate-800 dark:prose-pre:bg-zinc-900 prose-zinc"
-                          )}>
-                             <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {isLoading && (
-                      <div className="flex max-w-[85%] mr-auto">
-                        <div className="px-4 py-3 rounded-2xl bg-slate-100 dark:bg-zinc-800/80 text-slate-900 dark:text-zinc-200 border border-slate-200 dark:border-white/5 rounded-bl-sm flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </>
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex max-w-[85%] mr-auto">
+                    <div className="px-4 py-3 rounded-2xl bg-slate-100 dark:bg-zinc-800/80 text-slate-900 dark:text-zinc-200 border border-slate-200 dark:border-white/5 rounded-bl-sm flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input Area */}
@@ -245,13 +221,13 @@ export function GeminiChatBox() {
                     onKeyDown={e => {
                       if(e.key === 'Enter') handleSend();
                     }}
-                    disabled={!aiClient}
-                    placeholder={aiClient ? "Nhập tin nhắn..." : "Vui lòng cấu hình API Key"}
+                    disabled={false}
+                    placeholder="Nhập tin nhắn..."
                     className="w-full bg-white dark:bg-black border border-slate-200 dark:border-white/10 rounded-full pl-5 pr-12 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none focus:border-blue-500 dark:focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   />
                   <button 
                     onClick={handleSend}
-                    disabled={!input.trim() || isLoading || !aiClient}
+                    disabled={!input.trim() || isLoading}
                     className="absolute right-2 w-8 h-8 bg-blue-600 dark:bg-indigo-500 hover:bg-blue-700 dark:hover:bg-indigo-400 disabled:bg-slate-300 dark:disabled:bg-zinc-800 disabled:text-slate-500 dark:disabled:text-zinc-600 text-white rounded-full flex items-center justify-center transition-colors"
                   >
                     <Send size={14} className="ml-0.5" />

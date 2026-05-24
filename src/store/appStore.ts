@@ -25,7 +25,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  sidebarOpen: window.innerWidth >= 1024,
+  sidebarOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),
   maintenanceMode: false,

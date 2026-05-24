@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from '@google/genai';
 import { 
   Send, 
   Bot, 
@@ -26,8 +25,6 @@ import {
 import { cn } from '../../lib/utils';
 import AppLogo from '../../components/ui/AppLogo';
 import toast from 'react-hot-toast';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -102,9 +99,7 @@ export default function GeminiChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
-  // AI Client configuration state
-  const [aiClient, setAiClient] = useState<GoogleGenAI | null>(null);
-  const [checkingKey, setCheckingKey] = useState(true);
+  const [checkingKey, setCheckingKey] = useState(false);
   
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -128,23 +123,9 @@ export default function GeminiChat() {
     { title: 'Phân tích & Tóm tắt', icon: FileText, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', prompts: ['Tóm tắt tin tức công nghệ hôm nay', 'Mô tả nguyên lý hoạt động của blockchain', 'Phân tích điểm mạnh điểm yếu của Javascript'] }
   ];
 
-  // Fetch only Admin API Key
+  // No longer fetching key on client
   useEffect(() => {
-    const fetchKey = async () => {
-      try {
-        setCheckingKey(true);
-        const systemDoc = await getDoc(doc(db, 'settings', 'apiKeys'));
-        
-        if (systemDoc.exists() && systemDoc.data().geminiApiKey) {
-          setAiClient(new GoogleGenAI({ apiKey: systemDoc.data().geminiApiKey }));
-        }
-      } catch (error) {
-        console.error("Lỗi khi tải API Key config:", error);
-      } finally {
-        setCheckingKey(false);
-      }
-    };
-    fetchKey();
+    setCheckingKey(false);
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -216,11 +197,6 @@ export default function GeminiChat() {
     const textToSend = overrideText || input.trim();
     if (!textToSend || isLoading) return;
     
-    if (!aiClient) {
-      toast.error('Chưa cấu hình Gemini API Key. Vui lòng liên hệ Admin.');
-      return;
-    }
-
     if (!overrideText) setInput('');
     const newMessage: Message = { id: Date.now().toString(), role: 'user', text: textToSend, timestamp: Date.now() };
     
@@ -250,14 +226,27 @@ export default function GeminiChat() {
     setIsLoading(true);
 
     try {
-      const historyText = historyMessages.slice(-10).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n') + `\nUser: ${textToSend}`;
+      // Build context from history
+      const historyText = messages.slice(-10).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n') + `\nUser: ${textToSend}`;
 
-      const response = await aiClient.models.generateContent({
-        model: selectedModel,
-        contents: historyText
+      const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: selectedModel,
+          contents: {
+            parts: [{ text: historyText }]
+          }
+        })
       });
       
-      const text = response.text || 'Xin lỗi, tôi không thể tạo ra phản hồi vào lúc này.';
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Lỗi xử lý AI');
+      }
+
+      const data = await response.json();
+      const text = data.text || 'Xin lỗi, tôi không thể tạo ra phản hồi vào lúc này.';
 
       const aiMessage: Message = { 
         id: (Date.now() + 1).toString(), 
@@ -468,28 +457,7 @@ export default function GeminiChat() {
 
         {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto w-full no-scrollbar pt-8 pb-32">
-          {!aiClient ? (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
-                <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500 mb-6">
-                  <ShieldAlert size={32} strokeWidth={1.5} />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">Hệ thống AI chưa sẵn sàng</h3>
-                <p className="text-slate-600 dark:text-zinc-400 mb-8">Trợ lý Gemini cần được cấu hình API Key để hoạt động.</p>
-                {isSuperAdmin ? (
-                  <button 
-                    onClick={() => navigate('/admin')}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
-                  >
-                    <Settings2 size={18} />
-                    Đi đến trang quản trị
-                  </button>
-                ) : (
-                  <div className="px-6 py-3 bg-slate-100 dark:bg-black border border-slate-200 dark:border-white/10 rounded-xl text-slate-500 dark:text-zinc-500 text-sm">
-                    Vui lòng đợi Quản trị viên thiết lập hệ thống.
-                  </div>
-                )}
-            </div>
-          ) : messages.length <= 1 ? (
+          {messages.length <= 1 ? (
              <div className="min-h-[50vh] flex flex-col items-center justify-center py-12 max-w-3xl mx-auto px-4">
                <div className="text-center mb-12">
                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-600/20">
@@ -626,18 +594,18 @@ export default function GeminiChat() {
                       handleSend();
                     }
                   }}
-                  disabled={!aiClient}
-                  placeholder={aiClient ? "Message AI Assistant..." : "Hệ thống chưa sẵn sàng"}
+                  disabled={false}
+                  placeholder="Message AI Assistant..."
                   className="flex-1 max-h-[200px] bg-transparent py-2.5 px-3 text-[15px] outline-none disabled:opacity-50 dark:text-white dark:placeholder:text-zinc-500 placeholder:text-slate-400 resize-none no-scrollbar font-medium"
                 />
 
                 <div className="flex items-center pb-1 pr-1 shrink-0">
                   <button
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isLoading || !aiClient}
+                    disabled={!input.trim() || isLoading}
                     className={cn(
                       "w-9 h-9 rounded-xl flex items-center justify-center transition-colors",
-                      input.trim() && !isLoading && aiClient
+                      input.trim() && !isLoading
                         ? "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-slate-100 text-slate-400 dark:bg-zinc-900 dark:text-zinc-600"
                     )}

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
@@ -28,7 +29,7 @@ interface UtilityItem {
   adminOnly?: boolean;
 }
 
-const UtilityCard = ({ item, idx, onSelect, systemTools }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any }) => {
+const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number }) => {
   const { maintenanceTabs } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
@@ -102,6 +103,12 @@ const UtilityCard = ({ item, idx, onSelect, systemTools }: { item: UtilityItem, 
           )}>
             {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
           </div>
+          {(visits !== undefined && visits > 0) && (
+            <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-slate-400 dark:text-zinc-500 bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded border border-slate-200/50 dark:border-white/10 shadow-sm">
+              <Eye className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+              <span>{visits.toLocaleString('vi-VN')}</span>
+            </div>
+          )}
         </div>
       </div>
       
@@ -182,8 +189,11 @@ export default function UtilitiesPage() {
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
+  const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
   const { setAiActive } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
+
+  const lastTrackedUtilityRef = useRef<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -197,11 +207,25 @@ export default function UtilitiesPage() {
     if (utilityId) {
       const all = [...nativeUtilities, ...utilities];
       const match = all.find(u => u.id === utilityId);
-      if (match) setActiveUtility(match);
+      if (match) {
+        setActiveUtility(match);
+      }
     } else {
       setActiveUtility(null);
     }
   }, [sessionId, utilityId, utilities, navigate]);
+
+  // Track utility stats exactly once per active utility switch, avoiding multi-trigger and React Strict Mode issues
+  useEffect(() => {
+    if (activeUtility) {
+      if (lastTrackedUtilityRef.current !== activeUtility.id) {
+        lastTrackedUtilityRef.current = activeUtility.id;
+        statsService.incrementUtilityVisit(activeUtility.id);
+      }
+    } else {
+      lastTrackedUtilityRef.current = null;
+    }
+  }, [activeUtility?.id]);
 
   const handleSelect = (item: UtilityItem) => {
     // Check internal only
@@ -221,6 +245,19 @@ export default function UtilitiesPage() {
     setActiveUtility(null);
     navigate('/utilities');
   };
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'utility_stats'), (snapshot) => {
+      const stats: { [key: string]: number } = {};
+      snapshot.forEach((doc) => {
+        stats[doc.id] = doc.data().count || 0;
+      });
+      setUtilityStats(stats);
+    }, (err) => {
+      console.error("UtilitiesPage stats listener error:", err);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     // Settings for native tools
@@ -400,7 +437,14 @@ export default function UtilitiesPage() {
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
               {allItems.map((item, idx) => (
-                <UtilityCard key={item.id} item={item} idx={idx} onSelect={handleSelect} systemTools={systemTools} />
+                <UtilityCard 
+                  key={item.id} 
+                  item={item} 
+                  idx={idx} 
+                  onSelect={handleSelect} 
+                  systemTools={systemTools} 
+                  visits={utilityStats[item.id] || 0}
+                />
               ))}
             </div>
           </div>

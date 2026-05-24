@@ -243,9 +243,9 @@ export default function Auth() {
 
             <div className="space-y-12">
                 <h2 className="text-6xl lg:text-8xl font-serif italic font-medium text-slate-900 dark:text-white tracking-tighter leading-[0.85] max-w-lg lowercase">
-                   Đăng ký <br /> <span className="text-slate-300 dark:text-zinc-700">tài khoản.</span>
+                   Đăng ký <br /> <span className="text-slate-400 dark:text-zinc-700">tài khoản.</span>
                 </h2>
-                <p className="text-slate-500 dark:text-zinc-400 text-xl max-w-sm leading-relaxed font-medium italic">
+                <p className="text-slate-700 dark:text-zinc-300 text-xl max-w-sm leading-relaxed font-medium italic">
                   Khám phá sự vĩ đại từ những điều cốt lõi. Bảo mật là một đặc quyền, không phải gánh nặng.
                 </p>
             </div>
@@ -257,7 +257,7 @@ export default function Auth() {
               { label: 'Security', val: 'PROTECTED', color: '#f79e1b' }
             ].map(stat => (
               <div key={stat.label} className="space-y-3">
-                 <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.4em]">{stat.label}</p>
+                 <p className="text-[10px] font-black text-slate-600 dark:text-zinc-400 uppercase tracking-[0.4em]">{stat.label}</p>
                  <p className="text-4xl font-serif italic font-medium text-slate-900 dark:text-white leading-none">{stat.val}</p>
                  <div className="h-0.5 w-10 mt-2" style={{ backgroundColor: stat.color }} />
               </div>
@@ -359,7 +359,7 @@ export default function Auth() {
                               });
                             }}
                             className={cn(
-                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-6 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-6 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-600",
                               errors.identifier 
                                 ? "border-rose-500/50 ring-4 ring-rose-500/5" 
                                 : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"
@@ -400,7 +400,7 @@ export default function Auth() {
                               });
                             }}
                             className={cn(
-                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-14 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-14 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-600",
                               errors.password 
                                 ? "border-rose-500/50 ring-4 ring-rose-500/5" 
                                 : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"

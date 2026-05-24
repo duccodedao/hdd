@@ -10,6 +10,7 @@ import PwaBanner from '../pwa/PwaBanner';
 import { AlertCircle, ArrowUpRight } from 'lucide-react';
 
 import NotificationMarquee from './NotificationMarquee';
+import WelcomePopup from './WelcomePopup';
 
 export default function MainLayout() {
   const { sidebarOpen, toggleSidebar, aiActive, quotaExceeded, setQuotaExceeded } = useAppStore();
@@ -75,6 +76,7 @@ export default function MainLayout() {
               )}
               <Topbar />
               <NotificationMarquee />
+              <WelcomePopup />
             </>
           )}
           
