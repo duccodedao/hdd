@@ -30,7 +30,7 @@ interface UtilityItem {
 }
 
 const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number }) => {
-  const { maintenanceTabs } = useAppStore();
+  const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
@@ -119,7 +119,7 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
         </p>
       </div>
       
-      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link">
+      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
         <span className={cn(
           "text-[10px] font-bold text-slate-500 dark:text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-indigo-400"
@@ -128,6 +128,21 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
         </span>
         {!isBlocked && <ArrowRight className="w-4 h-4 text-slate-400 dark:text-zinc-700 group-hover:text-blue-600 dark:group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />}
       </div>
+
+      {isMaintenanceActive && maintenanceStampConfig?.imageUrl && (
+        <img 
+          src={maintenanceStampConfig.imageUrl}
+          alt="Maintenance"
+          className="absolute z-20 pointer-events-none drop-shadow-xl"
+          style={{
+            opacity: (maintenanceStampConfig.opacity || 80) / 100,
+            width: `${Math.min(maintenanceStampConfig.width || 80, 120)}px`,
+            bottom: '-5%',
+            right: '-5%',
+            transform: 'rotate(-10deg)',
+          }}
+        />
+      )}
     </motion.div>
   );
 };

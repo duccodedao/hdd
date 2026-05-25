@@ -5,12 +5,14 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import toast from 'react-hot-toast';
 import AppLogo from '../components/ui/AppLogo';
+import { useAppStore } from '../store/appStore';
 
 export default function MaintenancePage({ message }: { message?: string }) {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { maintenanceStampConfig } = useAppStore();
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +28,21 @@ export default function MaintenancePage({ message }: { message?: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
+      {maintenanceStampConfig?.imageUrl && (
+        <img 
+          src={maintenanceStampConfig.imageUrl}
+          alt="Maintenance"
+          className="absolute z-0 pointer-events-none drop-shadow-2xl"
+          style={{
+            opacity: (maintenanceStampConfig.opacity || 80) / 100,
+            width: `${Math.min(maintenanceStampConfig.width || 120, 250)}px`,
+            bottom: '20px',
+            right: '20px',
+            transform: 'rotate(-10deg)',
+          }}
+        />
+      )}
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

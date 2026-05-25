@@ -104,7 +104,7 @@ function VisitTracker() {
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
   const [seo, setSeo] = useState({
     title: 'BMASS',
@@ -112,14 +112,6 @@ export default function App() {
     imageUrl: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     faviconUrl: ''
   });
-
-  const [stampConfig, setStampConfig] = useState<{
-    active: boolean;
-    imageUrl: string;
-    opacity: number;
-    position: string;
-    width: number;
-  } | null>(null);
 
   useEffect(() => {
     initAudio();
@@ -160,6 +152,11 @@ export default function App() {
           setStampConfig(data.stampConfig);
         } else {
           setStampConfig(null);
+        }
+        if (data.maintenanceStampConfig) {
+          setMaintenanceStampConfig(data.maintenanceStampConfig);
+        } else {
+          setMaintenanceStampConfig(null);
         }
       }
     }, (err) => {

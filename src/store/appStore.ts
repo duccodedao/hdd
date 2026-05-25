@@ -22,6 +22,20 @@ interface AppState {
   setAiActive: (active: boolean) => void;
   quotaExceeded: boolean;
   setQuotaExceeded: (exceeded: boolean) => void;
+  stampConfig: {
+    active: boolean;
+    imageUrl: string;
+    width: number;
+    opacity: number;
+    position: string;
+  } | null;
+  setStampConfig: (config: any) => void;
+  maintenanceStampConfig: {
+    imageUrl: string;
+    width: number;
+    opacity: number;
+  } | null;
+  setMaintenanceStampConfig: (config: any) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -79,4 +93,8 @@ export const useAppStore = create<AppState>((set) => ({
   setAiActive: (active) => set({ aiActive: active }),
   quotaExceeded: false,
   setQuotaExceeded: (exceeded) => set({ quotaExceeded: exceeded }),
+  stampConfig: null,
+  setStampConfig: (config) => set({ stampConfig: config }),
+  maintenanceStampConfig: null,
+  setMaintenanceStampConfig: (config) => set({ maintenanceStampConfig: config }),
 }));

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
+import { useAppStore } from '../store/appStore';
 import { format } from 'date-fns';
 import { motion, useSpring, useTransform } from 'motion/react';
 
@@ -21,6 +22,7 @@ function Counter({ value }: { value: number }) {
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { stampConfig } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
@@ -113,10 +115,25 @@ export default function HomePage() {
             </div>
             
             <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 md:gap-20 text-center md:text-left">
-              <div className="shrink-0">
+              <div className="shrink-0 relative">
                 <div className="w-40 h-40 rounded-[2.5rem] border-[6px] border-slate-50 dark:border-white/5 p-1.5 relative shadow-2xl shadow-indigo-500/10 bg-white dark:bg-zinc-900">
                   <div className="absolute inset-0 bg-indigo-100 dark:bg-indigo-500/20 rounded-[2.5rem] animate-pulse blur-2xl opacity-20"></div>
                   <img src={aboutConfig.adminPhoto || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Admin" className="w-full h-full rounded-[2rem] object-cover p-0 relative z-10 bg-white dark:bg-zinc-900" />
+                  
+                  {stampConfig && stampConfig.active && stampConfig.imageUrl && (
+                    <img 
+                      src={stampConfig.imageUrl}
+                      alt="Watermark Overlay"
+                      className="absolute z-20 pointer-events-none drop-shadow-xl"
+                      style={{
+                        opacity: (stampConfig.opacity || 50) / 100,
+                        width: `${Math.min(stampConfig.width || 120, 80)}px`,
+                        bottom: '-15%',
+                        right: '-15%',
+                        transform: 'rotate(-5deg)'
+                      }}
+                    />
+                  )}
                 </div>
               </div>
               <div className="space-y-6 flex-1">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -106,8 +106,15 @@ export default function AdminDashboard() {
     width: 120,
   });
 
+  const [maintenanceStampConfig, setMaintenanceStampConfig] = useState({
+    imageUrl: '',
+    opacity: 80,
+    width: 80,
+  });
+
   const [audioUploading, setAudioUploading] = useState(false);
   const [isUploadingStamp, setIsUploadingStamp] = useState(false);
+  const [isUploadingMaintenanceStamp, setIsUploadingMaintenanceStamp] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
   const [seoConfig, setSeoConfig] = useState({
@@ -166,6 +173,7 @@ export default function AdminDashboard() {
           if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
           if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
           if (data.stampConfig) setStampConfig(prev => ({ ...prev, ...data.stampConfig }));
+          if (data.maintenanceStampConfig) setMaintenanceStampConfig(prev => ({ ...prev, ...data.maintenanceStampConfig }));
         }
 
         const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
@@ -417,6 +425,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveMaintenanceStampConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        maintenanceStampConfig
+      }, { merge: true });
+      toast.success('Đã cập nhật cấu hình con dấu bảo trì thành công!');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình con dấu bảo trì');
+    }
+  };
+
   const handleUploadStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -466,6 +485,50 @@ export default function AdminDashboard() {
       setUploadProgress(prev => {
         const next = { ...prev };
         delete next.stampImage;
+        return next;
+      });
+    }
+  };
+
+  const handleUploadMaintenanceStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Vui lòng hoàn thành Cấu hình GitHub trung tâm / Kho hình ảnh trước khi tải ảnh lên.');
+      return;
+    }
+
+    setIsUploadingMaintenanceStamp(true);
+    const originalId = toast.loading('Đang tải ảnh con dấu bảo trì lên GitHub...');
+    try {
+      const ghConfig = { owner: username, repo, token, branch };
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `system/maintenance_stamp_${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload System Maintenance Stamp: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, maintenanceStamp: Math.round(progress) }))
+      );
+
+      setMaintenanceStampConfig(prev => ({ ...prev, imageUrl: githubData.url }));
+      toast.success('Đã tải con dấu bảo trì lên thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải con dấu: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingMaintenanceStamp(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.maintenanceStamp;
         return next;
       });
     }
@@ -2720,6 +2783,134 @@ export default function AdminDashboard() {
                               onClick={handleSaveStampConfig}
                               disabled={!isSuperAdmin}
                               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập con dấu
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 8. Cấu hình Con Dấu Bảo Trì */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'maintenanceStamp' ? null : 'maintenanceStamp')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                            <ImageIcon className="w-4 h-4 text-orange-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">Thiết Lập Con Dấu Bảo Trì</h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              {maintenanceStampConfig.imageUrl ? 'Đã tải lên ảnh con dấu bảo trì' : 'Chưa cấu hình con dấu bảo trì'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'maintenanceStamp' ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedSetting === 'maintenanceStamp' && (
+                        <div className="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 space-y-5">
+                          <div className="p-4 bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-2xl mb-4">
+                            <div className="flex items-start gap-3">
+                              <Lightbulb className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                              <div className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                                <span><strong>Con dấu bảo trì:</strong> Hình ảnh này sẽ tự động đóng đè lên (trải mờ một góc) các Tiện ích và Ứng dụng khi chúng được đặt ở chế độ bảo trì.</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Kích thước con dấu (pixel)</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={maintenanceStampConfig.width}
+                                onChange={(e) => setMaintenanceStampConfig({...maintenanceStampConfig, width: parseInt(e.target.value) || 80})}
+                                placeholder="80"
+                                min={20}
+                                max={300}
+                                disabled={!isSuperAdmin}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="block text-[10px] font-bold ml-1 text-slate-500 uppercase tracking-widest">Độ hiển thị mờ/rõ nét (%): {maintenanceStampConfig.opacity || 80}%</label>
+                            </div>
+                            <input 
+                              type="range"
+                              min="5"
+                              max="100"
+                              value={maintenanceStampConfig.opacity || 80}
+                              onChange={(e) => setMaintenanceStampConfig({...maintenanceStampConfig, opacity: parseInt(e.target.value)})}
+                              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-orange-500"
+                              disabled={!isSuperAdmin}
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                              <span>Mờ ảo nhất (5%)</span>
+                              <span>Mặc định (80%)</span>
+                              <span>Rõ nét nhất (100%)</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải lên Con dấu bảo trì của bạn</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-orange-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="image/*"
+                                onChange={handleUploadMaintenanceStamp}
+                                disabled={isUploadingMaintenanceStamp || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {isUploadingMaintenanceStamp ? `Đang tải con dấu lên... ${uploadProgress.maintenanceStamp || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải ảnh con dấu bảo trì'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Khuyên dùng hình nền trong suốt (PNG/WebP)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {maintenanceStampConfig.imageUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn con dấu hiện tại:</span>
+                              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={maintenanceStampConfig.imageUrl}
+                                />
+                                {maintenanceStampConfig.imageUrl && (
+                                  <div className="relative p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-white/10 rounded-lg shrink-0">
+                                    <img 
+                                      src={maintenanceStampConfig.imageUrl} 
+                                      alt="Maintenance Stamp Preview" 
+                                      className="h-16 w-16 object-contain" 
+                                      style={{ opacity: (maintenanceStampConfig.opacity || 80) / 100 }}
+                                      referrerPolicy="no-referrer" 
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveMaintenanceStampConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
                             >
                               <Save size={14} /> Lưu thiết lập con dấu
                             </button>

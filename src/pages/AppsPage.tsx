@@ -31,7 +31,7 @@ export default function AppsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'all' | 'categories'>('all');
   const { userData, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceTabs } = useAppStore();
+  const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
 
   useEffect(() => {
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -191,7 +191,7 @@ export default function AppsPage() {
             >
               <AnimatePresence mode="popLayout">
                 {filteredApps.map((app) => (
-                  <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} />
+                  <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} maintenanceStampConfig={maintenanceStampConfig} />
                 ))}
               </AnimatePresence>
             </motion.div>
@@ -213,7 +213,7 @@ export default function AppsPage() {
                  >
                    <AnimatePresence mode="popLayout">
                      {category.apps.map((app) => (
-                       <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} />
+                       <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} maintenanceStampConfig={maintenanceStampConfig} />
                      ))}
                    </AnimatePresence>
                  </motion.div>
@@ -235,7 +235,7 @@ export default function AppsPage() {
                   >
                     <AnimatePresence mode="popLayout">
                       {uncategorizedApps.map((app) => (
-                        <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} />
+                        <AppCard key={app.id} app={app} onOpen={handleOpenApp} maintenanceTabs={maintenanceTabs} maintenanceStampConfig={maintenanceStampConfig} />
                       ))}
                     </AnimatePresence>
                   </motion.div>
@@ -248,7 +248,7 @@ export default function AppsPage() {
   );
 }
 
-function AppCard({ app, onOpen, maintenanceTabs }: { app: AppItem, onOpen: (app: AppItem) => void, maintenanceTabs: any }) {
+function AppCard({ app, onOpen, maintenanceTabs, maintenanceStampConfig }: { app: AppItem, onOpen: (app: AppItem) => void, maintenanceTabs: any, maintenanceStampConfig: any }) {
   return (
     <motion.div
         layout
@@ -293,7 +293,7 @@ function AppCard({ app, onOpen, maintenanceTabs }: { app: AppItem, onOpen: (app:
           {app.title}
         </h3>
 
-        <div className="flex gap-1 items-center mt-1">
+        <div className="flex gap-1 items-center mt-1 relative z-10">
           {app.internalOnly && (
             <span className="text-[7.5px] font-bold uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20 shadow-sm leading-none">
               Nội bộ
@@ -305,6 +305,21 @@ function AppCard({ app, onOpen, maintenanceTabs }: { app: AppItem, onOpen: (app:
             </span>
           )}
         </div>
+        {maintenanceTabs[`app_${app.id}`] && maintenanceStampConfig?.imageUrl && (
+          <img 
+            src={maintenanceStampConfig.imageUrl}
+            alt="Maintenance"
+            className="absolute z-20 pointer-events-none drop-shadow-xl"
+            style={{
+              opacity: (maintenanceStampConfig.opacity || 80) / 100,
+              width: `${maintenanceStampConfig.width || 80}px`,
+              bottom: '10px',
+              right: '10px',
+              transform: 'rotate(-10deg)',
+              maxWidth: '80%'
+            }}
+          />
+        )}
       </motion.div>
   );
 }
