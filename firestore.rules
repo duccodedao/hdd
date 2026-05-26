@@ -172,6 +172,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    match /calendar_events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
     // ACTIVITY LOGS
     match /activityLogs/{logId} {
       allow read: if isAdmin();

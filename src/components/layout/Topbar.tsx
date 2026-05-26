@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
 import { useAudioStore } from '../../store/audioStore';
+import { createPortal } from 'react-dom';
 
 export default function Topbar() {
   const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
@@ -21,6 +22,20 @@ export default function Topbar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+
+  const { systemVersion } = useAppStore();
+  const [needsUpdate, setNeedsUpdate] = useState(false);
+
+  useEffect(() => {
+    if (systemVersion) {
+      const localVersion = localStorage.getItem('appVersion');
+      if (localVersion !== systemVersion) {
+        setNeedsUpdate(true);
+      } else {
+        setNeedsUpdate(false);
+      }
+    }
+  }, [systemVersion]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -75,25 +90,32 @@ export default function Topbar() {
     navigate('/login');
   };
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const handleResetVersion = () => {
-    if (window.confirm("Làm mới phiên bản hệ thống?\n\nThao tác này sẽ xóa cache trình duyệt, giải phóng các thiết lập chạy ẩn của phiên bản cũ và đồng bộ ứng dụng mới nhất.")) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(keys => {
-          keys.forEach(key => caches.delete(key));
-        });
-      }
-      sessionStorage.clear();
-      setTimeout(() => {
-        window.location.reload();
-      }, 300);
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetVersion = () => {
+    if (systemVersion) {
+      localStorage.setItem('appVersion', systemVersion);
     }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(key => caches.delete(key));
+      });
+    }
+    sessionStorage.clear();
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
   };
 
   useEffect(() => {
@@ -287,10 +309,21 @@ export default function Topbar() {
           </button>
           <button
             onClick={handleResetVersion}
-            className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all group"
+            className={cn(
+              "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all group",
+              needsUpdate 
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 animate-pulse border border-amber-200 dark:border-amber-700/50 shadow-[0_0_10px_rgba(251,191,36,0.3)]" 
+                : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
+            )}
             title="Làm mới phiên bản (Xóa Cache)"
           >
-            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+            <RefreshCw className={cn("w-4 h-4 transition-transform duration-500", !needsUpdate && "group-hover:rotate-180")} />
+            {needsUpdate && (
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+            )}
           </button>
           <button
             onClick={() => toggleDarkMode()}
@@ -365,6 +398,50 @@ export default function Topbar() {
           </Link>
         )}
       </div>
+
+      {createPortal(
+        <AnimatePresence>
+          {showResetConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setShowResetConfirm(false)}
+            >
+               <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col"
+                onClick={e => e.stopPropagation()}
+               >
+                 <div className="p-6 pb-2">
+                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+                     <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                   </div>
+                   <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">Làm mới phiên bản?</h2>
+                   <p className="text-slate-500 dark:text-zinc-400 text-sm text-center mt-2">
+                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn.
+                   </p>
+                 </div>
+                 <div className="p-6 flex gap-3">
+                   <button 
+                     onClick={() => setShowResetConfirm(false)}
+                     className="flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                   >
+                     Hủy Bỏ
+                   </button>
+                   <button 
+                     onClick={confirmResetVersion}
+                     className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md"
+                   >
+                     <RefreshCw className="w-4 h-4" />
+                     Xác Nhận
+                   </button>
+                 </div>
+               </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </header>
   );
 }

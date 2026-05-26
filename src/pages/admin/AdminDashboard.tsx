@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks' | 'versions'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -61,6 +61,8 @@ export default function AdminDashboard() {
     popupTitle: '',
     popupMessage: ''
   });
+
+  const [appVersion, setAppVersion] = useState('');
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
     username: '',
@@ -167,6 +169,7 @@ export default function AdminDashboard() {
         const sysSnap = await getDoc(doc(db, 'settings', 'system'));
         if (sysSnap.exists()) {
           const data = sysSnap.data();
+          if (data.appVersion) setAppVersion(data.appVersion);
           if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
           if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
           if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
@@ -549,6 +552,15 @@ export default function AdminDashboard() {
       toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveAppVersion = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { appVersion }, { merge: true });
+      toast.success('Đã lưu phiên bản hệ thống thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu phiên bản');
     }
   };
 
@@ -1267,6 +1279,7 @@ export default function AdminDashboard() {
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
             { id: 'system', label: 'Hệ thống', icon: Settings },
+            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
             { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
@@ -1284,7 +1297,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
@@ -1807,6 +1820,8 @@ export default function AdminDashboard() {
                 { key: 'profile', label: 'Hồ sơ / Tài khoản', icon: UserCircle, page: 'Hệ thống' },
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
+                { key: 'tasks', label: 'Trang Công việc', icon: CheckSquare, page: 'Hệ thống' },
+                { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -2130,9 +2145,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'global' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'global' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'global' && (
@@ -2194,9 +2207,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'vault' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'vault' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'vault' && (
@@ -2268,9 +2279,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'personal' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'personal' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'personal' && (
@@ -2332,9 +2341,7 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {expandedSetting === 'image' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                        </span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'image' ? 'rotate-180' : ''}`} />
                       </button>
 
                       {expandedSetting === 'image' && (
@@ -2397,9 +2404,7 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {expandedSetting === 'audio' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                        </span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'audio' ? 'rotate-180' : ''}`} />
                       </button>
 
                       {expandedSetting === 'audio' && (
@@ -2511,9 +2516,7 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {expandedSetting === 'seo' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                        </span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'seo' ? 'rotate-180' : ''}`} />
                       </button>
 
                       {expandedSetting === 'seo' && (
@@ -2655,9 +2658,7 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {expandedSetting === 'stamp' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                        </span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'stamp' ? 'rotate-180' : ''}`} />
                       </button>
 
                       {expandedSetting === 'stamp' && (
@@ -2922,6 +2923,43 @@ export default function AdminDashboard() {
             </div>
         </motion.div>
 
+      )}
+
+      {activeTab === 'versions' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
+          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <RefreshCcw className="w-6 h-6 text-indigo-500" />
+                Quản lý Phiên bản Hệ thống
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">Cập nhật phiên bản hệ thống (Ví dụ: v1.0, v2). Khi có thay đổi, người dùng sẽ được nhắc Làm mới ứng dụng.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiền tố / Số Phiên Bản *</label>
+                <input 
+                  type="text" 
+                  value={appVersion}
+                  onChange={(e) => setAppVersion(e.target.value)}
+                  placeholder="Ví dụ: v2.0"
+                  className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button 
+                onClick={handleSaveAppVersion}
+                disabled={!isSuperAdmin}
+                className="flex-1 py-3.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Save size={16} /> Lưu Phiên Bản
+              </button>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {activeTab === 'tasks' && (

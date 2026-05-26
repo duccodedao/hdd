@@ -28,6 +28,7 @@ import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
 import TasksPage from './pages/TasksPage';
+import CalendarPage from './pages/CalendarPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -104,7 +105,7 @@ function VisitTracker() {
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
   const [seo, setSeo] = useState({
     title: 'BMASS',
@@ -157,6 +158,9 @@ export default function App() {
           setMaintenanceStampConfig(data.maintenanceStampConfig);
         } else {
           setMaintenanceStampConfig(null);
+        }
+        if (data.appVersion) {
+          setSystemVersion(data.appVersion);
         }
       }
     }, (err) => {
@@ -309,6 +313,7 @@ export default function App() {
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
               <Route path="/tasks" element={<TabGuard tabKey="tasks"><TasksPage /></TabGuard>} />
+              <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

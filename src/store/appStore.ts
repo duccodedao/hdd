@@ -36,6 +36,8 @@ interface AppState {
     opacity: number;
   } | null;
   setMaintenanceStampConfig: (config: any) => void;
+  systemVersion: string;
+  setSystemVersion: (v: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -97,4 +99,6 @@ export const useAppStore = create<AppState>((set) => ({
   setStampConfig: (config) => set({ stampConfig: config }),
   maintenanceStampConfig: null,
   setMaintenanceStampConfig: (config) => set({ maintenanceStampConfig: config }),
+  systemVersion: '',
+  setSystemVersion: (v) => set({ systemVersion: v }),
 }));

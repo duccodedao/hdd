@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
-  Image as ImageIcon
+  Image as ImageIcon, Calendar
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -236,6 +236,25 @@ export default function Sidebar({ className }: { className?: string }) {
                     <div className="flex items-center gap-3">
                       <CheckSquare className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/tasks' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
                       <span className={cn(location.pathname === '/tasks' && "font-semibold")}>Công việc</span>
+                    </div>
+                  </NavLink>
+                )}
+
+                {/* Calendar Item */}
+                {(!systemTools['calendar']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/calendar"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/calendar' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/calendar' && "font-semibold")}>Lịch làm việc</span>
                     </div>
                   </NavLink>
                 )}

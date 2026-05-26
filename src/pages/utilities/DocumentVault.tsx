@@ -102,7 +102,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       setLoading(false);
     }, (err: any) => {
       setLoading(false);
-      handleFirestoreError(err, OperationType.LIST, 'documents');
+      console.error("DocumentVault documents error:", err);
     });
 
     // Fetch Categories
@@ -112,7 +112,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       fetchedCats.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' }));
       setCategories(fetchedCats);
     }, (err: any) => {
-      handleFirestoreError(err, OperationType.LIST, 'document_categories');
+      console.error("DocumentVault categories error:", err);
     });
 
     return () => {

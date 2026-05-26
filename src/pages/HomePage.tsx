@@ -65,6 +65,8 @@ export default function HomePage() {
         else if (id === yearId) stats.year = count;
       });
       setSiteStats(stats);
+    }, (err) => {
+      console.error("HomePage stats listener error:", err);
     });
 
     return () => unsubStats();
