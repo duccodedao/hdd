@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Zap, Cpu, ArrowRight, ShieldCheck, Fingerprint, Lock, Globe, Command, Sparkles, Box, CreditCard, ChevronRight, Activity, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import AppLogo from '../components/ui/AppLogo';
 
@@ -28,8 +28,8 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#000] text-zinc-400 font-sans selection:bg-[#ff5f00] selection:text-white overflow-x-hidden relative">
-      {/* Premium Mastercard-style Background */}
+    <div className="min-h-screen bg-transparent text-zinc-400 font-sans selection:bg-[#ff5f00] selection:text-white overflow-x-hidden relative">
+      {/* Premium Mastercard-style Background - Layered on top of global grid */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
          {/* Overlapping Circles (Mastercard Brand Identity vibe) */}
          <div className="absolute top-[-20%] right-[-10%] w-[80vw] h-[80vw] max-w-[1200px] bg-gradient-to-br from-[#eb001b]/10 to-transparent rounded-full blur-[120px] opacity-60" />
@@ -284,14 +284,14 @@ export default function LandingPage() {
       {/* Pricing section disabled */}
 
       {/* Security Call to Action */}
-      <section className="py-32 lg:py-64 px-4 lg:px-16 relative overflow-hidden bg-white rounded-[3rem] lg:rounded-[10rem] mx-4 lg:mx-8 mb-20 lg:mb-32 z-20">
+      <section className="py-32 lg:py-64 px-4 lg:px-16 relative overflow-hidden bg-white text-slate-950 rounded-[3rem] lg:rounded-[10rem] mx-4 lg:mx-8 mb-20 lg:mb-32 z-20">
          <div className="absolute top-0 right-0 w-[60%] h-[120%] bg-gradient-to-l from-zinc-100 to-transparent pointer-events-none" />
          <div className="max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-32 items-center relative z-10">
             <div className="space-y-8 lg:space-y-12">
                <div className="space-y-4 lg:space-y-6">
-                  <h2 className="text-[10px] lg:text-[12px] font-black text-zinc-400 uppercase tracking-[0.4em] lg:tracking-[0.6em]">Start Your Journey</h2>
+                  <h2 className="text-[10px] lg:text-[12px] font-black text-slate-500 uppercase tracking-[0.4em] lg:tracking-[0.6em]">Start Your Journey</h2>
                   <h3 className="text-5xl md:text-9xl font-serif italic text-black leading-[0.9] lg:leading-[0.8] tracking-tighter lowercase">Sẵn sàng để <br /> trở thành vĩ đại?</h3>
-                  <p className="text-zinc-600 text-lg lg:text-2xl font-medium max-w-xl italic leading-relaxed tracking-tight">Gia nhập cộng đồng người dùng chuyên nghiệp đang làm chủ mọi công cụ ngay hôm nay.</p>
+                  <p className="text-slate-600 text-lg lg:text-2xl font-medium max-w-xl italic leading-relaxed tracking-tight">Gia nhập cộng đồng người dùng chuyên nghiệp đang làm chủ mọi công cụ ngay hôm nay.</p>
                </div>
                
                <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-8 pt-4 lg:pt-8">
@@ -326,17 +326,45 @@ export default function LandingPage() {
       <footer className="max-w-[1920px] mx-auto px-4 lg:px-16 py-20 lg:py-32 border-t border-white/5 relative z-10">
          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-24">
             <div className="md:col-span-6 space-y-8 lg:space-y-12">
-               <div className="flex items-center gap-3 lg:gap-4">
+               <div className="flex items-center gap-3 lg:gap-4 cursor-pointer" onClick={() => navigate('/')}>
                <AppLogo className="w-8 h-8 lg:w-10 lg:h-10" />
                <span className="font-display font-black text-white text-2xl lg:text-3xl tracking-tighter uppercase italic ml-2">BMASS.</span>
                </div>
-               <p className="text-zinc-600 text-lg lg:text-xl font-medium leading-relaxed italic max-w-sm">
+               <p className="text-zinc-600 text-lg lg:text-xl font-medium leading-relaxed italic max-w-sm mt-6">
                   Lý tưởng được định hình từ khối óc. Bảo mật được đảm bảo bởi BMASS.
                </p>
             </div>
 
-            <div className="md:col-span-6 space-y-6 lg:space-y-12">
-               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+            <div className="md:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-12">
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/login')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Quản trị</button></li>
+                     <li><button onClick={() => navigate('/utilities')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Tiện ích</button></li>
+                     <li><button onClick={() => navigate('/releases')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Cập nhật</button></li>
+                  </ul>
+               </div>
+
+               <div className="space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">PHÁP LÝ</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/privacy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Bảo mật</button></li>
+                     <li><button onClick={() => navigate('/terms')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Điều khoản</button></li>
+                     <li><button onClick={() => navigate('/policy')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold block">Chính sách</button></li>
+                  </ul>
+               </div>
+
+               <div className="hidden md:block space-y-6 lg:space-y-12">
+                  <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">KẾT NỐI</h4>
+                  <ul className="space-y-4">
+                     <li><button onClick={() => navigate('/contact')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Hỗ trợ</button></li>
+                     <li><button onClick={() => window.open('https://github.com/sonlyhongduc', '_blank')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Github</button></li>
+                  </ul>
+               </div>
+            </div>
+
+            <div className="md:col-span-4 space-y-6 lg:space-y-12">
+               <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">XÁC THỰC</h4>
                <button 
                   onClick={() => navigate('/login')}
                   className="w-full relative group overflow-hidden bg-white/5 border border-white/10 hover:border-[#eb001b]/50 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 flex items-center justify-center gap-4 transition-all duration-300 active:scale-95"

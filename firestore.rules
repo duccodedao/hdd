@@ -15,21 +15,31 @@ service cloud.firestore {
         allow read, write: if true;
       }
     }
+    match /utility_stats/{id} {
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin'])
+        ('email' in request.auth.token && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin'] ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']
+        ))
       );
     }
     function isSuperAdmin() {
       return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin')
+        ('email' in request.auth.token && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']
+        ))
       );
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -166,6 +176,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    match /calendar_events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /hrm_employees/{empId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /hrm_collaborators/{collabId} {
+      allow read, write: if isAdmin();
+    }
+    
     // ACTIVITY LOGS
     match /activityLogs/{logId} {
       allow read: if isAdmin();
@@ -189,6 +212,12 @@ service cloud.firestore {
     match /form_responses/{responseId} {
       allow create, update: if true;
       allow read, update, delete: if isAdmin();
+    }
+
+    // AVATAR FRAMES
+    match /avatar_frames/{frameId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // --- Safety Net ---

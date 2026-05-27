@@ -1,43 +1,78 @@
 import { db } from '../lib/firebase';
-import { doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, increment, serverTimestamp, getDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 
+// In-memory cache to throttle duplicate increments (e.g., from React Strict Mode, fast clicks, re-renders)
+const recentPageVisits = new Map<string, number>();
+const recentUtilityVisits = new Map<string, number>();
+let hasTrackedSiteVisit = false;
+
 export const statsService = {
-  async incrementVisit() {
-    const now = new Date();
-    const today = format(now, 'yyyy-MM-dd');
-    const month = format(now, 'yyyy-MM');
-    const year = format(now, 'yyyy');
+  async incrementVisit(path: string = window.location.pathname) {
+    // Only increment total/daily site visit count once per page-refresh/access session
+    if (hasTrackedSiteVisit) {
+      return;
+    }
+    hasTrackedSiteVisit = true;
 
-    // Use session storage to avoid multiple increments in the same session
-    const sessionKey = `visited_${today}`;
-    if (sessionStorage.getItem(sessionKey)) return;
-    sessionStorage.setItem(sessionKey, 'true');
+    const now = Date.now();
+    const normalDateInput = new Date(now);
+    const today = format(normalDateInput, 'yyyy-MM-dd');
+    const month = format(normalDateInput, 'yyyy-MM');
+    const year = format(normalDateInput, 'yyyy');
 
-    const statDocs = [
-      { id: 'total' },
-      { id: `day_${today}` },
-      { id: `month_${month}` },
-      { id: `year_${year}` }
+    const statIds = [
+      'total',
+      `day_${today}`,
+      `month_${month}`,
+      `year_${year}`
     ];
 
-    for (const stat of statDocs) {
-      const ref = doc(db, 'site_visitation_stats', stat.id);
+    const batch = writeBatch(db);
+
+    for (const id of statIds) {
+      const ref = doc(db, 'site_visitation_stats', id);
       try {
-        await updateDoc(ref, {
+        // We use a small trick: if we don't know if doc exists, 
+        // we can either try to get it first or just use set with merge.
+        // But increment(1) on a non-existent field works if the doc exists.
+        // For atomic batch with increment, set with merge is safer if doc might not exist.
+        batch.set(ref, {
           count: increment(1),
           lastUpdated: serverTimestamp()
-        });
-      } catch (e: any) {
-        if (e.code === 'not-found') {
-          await setDoc(ref, {
-            count: 1,
-            lastUpdated: serverTimestamp()
-          });
-        } else {
-          console.error(`Error incrementing stat ${stat.id}:`, e);
-        }
+        }, { merge: true });
+      } catch (e) {
+        console.error(`Error adding to batch for ${id}:`, e);
       }
+    }
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error("Error committing stats batch:", e);
+    }
+  },
+
+  async incrementUtilityVisit(utilityId: string) {
+    const now = Date.now();
+    const lastTime = recentUtilityVisits.get(utilityId) || 0;
+    
+    // Cooldown of 10 seconds per utility
+    if (now - lastTime < 10000) {
+      return;
+    }
+    recentUtilityVisits.set(utilityId, now);
+
+    const ref = doc(db, 'utility_stats', utilityId);
+    try {
+      const batch = writeBatch(db);
+      batch.set(ref, {
+        count: increment(1),
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+      await batch.commit();
+    } catch (e) {
+      console.error(`Error incrementing utility stats for ${utilityId}:`, e);
     }
   }
 };

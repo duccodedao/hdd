@@ -12,9 +12,10 @@ import * as XLSX from 'xlsx';
 interface Question {
   id: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select';
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'file';
   required: boolean;
   options?: string[];
+  correctAnswer?: string | string[];
   role?: 'standard' | 'primary' | 'prefilled';
 }
 
@@ -28,6 +29,10 @@ interface Form {
   createdBy: string;
   hasDataset?: boolean;
   dataset?: any[];
+  isAnonymous?: boolean;
+  collectUserInfo?: boolean;
+  limitOneResponse?: boolean;
+  maxResponses?: number;
 }
 
 export default function AdminForms() {
@@ -53,7 +58,11 @@ export default function AdminForms() {
     description: '',
     questions: [] as Question[],
     hasDataset: false,
-    dataset: [] as any[]
+    dataset: [],
+    isAnonymous: false,
+    collectUserInfo: false,
+    limitOneResponse: false,
+    maxResponses: 0
   });
 
   useEffect(() => {
@@ -145,6 +154,30 @@ export default function AdminForms() {
     });
   };
 
+  const handleDeleteResponse = (responseId: string) => {
+    openConfirm({
+      title: 'Xóa câu trả lời',
+      message: 'Bạn có chắc chắn muốn xóa phản hồi này? Người dùng đã trả lời và bị giới hạn trước đó sẽ được trả lời lại.',
+      confirmText: 'Xóa vĩnh viễn',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'form_responses', responseId));
+          setResponses(prev => prev.filter(r => r.id !== responseId));
+          if (selectedForm) {
+            setResponseCounts(prev => ({
+              ...prev,
+              [selectedForm.id]: Math.max(0, (prev[selectedForm.id] || 1) - 1)
+            }));
+          }
+          toast.success('Đã xóa câu trả lời thành công!');
+        } catch (e) {
+          toast.error('Lỗi khi xóa câu trả lời');
+        }
+      }
+    });
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -152,7 +185,11 @@ export default function AdminForms() {
       description: '',
       questions: [],
       hasDataset: false,
-      dataset: []
+      dataset: [],
+      isAnonymous: false,
+      collectUserInfo: false,
+      limitOneResponse: false,
+      maxResponses: 0
     });
     setSelectedForm(null);
     setImportData(null);
@@ -220,11 +257,26 @@ export default function AdminForms() {
     if (!selectedForm || responses.length === 0) return;
     
     try {
-      const headers = ['Thời gian', ...selectedForm.questions.map(q => q.label)];
+      const headers = ['Thời gian', 'Tài khoản', 'Email', ...selectedForm.questions.map(q => q.label)];
       const rows = responses.map(resp => {
-        const rowData: any[] = [format(toSafeDate(resp.submittedAt), 'HH:mm dd/MM/yyyy')];
+        const rowData: any[] = [
+          format(toSafeDate(resp.submittedAt), 'HH:mm dd/MM/yyyy'),
+          resp.userDisplayName || 'N/A',
+          resp.userEmail || 'N/A'
+        ];
         selectedForm.questions.forEach(q => {
-          rowData.push(resp.answers[q.id] || '');
+          const ans = resp.answers[q.id];
+          if (!ans) {
+             rowData.push('');
+          } else if (Array.isArray(ans)) {
+             rowData.push(ans.join(', '));
+          } else if (typeof ans === 'string' && ans.startsWith('data:')) {
+             rowData.push('[Tệp đính kèm Base64]');
+          } else if (typeof ans === 'string' && ans.startsWith('http')) {
+             rowData.push(ans);
+          } else {
+             rowData.push(ans);
+          }
         });
         return rowData;
       });
@@ -472,7 +524,11 @@ export default function AdminForms() {
                             description: form.description, 
                             questions: form.questions,
                             hasDataset: form.hasDataset || false,
-                            dataset: form.dataset || []
+                            dataset: form.dataset || [],
+                            isAnonymous: form.isAnonymous || false,
+                            collectUserInfo: form.collectUserInfo || false,
+                            limitOneResponse: form.limitOneResponse || false,
+                            maxResponses: form.maxResponses || 0
                           }); 
                           setCreationMode(form.hasDataset ? 'dataset' : 'standard');
                           setView('edit'); 
@@ -668,6 +724,25 @@ export default function AdminForms() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={formData.isAnonymous} onChange={(e) => setFormData(p => ({ ...p, isAnonymous: e.target.checked }))} className="w-4 h-4 accent-purple-500" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Trả lời ẩn danh</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={formData.collectUserInfo} disabled={formData.isAnonymous} onChange={(e) => setFormData(p => ({ ...p, collectUserInfo: e.target.checked }))} className="w-4 h-4 accent-purple-500 disabled:opacity-50" />
+                  <span className={`text-sm font-medium ${formData.isAnonymous ? 'text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>Thu thập tài khoản & Email</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={formData.limitOneResponse} disabled={!formData.collectUserInfo} onChange={(e) => setFormData(p => ({ ...p, limitOneResponse: e.target.checked }))} className="w-4 h-4 accent-purple-500 disabled:opacity-50" />
+                  <span className={`text-sm font-medium ${!formData.collectUserInfo ? 'text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>Giới hạn 1 lượt/user</span>
+                </label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Giới hạn TỔNG lượt trả lời</label>
+                  <input type="number" min="0" value={formData.maxResponses || ''} onChange={(e) => setFormData(p => ({ ...p, maxResponses: parseInt(e.target.value) || 0 }))} placeholder="0 = Không giới hạn" className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-purple-500 dark:text-white" />
+                </div>
+              </div>
+
               <div className="pt-8 border-t border-slate-100 dark:border-white/5 space-y-6">
                  <div className="flex items-center justify-between">
                     <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -723,11 +798,14 @@ export default function AdminForms() {
                                  className="w-full bg-white dark:bg-zinc-900 border border-slate-100 dark:border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-purple-500 dark:text-white"
                                  disabled={q.role === 'primary' || q.role === 'prefilled'}
                                >
-                                 <option value="text">Văn bản ngắn</option>
-                                 <option value="textarea">Văn bản dài</option>
+                                 <option value="text">Trả lời ngắn</option>
+                                 <option value="textarea">Trả lời dài</option>
                                  <option value="number">Số</option>
                                  <option value="date">Ngày tháng</option>
-                                 <option value="select">Lựa chọn (Select)</option>
+                                 <option value="radio">Trắc nghiệm</option>
+                                 <option value="checkbox">Hộp kiểm</option>
+                                 <option value="select">Menu thả xuống</option>
+                                 <option value="file">Tải tệp lên</option>
                                </select>
                             </div>
                             <div className="md:col-span-2 flex items-center gap-4">
@@ -758,21 +836,66 @@ export default function AdminForms() {
                            </div>
                          )}
                          
-                         {q.type === 'select' && (
+                         {['select', 'radio', 'checkbox'].includes(q.type) && (
                            <div className="mt-4 pl-12 space-y-3">
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách tùy chọn</label>
+                              <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách tùy chọn</label>
+                                {['radio', 'checkbox'].includes(q.type) && (
+                                  <label className="text-[10px] text-emerald-500 font-bold uppercase cursor-pointer">
+                                    Click vào biểu tượng (✓) để đánh dấu đáp án đúng (tùy chọn)
+                                  </label>
+                                )}
+                              </div>
                               <div className="flex flex-wrap gap-2">
-                                 {q.options?.map((opt, oIdx) => (
-                                   <div key={oIdx} className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-lg group/opt">
-                                      <span className="text-sm dark:text-white">{opt}</span>
+                                 {q.options?.map((opt, oIdx) => {
+                                   let isCorrect = false;
+                                   if (Array.isArray(q.correctAnswer)) {
+                                     isCorrect = q.correctAnswer.includes(opt);
+                                   } else {
+                                     isCorrect = q.correctAnswer === opt;
+                                   }
+
+                                   return (
+                                   <div key={oIdx} className={`flex items-center gap-2 bg-white dark:bg-zinc-900 border ${isCorrect ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-200 dark:border-white/10'} px-3 py-1.5 rounded-lg group/opt transition-colors`}>
+                                      <span className={`text-sm ${isCorrect ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'text-slate-700 dark:text-white'}`}>{opt}</span>
+                                      
+                                      {['radio', 'checkbox'].includes(q.type) && (
+                                        <button
+                                          onClick={() => {
+                                            if (q.type === 'radio') {
+                                              updateQuestion(q.id, { correctAnswer: isCorrect ? '' : opt });
+                                            } else {
+                                              const current = Array.isArray(q.correctAnswer) ? q.correctAnswer : [];
+                                              if (isCorrect) {
+                                                updateQuestion(q.id, { correctAnswer: current.filter(c => c !== opt) });
+                                              } else {
+                                                updateQuestion(q.id, { correctAnswer: [...current, opt] });
+                                              }
+                                            }
+                                          }}
+                                          title="Đánh dấu là đáp án đúng"
+                                          className={`ml-1 ${isCorrect ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-500'} transition-colors`}
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+
                                       <button 
-                                        onClick={() => updateQuestion(q.id, { options: q.options?.filter((_, i) => i !== oIdx) })}
-                                        className="text-slate-400 hover:text-rose-500"
+                                        onClick={() => {
+                                          updateQuestion(q.id, { options: q.options?.filter((_, i) => i !== oIdx) });
+                                          // Also remove from correct answers if it was one
+                                          if (q.type === 'radio' && q.correctAnswer === opt) {
+                                            updateQuestion(q.id, { correctAnswer: '' });
+                                          } else if (q.type === 'checkbox' && Array.isArray(q.correctAnswer)) {
+                                            updateQuestion(q.id, { correctAnswer: q.correctAnswer.filter(c => c !== opt) });
+                                          }
+                                        }}
+                                        className="text-slate-400 hover:text-rose-500 ml-1"
                                       >
                                         <X className="w-3 h-3" />
                                       </button>
                                    </div>
-                                 ))}
+                                 )})}
                                  <div className="flex items-center gap-2">
                                     <input 
                                       type="text" 
@@ -782,7 +905,11 @@ export default function AdminForms() {
                                         if (e.key === 'Enter') {
                                           const val = e.currentTarget.value.trim();
                                           if (val) {
-                                            updateQuestion(q.id, { options: [...(q.options || []), val] });
+                                            if (!q.options?.includes(val)) {
+                                              updateQuestion(q.id, { options: [...(q.options || []), val] });
+                                            } else {
+                                              toast.error('Tùy chọn đã tồn tại');
+                                            }
                                             e.currentTarget.value = '';
                                           }
                                         }
@@ -866,9 +993,12 @@ export default function AdminForms() {
                    <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
                       <tr>
                          <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Thời gian</th>
+                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Tài khoản</th>
+                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Email</th>
                          {selectedForm?.questions.map(q => (
                            <th key={q.id} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{q.label}</th>
                          ))}
+                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Thao tác</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-200 dark:divide-white/10">
@@ -878,15 +1008,79 @@ export default function AdminForms() {
                              <div className="flex flex-col">
                                <span className="text-sm text-slate-900 dark:text-white font-medium">{format(toSafeDate(resp.submittedAt), 'HH:mm dd/MM')}</span>
                                <span className="text-[10px] text-slate-400">#{(resp.id as string).slice(-6)}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">{resp.userDisplayName || 'anonymous'}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">{resp.userEmail || 'anonymous'}</span>
+                            </td>
+                            <td style={{ display: 'none' }}>
+                              <div>
                              </div>
                            </td>
                            {selectedForm?.questions.map(q => (
                              <td key={q.id} className="px-6 py-4">
                                <div className="text-sm text-slate-600 dark:text-slate-300 max-w-[250px] line-clamp-3">
-                                 {resp.answers[q.id] || <span className="italic opacity-30 text-[10px]">Trống</span>}
+                                 {(() => {
+                                   const ans = resp.answers[q.id];
+                                   if (!ans) return <span className="italic opacity-30 text-[10px]">Trống</span>;
+                                   if (Array.isArray(ans)) return ans.join(', ');
+                                   if (typeof ans === 'string' && ans.startsWith('data:')) {
+                                     return (
+                                       <div className="flex flex-col gap-1 items-start">
+                                         <button
+                                           onClick={() => {
+                                             const newTab = window.open();
+                                             if (newTab) {
+                                               newTab.document.write(`<iframe src="${ans}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                             } else {
+                                               toast.error('Trình duyệt đã chặn popup. Vui lòng thử lại!');
+                                             }
+                                           }}
+                                           className="text-[10px] text-purple-600 dark:text-purple-400 font-bold border border-purple-200 dark:border-purple-500/25 px-2.5 py-1 rounded-full hover:bg-purple-100/50 dark:hover:bg-purple-500/10 transition active:scale-95 cursor-pointer whitespace-nowrap"
+                                         >
+                                           Xem tệp (Base64)
+                                         </button>
+                                         <span className="text-[9px] text-slate-400 font-mono block max-w-[150px] truncate" title={ans}>
+                                           {ans.slice(0, 50)}...
+                                         </span>
+                                       </div>
+                                     );
+                                   }
+                                   if (typeof ans === 'string' && ans.startsWith('http')) {
+                                     return (
+                                       <div className="flex flex-col gap-1 items-start">
+                                         <a 
+                                           href={ans} 
+                                           target="_blank" 
+                                           rel="noreferrer" 
+                                           className="text-[10px] text-blue-500 font-bold border border-blue-200 dark:border-blue-500/25 px-2.5 py-1 rounded-full hover:bg-blue-100/50 dark:hover:bg-blue-500/10 transition inline-block text-center cursor-pointer whitespace-nowrap"
+                                         >
+                                           Xem tệp (Raw)
+                                         </a>
+                                         <span className="text-[9px] text-slate-400 font-mono block max-w-[150px] truncate" title={ans}>
+                                           {ans}
+                                         </span>
+                                       </div>
+                                     );
+                                   }
+                                   return ans;
+                                 })()}
                                </div>
                              </td>
                            ))}
+                           <td className="px-6 py-4 whitespace-nowrap text-right">
+                             <button
+                               onClick={() => handleDeleteResponse(resp.id)}
+                               className="p-1 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ml-auto cursor-pointer border border-rose-200 dark:border-rose-500/20 active:scale-95 inline-flex whitespace-nowrap"
+                               title="Xóa phản hồi này"
+                             >
+                               <Trash2 className="w-3.5 h-3.5" />
+                               Xóa
+                             </button>
+                           </td>
                         </tr>
                       ))}
                    </tbody>

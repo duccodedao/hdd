@@ -48,6 +48,18 @@ export default function LocationGuard({ children }: LocationGuardProps) {
   useEffect(() => {
     let mounted = true;
     if (user && userData && location) {
+      // Prevent Infinite Loot/loop: Only update Firestore if coordinates are missing or have changed significantly.
+      // A threshold of 0.0001 degrees (~11 meters) helps avoid continuous writes driven by tiny GPS drift noise.
+      const recordedLat = userData.location?.lat;
+      const recordedLng = userData.location?.lng;
+      const hasLocationChanged = !recordedLat || !recordedLng || 
+                                 Math.abs(recordedLat - location.lat) > 0.0001 || 
+                                 Math.abs(recordedLng - location.lng) > 0.0001;
+
+      if (!hasLocationChanged) {
+        return;
+      }
+
       const updateLocation = async () => {
         try {
           let address = '';

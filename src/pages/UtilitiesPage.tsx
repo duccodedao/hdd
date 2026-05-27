@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
 import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
 import PersonalFileManager from './utilities/PersonalFileManager';
+import AvatarFrameManager from './utilities/AvatarFrameManager';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
@@ -27,11 +29,13 @@ interface UtilityItem {
   adminOnly?: boolean;
 }
 
-const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void }) => {
-  const { maintenanceTabs } = useAppStore();
+const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number }) => {
+  const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
+  const config = systemTools?.[item.id];
+  const isInternal = config?.internal || (item as any).internalOnly;
   const Icon = item.icon;
 
   if (item.adminOnly && !isSuperAdmin) {
@@ -91,16 +95,18 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         <div className="flex flex-col items-end gap-1.5">
           <div className={cn(
             "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-            isMaintenanceActive ? (isSuperAdmin ? 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 'bg-red-100 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20') :
-            item.id === 'ai-scanner' ? 'bg-indigo-100 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20' : 
-            item.type === 'embed' ? 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-zinc-800 dark:text-zinc-500 dark:border-white/5' : 
-            'bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-white/50 dark:border-white/10'
+            isMaintenanceActive 
+              ? 'bg-rose-100 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' 
+              : isInternal 
+                ? 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
+                : 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
           )}>
-            {isMaintenanceActive ? (isSuperAdmin ? 'Bảo trì (Admin)' : 'Bảo trì') : (item.id === 'ai-scanner' ? 'AI Neural' : item.type === 'embed' ? 'Web Ext' : 'System')}
+            {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
           </div>
-          {(item as any).internalOnly && (
-            <div className="text-[8px] font-black uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">
-              Nội bộ
+          {(visits !== undefined && visits > 0) && (
+            <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-slate-400 dark:text-zinc-500 bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded border border-slate-200/50 dark:border-white/10 shadow-sm">
+              <Eye className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+              <span>{visits.toLocaleString('vi-VN')}</span>
             </div>
           )}
         </div>
@@ -113,20 +119,43 @@ const UtilityCard = ({ item, idx, onSelect }: { item: UtilityItem, idx: number, 
         </p>
       </div>
       
-      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link">
+      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
         <span className={cn(
           "text-[10px] font-bold text-slate-500 dark:text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-indigo-400"
         )}>
-          {isBlocked ? 'Đang bảo trì' : 'Thực thi'} {!isBlocked && <Zap className="w-3 h-3" />}
+          {isBlocked ? 'Đang bảo trì' : 'Truy cập ngay'} {!isBlocked && <Zap className="w-3 h-3" />}
         </span>
         {!isBlocked && <ArrowRight className="w-4 h-4 text-slate-400 dark:text-zinc-700 group-hover:text-blue-600 dark:group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />}
       </div>
+
+      {isMaintenanceActive && maintenanceStampConfig?.imageUrl && (
+        <img 
+          src={maintenanceStampConfig.imageUrl}
+          alt="Maintenance"
+          className="absolute z-20 pointer-events-none drop-shadow-xl"
+          style={{
+            opacity: (maintenanceStampConfig.opacity || 80) / 100,
+            width: `${Math.min(maintenanceStampConfig.width || 80, 120)}px`,
+            bottom: '-5%',
+            right: '-5%',
+            transform: 'rotate(-10deg)',
+          }}
+        />
+      )}
     </motion.div>
   );
 };
 
 const nativeUtilities: UtilityItem[] = [
+  {
+    id: 'avatar-frame',
+    title: 'Khung Ảnh Đại Diện',
+    description: 'Thiết kế lồng ghép khung ảnh đại diện (avatar frame) chuyên nghiệp cho các chiến dịch.',
+    icon: ImageIcon,
+    type: 'tool',
+    createdAt: Date.now() + 4000
+  },
   {
     id: 'file-manager',
     title: 'Quản Lý File Cá Nhân',
@@ -175,8 +204,11 @@ export default function UtilitiesPage() {
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
+  const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
   const { setAiActive } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
+
+  const lastTrackedUtilityRef = useRef<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -190,11 +222,25 @@ export default function UtilitiesPage() {
     if (utilityId) {
       const all = [...nativeUtilities, ...utilities];
       const match = all.find(u => u.id === utilityId);
-      if (match) setActiveUtility(match);
+      if (match) {
+        setActiveUtility(match);
+      }
     } else {
       setActiveUtility(null);
     }
   }, [sessionId, utilityId, utilities, navigate]);
+
+  // Track utility stats exactly once per active utility switch, avoiding multi-trigger and React Strict Mode issues
+  useEffect(() => {
+    if (activeUtility) {
+      if (lastTrackedUtilityRef.current !== activeUtility.id) {
+        lastTrackedUtilityRef.current = activeUtility.id;
+        statsService.incrementUtilityVisit(activeUtility.id);
+      }
+    } else {
+      lastTrackedUtilityRef.current = null;
+    }
+  }, [activeUtility?.id]);
 
   const handleSelect = (item: UtilityItem) => {
     // Check internal only
@@ -214,6 +260,19 @@ export default function UtilitiesPage() {
     setActiveUtility(null);
     navigate('/utilities');
   };
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'utility_stats'), (snapshot) => {
+      const stats: { [key: string]: number } = {};
+      snapshot.forEach((doc) => {
+        stats[doc.id] = doc.data().count || 0;
+      });
+      setUtilityStats(stats);
+    }, (err) => {
+      console.error("UtilitiesPage stats listener error:", err);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     // Settings for native tools
@@ -251,7 +310,7 @@ export default function UtilitiesPage() {
 
     if (isBlocked) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-zinc-950 min-h-screen animate-fade-in">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent min-h-[60vh] animate-fade-in">
           <div className="w-20 h-20 rounded-3xl bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 mb-8">
             <Lock size={40} />
           </div>
@@ -267,6 +326,10 @@ export default function UtilitiesPage() {
           </button>
         </div>
       );
+    }
+
+    if (activeUtility.id === 'avatar-frame') {
+      return <AvatarFrameManager onBack={handleBack} />;
     }
 
     if (activeUtility.id === 'file-manager') {
@@ -333,7 +396,7 @@ export default function UtilitiesPage() {
   }
 
   return (
-    <div className="max-w-[1920px] mx-auto py-6 lg:py-20 relative min-h-screen animate-fade-in">
+    <div className="max-w-[1920px] mx-auto py-6 lg:py-20 relative min-h-screen bg-transparent animate-fade-in">
       <div className="space-y-10 lg:space-y-16">
         {/* Header section */}
         <header className="space-y-6">
@@ -389,7 +452,14 @@ export default function UtilitiesPage() {
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
               {allItems.map((item, idx) => (
-                <UtilityCard key={item.id} item={item} idx={idx} onSelect={handleSelect} />
+                <UtilityCard 
+                  key={item.id} 
+                  item={item} 
+                  idx={idx} 
+                  onSelect={handleSelect} 
+                  systemTools={systemTools} 
+                  visits={utilityStats[item.id] || 0}
+                />
               ))}
             </div>
           </div>

@@ -224,22 +224,16 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-transparent flex flex-col md:flex-row relative overflow-hidden selection:bg-indigo-500/30">
       <Helmet>
-        <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS Dashboard</title>
+        <title>{activeCard === 'login' ? 'Đăng nhập' : 'Đăng ký'} | BMASS</title>
         <meta name="description" content="Truy cập vào hệ điều hành quản trị bảo mật BMASS." />
       </Helmet>
-      {/* Premium Mastercard-style Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-         <div className="absolute top-[-20%] right-[-10%] w-[100vw] h-[100vw] max-w-[1200px] bg-gradient-to-br from-red-600/10 via-orange-500/5 to-transparent rounded-full blur-[140px] opacity-40 dark:opacity-30" />
-         <div className="absolute bottom-[-20%] left-[-10%] w-[80vw] h-[80vw] max-w-[1000px] bg-gradient-to-tr from-indigo-600/10 via-purple-500/5 to-transparent rounded-full blur-[120px] opacity-30 dark:opacity-20" />
-         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none z-[1] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
-      </div>
-
+      
       {/* Visual Side */}
-      <div className="hidden md:flex flex-col justify-between p-12 lg:p-20 w-1/2 relative bg-slate-50 dark:bg-zinc-950 border-r border-slate-200 dark:border-white/5 overflow-hidden">
-         <div className="absolute top-[10%] left-[-10%] w-[50vw] h-[50vw] bg-red-600/5 rounded-full blur-[120px]" />
-         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-orange-500/5 rounded-full blur-[120px]" />
+      <div className="hidden md:flex flex-col justify-between p-12 lg:p-20 w-1/2 relative bg-slate-50/50 dark:bg-black/20 border-r border-slate-200 dark:border-white/5 overflow-hidden">
+         <div className="absolute top-[10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/5 rounded-full blur-[120px]" />
+         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-purple-500/5 rounded-full blur-[120px]" />
          
          <div className="relative z-10">
             <div className="flex items-center gap-6 mb-20">
@@ -249,9 +243,9 @@ export default function Auth() {
 
             <div className="space-y-12">
                 <h2 className="text-6xl lg:text-8xl font-serif italic font-medium text-slate-900 dark:text-white tracking-tighter leading-[0.85] max-w-lg lowercase">
-                   Đăng ký <br /> <span className="text-slate-300 dark:text-zinc-700">tài khoản.</span>
+                   Đăng ký <br /> <span className="text-slate-400 dark:text-zinc-700">tài khoản.</span>
                 </h2>
-                <p className="text-slate-500 dark:text-zinc-400 text-xl max-w-sm leading-relaxed font-medium italic">
+                <p className="text-slate-700 dark:text-zinc-300 text-xl max-w-sm leading-relaxed font-medium italic">
                   Khám phá sự vĩ đại từ những điều cốt lõi. Bảo mật là một đặc quyền, không phải gánh nặng.
                 </p>
             </div>
@@ -263,7 +257,7 @@ export default function Auth() {
               { label: 'Security', val: 'PROTECTED', color: '#f79e1b' }
             ].map(stat => (
               <div key={stat.label} className="space-y-3">
-                 <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.4em]">{stat.label}</p>
+                 <p className="text-[10px] font-black text-slate-600 dark:text-zinc-400 uppercase tracking-[0.4em]">{stat.label}</p>
                  <p className="text-4xl font-serif italic font-medium text-slate-900 dark:text-white leading-none">{stat.val}</p>
                  <div className="h-0.5 w-10 mt-2" style={{ backgroundColor: stat.color }} />
               </div>
@@ -365,7 +359,7 @@ export default function Auth() {
                               });
                             }}
                             className={cn(
-                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-6 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-6 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-600",
                               errors.identifier 
                                 ? "border-rose-500/50 ring-4 ring-rose-500/5" 
                                 : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"
@@ -406,7 +400,7 @@ export default function Auth() {
                               });
                             }}
                             className={cn(
-                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-14 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-zinc-700",
+                              "h-14 w-full bg-slate-50 dark:bg-zinc-900 border rounded-2xl pl-12 pr-14 outline-none transition-all text-base font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-600",
                               errors.password 
                                 ? "border-rose-500/50 ring-4 ring-rose-500/5" 
                                 : "border-slate-200 dark:border-white/5 focus:border-blue-500/50 dark:focus:border-indigo-500/50 focus:ring-4 focus:ring-blue-500/5 dark:focus:ring-indigo-500/5"

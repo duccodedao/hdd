@@ -1,11 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Scan, FileText, Upload, Loader2, Copy, Check, Sparkles, ArrowLeft, Trash2, Edit3, Box } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
-import { GoogleGenAI } from '@google/genai';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 
 interface AiScannerProps {
   onBack: () => void;
@@ -17,22 +14,7 @@ export default function AiScanner({ onBack }: AiScannerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<string>('');
   const [copied, setCopied] = useState(false);
-  const [aiClient, setAiClient] = useState<GoogleGenAI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const fetchKey = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
-        if (docSnap.exists() && docSnap.data().geminiApiKey) {
-          setAiClient(new GoogleGenAI({ apiKey: docSnap.data().geminiApiKey }));
-        }
-      } catch (error) {
-        console.error("Lỗi khi tải Gemini API Key:", error);
-      }
-    };
-    fetchKey();
-  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -51,10 +33,6 @@ export default function AiScanner({ onBack }: AiScannerProps) {
 
   const processWithAi = async () => {
     if (!file || !preview) return;
-    if (!aiClient) {
-      toast.error('Hệ thống chưa cấu hình AI.');
-      return;
-    }
     
     setIsProcessing(true);
     try {
@@ -80,22 +58,32 @@ export default function AiScanner({ onBack }: AiScannerProps) {
         mimeType = 'application/pdf';
       }
 
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType
+      const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "gemini-3.5-flash",
+          contents: {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType
+                }
               }
-            }
-          ]
-        }
+            ]
+          }
+        })
       });
 
-      setResult(response.text || '');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Lỗi xử lý AI');
+      }
+
+      const data = await response.json();
+      setResult(data.text || '');
       toast.success('Đã quét và trích xuất bằng AI thành công!');
     } catch (error) {
       console.error(error);
@@ -116,8 +104,11 @@ export default function AiScanner({ onBack }: AiScannerProps) {
     <div className="max-w-[1400px] mx-auto px-6 py-8 lg:py-12 relative min-h-screen animate-fade-in font-sans">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-slate-100 dark:border-white/5 pb-8">
         <div className="space-y-1">
-          <button onClick={onBack} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-indigo-500 mb-4 transition-all group w-fit">
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Quay lại Thực đơn
+          <button 
+            onClick={onBack} 
+            className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5 mb-6 group w-fit"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay Lại
           </button>
           <div className="flex items-center gap-3">
              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
@@ -27,10 +27,12 @@ import AboutPage from './pages/AboutPage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
-import TasksPage from './pages/TasksPage';
+import CalendarPage from './pages/CalendarPage';
+import HrmPage from './pages/HrmPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import PolicyPage from './pages/PolicyPage';
 import ReleaseNotesPage from './pages/ReleaseNotesPage';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
@@ -48,19 +50,75 @@ import { TabGuard } from './components/guards/TabGuard';
 import { OnboardingGuard } from './components/guards/OnboardingGuard';
 
 import CookieConsentComponent from './components/common/CookieConsent';
-import GuestTracker from './components/common/GuestTracker';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 import HomePage from './pages/HomePage';
 
-export default function App() {
-  const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices } = useAppStore();
+import { useAudioStore } from './store/audioStore';
+
+let lastIncrementedPath: string | null = null;
+let lastIncrementTime: number = 0;
+
+function getStampPositionStyles(position: string): React.CSSProperties {
+  switch (position) {
+    case 'top-left':
+      return { top: '24px', left: '24px' };
+    case 'top-right':
+      return { top: '24px', right: '24px' };
+    case 'bottom-left':
+      return { bottom: '24px', left: '24px' };
+    case 'bottom-right':
+      return { bottom: '24px', right: '24px' };
+    case 'center':
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+      };
+    default:
+      return { bottom: '24px', right: '24px' };
+  }
+}
+
+function VisitTracker() {
+  const location = useLocation();
 
   useEffect(() => {
-    // Increment visit counter
-    statsService.incrementVisit().catch(console.error);
+    const now = Date.now();
+    // Only increment if we changed paths, or if it is a fresh page-refresh (represented by passing of time > 2000ms)
+    if (lastIncrementedPath !== location.pathname || (now - lastIncrementTime) > 2000) {
+      lastIncrementedPath = location.pathname;
+      lastIncrementTime = now;
+      const increment = async () => {
+        try {
+          await statsService.incrementVisit(location.pathname);
+        } catch (e) {
+          console.error("Failed to increment visit", e);
+        }
+      };
+      increment();
+    }
+  }, [location.pathname]);
 
+  return null;
+}
+
+export default function App() {
+  const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion } = useAppStore();
+  const initAudio = useAudioStore((state) => state.init);
+  const [seo, setSeo] = useState({
+    title: 'BMASS',
+    description: 'Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.',
+    imageUrl: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    faviconUrl: ''
+  });
+
+  useEffect(() => {
+    initAudio();
+  }, [initAudio]);
+
+  useEffect(() => {
     // Offline status listening
     const handleOnline = () => setOnlineStatus(true);
     const handleOffline = () => setOnlineStatus(false);
@@ -91,12 +149,40 @@ export default function App() {
         if (data.blockedDevices) {
           setBlockedDevices(data.blockedDevices);
         }
+        if (data.stampConfig) {
+          setStampConfig(data.stampConfig);
+        } else {
+          setStampConfig(null);
+        }
+        if (data.maintenanceStampConfig) {
+          setMaintenanceStampConfig(data.maintenanceStampConfig);
+        } else {
+          setMaintenanceStampConfig(null);
+        }
+        if (data.appVersion) {
+          setSystemVersion(data.appVersion);
+        }
       }
     }, (err) => {
       console.error("Could not fetch system settings", err);
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
+    });
+
+    // Real-time SEO settings listener
+    const unsubscribeSeo = onSnapshot(doc(db, 'settings', 'seo'), (seoDoc) => {
+      if (seoDoc.exists()) {
+        const data = seoDoc.data();
+        setSeo({
+          title: data.title || 'BMASS',
+          description: data.description || 'Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa.',
+          imageUrl: data.imageUrl || 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+          faviconUrl: data.faviconUrl || ''
+        });
+      }
+    }, (err) => {
+      console.error("Could not fetch SEO settings", err);
     });
 
     // Auth listener
@@ -116,8 +202,8 @@ export default function App() {
           if (docSnap.exists()) {
             setUserData(docSnap.data() as UserData);
           } else {
-            // Document doesn't exist yet, fallback to local user data representation based on auth
-            setUserData({
+            // Document doesn't exist yet, fallback to local user data representation based on auth and auto-create it
+            const fallbackUser: UserData = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               displayName: firebaseUser.displayName || 'User',
@@ -126,7 +212,10 @@ export default function App() {
               status: 'active',
               createdAt: Date.now(),
               lastLoginAt: Date.now()
-            });
+            };
+            setUserData(fallbackUser);
+            setDoc(doc(db, 'users', firebaseUser.uid), fallbackUser, { merge: true })
+              .catch((error) => console.error("Error auto-creating missing user document:", error));
           }
         }, (err) => {
           console.error("Error listening to user data:", err);
@@ -144,6 +233,7 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeUser) unsubscribeUser();
       unsubscribeSystem();
+      unsubscribeSeo();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -162,14 +252,38 @@ export default function App() {
   return (
     <HelmetProvider>
       <Helmet>
-        <title>BMASS Dashboard | Hệ sinh thái Bảo mật</title>
-        <meta name="description" content="Hệ điều hành quản trị bảo mật và định danh số thế hệ mới. Trải nghiệm tối giản, hiệu năng tối đa." />
-        <meta property="og:title" content="BMASS Dashboard" />
-        <meta property="og:description" content="Hệ sinh thái quản trị bảo mật nâng cao." />
-        <meta property="og:image" content="/logo.png" />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:image" content={seo.imageUrl} />
+        {seo.faviconUrl && <link rel="icon" type="image/x-icon" href={seo.faviconUrl} />}
+        {seo.faviconUrl && <link rel="apple-touch-icon" href={seo.faviconUrl} />}
+        {seo.faviconUrl && <link rel="shortcut icon" href={seo.faviconUrl} />}
       </Helmet>
       <BrowserRouter>
-      <GuestTracker />
+      {/* GLOBAL COPYRIGHT RED SEAL STAMP OVERLAY */}
+      {stampConfig && stampConfig.active && stampConfig.imageUrl && (
+        <div 
+          className="fixed pointer-events-none select-none z-[9999]"
+          style={{
+            opacity: (stampConfig.opacity || 50) / 100,
+            width: `${stampConfig.width || 120}px`,
+            height: 'auto',
+            ...getStampPositionStyles(stampConfig.position || 'bottom-right')
+          }}
+        >
+          <img 
+            src={stampConfig.imageUrl} 
+            alt="Stamp Watermark Seal" 
+            className="w-full h-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+      )}
+      <VisitTracker />
+      <div className="space-grid" />
+      <div className="stardust" />
       <GoogleOneTap />
       <OfflineNotification />
       <CookieConsentComponent />
@@ -201,11 +315,14 @@ export default function App() {
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
-              <Route path="/tasks" element={<TabGuard tabKey="tasks"><TasksPage /></TabGuard>} />
+              <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
+              <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
+              <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/policy" element={<PolicyPage />} />
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}

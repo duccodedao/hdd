@@ -108,7 +108,7 @@ export default function AdminDocumentVault() {
         setGhConfig(data);
       }
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'settings/github_integration');
+      console.error("AdminDocumentVault config listener error:", err);
     });
 
     // Category listener + Ensure 'Khác' exists
@@ -123,14 +123,14 @@ export default function AdminDocumentVault() {
         });
       }
     }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'document_categories');
+      console.error("AdminDocumentVault categories listener error:", err);
     });
     
     // Documents listener
     const unsubDocs = onSnapshot(query(collection(db, 'documents'), orderBy('createdAt', 'desc')), (snap) => {
       setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminDocument)));
     }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'documents');
+      console.error("AdminDocumentVault documents listener error:", err);
     });
 
     return () => { unsubConfig(); unsubCat(); unsubDocs(); };
@@ -164,7 +164,7 @@ export default function AdminDocumentVault() {
       setNewCatName('');
       setNewCatDesc('');
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'document_categories');
+      console.error(err);
       toast.error('Lỗi khi thêm danh mục');
     }
   };
@@ -193,7 +193,7 @@ export default function AdminDocumentVault() {
         await deleteDoc(doc(db, 'document_categories', id));
         toast.success('Đã xoá danh mục thành công', { id: toastId });
       } catch (err: any) {
-        handleFirestoreError(err, OperationType.DELETE, `document_categories/${id}`);
+        console.error(err);
         toast.error('Lỗi khi xoá danh mục: ' + err.message, { id: toastId });
       }
     }, 'danger');

@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { useAuthStore } from '../../store/authStore';
+import { useConfirmStore } from '../../store/confirmStore';
 import ConfirmModal from '../../components/ConfirmModal';
 
 const DOCS_PER_PAGE = 50;
@@ -101,7 +102,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       setLoading(false);
     }, (err: any) => {
       setLoading(false);
-      handleFirestoreError(err, OperationType.LIST, 'documents');
+      console.error("DocumentVault documents error:", err);
     });
 
     // Fetch Categories
@@ -111,7 +112,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       fetchedCats.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' }));
       setCategories(fetchedCats);
     }, (err: any) => {
-      handleFirestoreError(err, OperationType.LIST, 'document_categories');
+      console.error("DocumentVault categories error:", err);
     });
 
     return () => {
@@ -341,9 +342,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       {/* Back Button */}
       <button 
         onClick={onBack} 
-        className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white mb-10 transition-colors"
+        className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5 mb-10 group w-fit"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Quay lại
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay Lại
       </button>
 
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
@@ -523,7 +524,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                     onClick={() => setExplorerCategory(null)}
                     className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 transition-all group"
                   >
-                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Quay lại
+                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Quay Lại
                   </button>
                 </div>
               )}
@@ -902,6 +903,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = "md:max-w-xl" }: a
 );
 
 const CategoryManagerModal = ({ isOpen, onClose, categories }: any) => {
+  const { openConfirm } = useConfirmStore();
   const [newCat, setNewCat] = useState('');
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -930,12 +932,19 @@ const CategoryManagerModal = ({ isOpen, onClose, categories }: any) => {
     } catch (e) { toast.error('Lỗi khi cập nhật danh mục'); }
   };
 
-  const handleDeleteCat = async (id: string) => {
-    if (!confirm('Xóa danh mục sẽ khiến các văn bản trong danh mục chuyển sang trạng thái tự do. Tiếp tục?')) return;
-    try {
-      await deleteDoc(doc(db, 'document_categories', id));
-      toast.success('Đã xóa bỏ danh mục');
-    } catch (e) { toast.error('Lỗi khi xóa'); }
+  const handleDeleteCat = (id: string) => {
+    openConfirm({
+      title: 'Xóa phân loại tài liệu',
+      message: 'Xóa danh mục sẽ khiến các văn bản trong danh mục chuyển sang trạng thái tự do. Tiếp tục?',
+      confirmText: 'Đồng ý xóa',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'document_categories', id));
+          toast.success('Đã xóa bỏ danh mục');
+        } catch (e) { toast.error('Lỗi khi xóa'); }
+      }
+    });
   };
 
   return (

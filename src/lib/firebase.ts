@@ -35,5 +35,4 @@ interface FirestoreErrorInfo {
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errMessage = error instanceof Error ? error.message : String(error);
   console.error('Firestore Error: ', { errMessage, operationType, path, uid: auth.currentUser?.uid });
-  throw new Error(errMessage);
 }

@@ -3,6 +3,8 @@ export interface GitHubConfig {
   token: string;
   owner: string;
   repo: string;
+  branch?: string;
+  path?: string;
 }
 
 export interface Category {

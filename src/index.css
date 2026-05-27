@@ -78,15 +78,39 @@
     --sal: env(safe-area-inset-left);
   }
 
-  /* Default to Light Mode */
+  /* Default to Dark Mode by default for a space theme */
   html {
-    @apply scroll-smooth bg-slate-50 text-slate-950 transition-colors duration-500;
-    color-scheme: light;
+    @apply scroll-smooth bg-slate-950 text-zinc-300 transition-colors duration-500 min-h-screen relative overflow-x-hidden;
+    color-scheme: dark;
+  }
+
+  html::before {
+    content: "";
+    @apply fixed inset-0 bg-transparent -z-10 pointer-events-none;
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(99, 102, 241, 0.15) 1px, transparent 0);
+    background-size: 48px 48px;
+  }
+
+  html::after {
+    content: "";
+    @apply fixed inset-0 -z-20 pointer-events-none;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.08) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+    filter: blur(120px);
+    animation: nebula-pulse 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes nebula-pulse {
+    from { opacity: 0.6; transform: scale(1); }
+    to { opacity: 1; transform: scale(1.1); }
   }
 
   html.dark {
-    @apply bg-[#09090b] text-zinc-300;
-    color-scheme: dark;
+    @apply bg-[#020205];
   }
 
   body {
@@ -155,6 +179,78 @@
     -webkit-text-fill-color: transparent;
   }
 }
+
+@utility bg-grid-pattern {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.05) 1px, transparent 0);
+  background-size: 32px 32px;
+  
+  .dark & {
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+  }
+}
+
+@utility bg-mesh {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
+  filter: blur(100px);
+
+  .dark & {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
+  }
+}
+
+@utility stardust {
+  @apply fixed inset-0 -z-10 pointer-events-none opacity-[0.2] dark:opacity-[0.3];
+  background-image: 
+    radial-gradient(1.5px 1.5px at 20px 30px, #fff, rgba(255,255,255,0)),
+    radial-gradient(1.5px 1.5px at 40px 70px, #fff, rgba(255,255,255,0)),
+    radial-gradient(2px 2px at 50px 160px, #fff, rgba(255,255,255,0)),
+    radial-gradient(1.5px 1.5px at 90px 40px, #fff, rgba(255,255,255,0)),
+    radial-gradient(2px 2px at 130px 80px, #fff, rgba(255,255,255,0)),
+    radial-gradient(1.5px 1.5px at 160px 120px, #fff, rgba(255,255,255,0));
+  background-repeat: repeat;
+  background-size: 250px 250px;
+  animation: stardust-drift 180s linear infinite;
+  filter: blur(0.5px) drop-shadow(0 0 2px rgba(255,255,255,0.5));
+}
+
+@utility space-grid {
+  @apply fixed inset-0 -z-10 pointer-events-none overflow-hidden;
+  perspective: 1000px;
+  
+  &::before {
+    content: "";
+    @apply absolute inset-0;
+    background-image: 
+      linear-gradient(to right, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(circle at 50% 50%, black, transparent 90%);
+    transform: rotateX(20deg);
+    transform-origin: top;
+  }
+
+  .dark &::before {
+    background-image: 
+      linear-gradient(to right, rgba(99, 102, 241, 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(99, 102, 241, 0.15) 1px, transparent 1px);
+  }
+}
+
+@keyframes stardust-drift {
+  from { transform: translateY(0); }
+  to { transform: translateY(-200px); }
+}
+
 
 /* Custom scrollbar - Linear style */
 ::-webkit-scrollbar {

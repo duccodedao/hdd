@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -8,9 +8,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
+import { useAudioStore } from '../../store/audioStore';
+import { createPortal } from 'react-dom';
 
 export default function Topbar() {
-  const { toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
+  const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
   const { user, userData } = useAuthStore();
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
@@ -20,6 +22,20 @@ export default function Topbar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+
+  const { systemVersion } = useAppStore();
+  const [needsUpdate, setNeedsUpdate] = useState(false);
+
+  useEffect(() => {
+    if (systemVersion) {
+      const localVersion = localStorage.getItem('appVersion');
+      if (localVersion !== systemVersion) {
+        setNeedsUpdate(true);
+      } else {
+        setNeedsUpdate(false);
+      }
+    }
+  }, [systemVersion]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -74,6 +90,34 @@ export default function Topbar() {
     navigate('/login');
   };
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleResetVersion = () => {
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetVersion = () => {
+    if (systemVersion) {
+      localStorage.setItem('appVersion', systemVersion);
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(key => caches.delete(key));
+      });
+    }
+    sessionStorage.clear();
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -125,9 +169,20 @@ export default function Topbar() {
       <div className="flex items-center gap-4">
         <button 
           onClick={toggleSidebar}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 transition-all border border-slate-200 dark:border-white/5 shadow-sm active:scale-95"
+          className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border shadow-md active:scale-95 relative ${
+            !sidebarOpen 
+              ? 'bg-indigo-600 dark:bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 animate-pulse shadow-[0_0_15px_rgba(99,102,241,0.55)]' 
+              : 'bg-slate-100 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-white/5'
+          }`}
+          title="Mở thanh trình đơn"
         >
           <Menu className="w-5 h-5" />
+          {!sidebarOpen && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+          )}
         </button>
 
         <div className="hidden md:flex items-center gap-6 pl-4 border-l border-slate-200 dark:border-white/5">
@@ -171,7 +226,80 @@ export default function Topbar() {
           />
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Audio Player */}
+          {(() => {
+            const { isPlaying, currentTime, duration, toggle, seek, audioUrl, audioTitle } = useAudioStore();
+            const [showPlayerTimeline, setShowPlayerTimeline] = useState(false);
+
+            const formatTime = (secs: number) => {
+              if (isNaN(secs) || secs === Infinity) return '0:00';
+              const m = Math.floor(secs / 60);
+              const s = Math.floor(secs % 60);
+              return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+
+            if (!audioUrl) return null;
+
+            return (
+              <div 
+                className={cn(
+                  "flex items-center gap-2 p-1 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-full transition-all duration-300",
+                  showPlayerTimeline ? "max-w-[200px] md:max-w-xs pr-3" : "max-w-[36px]"
+                )}
+                onMouseEnter={() => setShowPlayerTimeline(true)}
+                onMouseLeave={() => setShowPlayerTimeline(false)}
+              >
+                <button
+                  onClick={toggle}
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-full text-white transition-all shadow-sm active:scale-90",
+                    isPlaying ? "bg-purple-600 shadow-purple-500/20" : "bg-slate-500 dark:bg-zinc-700 hover:bg-slate-600"
+                  )}
+                  title={isPlaying ? "Tạm dừng nhạc" : "Phát nhạc nền"}
+                >
+                  {isPlaying ? (
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                    >
+                      <Pause className="w-3 h-3 fill-current" />
+                    </motion.div>
+                  ) : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                </button>
+
+                <AnimatePresence>
+                  {showPlayerTimeline && (
+                    <motion.div
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="flex items-center gap-1.5 md:gap-2 overflow-hidden whitespace-nowrap"
+                    >
+                      <div className="flex flex-col text-left max-w-[60px] md:max-w-[100px] select-none leading-none">
+                        <span className="text-[9px] font-bold text-slate-800 dark:text-zinc-200 truncate capitalize">
+                          {audioTitle}
+                        </span>
+                        <span className="text-[8px] font-mono text-slate-400 dark:text-zinc-500 mt-0.5">
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                      </div>
+
+                      <input 
+                        type="range"
+                        min={0}
+                        max={duration || 100}
+                        value={currentTime}
+                        onChange={(e) => seek(parseFloat(e.target.value))}
+                        className="w-14 md:w-20 h-1 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-600 dark:accent-purple-400 outline-none"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })()}
+
           <button
             onClick={handleFullscreenToggle}
             className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all"
@@ -180,9 +308,27 @@ export default function Topbar() {
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
           <button
+            onClick={handleResetVersion}
+            className={cn(
+              "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all group",
+              needsUpdate 
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 animate-pulse border border-amber-200 dark:border-amber-700/50 shadow-[0_0_10px_rgba(251,191,36,0.3)]" 
+                : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
+            )}
+            title="Làm mới phiên bản (Xóa Cache)"
+          >
+            <RefreshCw className={cn("w-4 h-4 transition-transform duration-500", !needsUpdate && "group-hover:rotate-180")} />
+            {needsUpdate && (
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => toggleDarkMode()}
             className="relative w-9 h-9 flex items-center justify-center text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all"
-            title={darkMode ? "Vùng sáng hệ thống" : "Vùng tối hệ thống"}
+            title={darkMode ? "Vùng sáng" : "Vùng tối"}
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -252,6 +398,50 @@ export default function Topbar() {
           </Link>
         )}
       </div>
+
+      {createPortal(
+        <AnimatePresence>
+          {showResetConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
+              onClick={(e) => { if (e.target === e.currentTarget) setShowResetConfirm(false); }}
+            >
+               <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col"
+                onClick={e => e.stopPropagation()}
+               >
+                 <div className="p-6 pb-2">
+                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+                     <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                   </div>
+                   <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">Làm mới phiên bản?</h2>
+                   <p className="text-slate-500 dark:text-zinc-400 text-sm text-center mt-2">
+                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn.
+                   </p>
+                 </div>
+                 <div className="p-6 flex gap-3">
+                   <button 
+                     onClick={() => setShowResetConfirm(false)}
+                     className="flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                   >
+                     Hủy Bỏ
+                   </button>
+                   <button 
+                     onClick={confirmResetVersion}
+                     className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-widest text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md"
+                   >
+                     <RefreshCw className="w-4 h-4" />
+                     Xác Nhận
+                   </button>
+                 </div>
+               </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </header>
   );
 }

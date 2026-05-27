@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2 } from 'lucide-react';
+import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -13,13 +13,13 @@ import { vi } from 'date-fns/locale';
 
 import AdminUtilities from './AdminUtilities';
 import AdminIpBlocking from './AdminIpBlocking';
-import AdminLogins from './AdminLogins';
 import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
-import AdminTasks from './AdminTasks';
 import { useConfirmStore } from '../../store/confirmStore';
+import { useAudioStore } from '../../store/audioStore';
+import { githubService } from '../../services/githubService';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 
 export default function AdminDashboard() {
@@ -28,10 +28,8 @@ export default function AdminDashboard() {
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
-  const [guests, setGuests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userTab, setUserTab] = useState<'registered' | 'guests'>('registered');
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'logins' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -47,7 +45,7 @@ export default function AdminDashboard() {
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
     adminName: 'Quản trị viên',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
-    adminPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200&h=200',
+    adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
@@ -57,8 +55,13 @@ export default function AdminDashboard() {
   const [notificationConfig, setNotificationConfig] = useState({
     active: false,
     message: '',
-    isEmergency: false
+    isEmergency: false,
+    popupActive: false,
+    popupTitle: '',
+    popupMessage: ''
   });
+
+  const [appVersion, setAppVersion] = useState('');
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
     username: '',
@@ -76,7 +79,8 @@ export default function AdminDashboard() {
     username: '',
     repo: '',
     token: '',
-    branch: 'main'
+    branch: 'main',
+    path: 'assets/uploads'
   });
 
   const [githubIntegrationConfig, setGithubIntegrationConfig] = useState({
@@ -86,6 +90,42 @@ export default function AdminDashboard() {
     branch: 'main',
     path: 'assets/uploads'
   });
+
+  const [audioConfig, setAudioConfig] = useState({
+    musicUrl: '',
+    title: 'Nhạc nền hệ thống BMass',
+    repo: '',
+    branch: 'main',
+    path: 'assets/audio'
+  });
+
+  const [stampConfig, setStampConfig] = useState({
+    active: false,
+    imageUrl: '',
+    opacity: 50,
+    position: 'bottom-right',
+    width: 120,
+  });
+
+  const [maintenanceStampConfig, setMaintenanceStampConfig] = useState({
+    imageUrl: '',
+    opacity: 80,
+    width: 80,
+  });
+
+  const [audioUploading, setAudioUploading] = useState(false);
+  const [isUploadingStamp, setIsUploadingStamp] = useState(false);
+  const [isUploadingMaintenanceStamp, setIsUploadingMaintenanceStamp] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+
+  const [seoConfig, setSeoConfig] = useState({
+    title: '',
+    description: '',
+    imageUrl: '',
+    faviconUrl: ''
+  });
+  const [isUploadingSeoImg, setIsUploadingSeoImg] = useState(false);
+  const [isUploadingSeoIcon, setIsUploadingSeoIcon] = useState(false);
 
   const [expandedSetting, setExpandedSetting] = useState<string | null>('global');
 
@@ -122,33 +162,67 @@ export default function AdminDashboard() {
       }, (err) => console.error("Admin: contact_requests listener error:", err));
     }
     
-    const unsubSystem = onSnapshot(doc(db, 'settings', 'system'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
-        if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
-        if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
-        if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
-        if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
-      }
-    }, (err) => console.error("Admin: system settings listener error:", err));
+    // Fetch settings ONCE to avoid overwriting admin inputs while typing
+    const fetchSettings = async () => {
+      try {
+        const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+        if (sysSnap.exists()) {
+          const data = sysSnap.data();
+          if (data.appVersion) setAppVersion(data.appVersion);
+          if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
+          if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
+          if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
+          if (data.githubGlobalConfig) setGithubGlobalConfig(data.githubGlobalConfig);
+          if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
+          if (data.stampConfig) setStampConfig(prev => ({ ...prev, ...data.stampConfig }));
+          if (data.maintenanceStampConfig) setMaintenanceStampConfig(prev => ({ ...prev, ...data.maintenanceStampConfig }));
+        }
 
-    let unsubGithubIntegration = () => {};
-    if (isAdmin) {
-      unsubGithubIntegration = onSnapshot(doc(db, 'settings', 'github_integration'), (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
+        const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
+        if (ghSnap.exists()) {
+          const data = ghSnap.data();
+          const fetchedUsername = data.username || data.owner || '';
+          const fetchedToken = data.token || '';
           setGithubIntegrationConfig({
-            username: data.username || data.owner || '',
+            username: fetchedUsername,
             repo: data.repo || '',
-            token: data.token || '',
+            token: fetchedToken,
             branch: data.branch || 'main',
             path: data.path || 'assets/uploads'
           });
+          setGithubGlobalConfig(prev => ({
+            username: prev.username || fetchedUsername,
+            token: prev.token || fetchedToken
+          }));
         }
-      }, (err) => console.error("Admin: github_integration listener error:", err));
-    }
 
+        const audioSnap = await getDoc(doc(db, 'settings', 'audio'));
+        if (audioSnap.exists()) {
+          const data = audioSnap.data();
+          setAudioConfig({
+            musicUrl: data.musicUrl || '',
+            title: data.title || 'Nhạc nền hệ thống BMass',
+            repo: data.repo || '',
+            branch: data.branch || 'main',
+            path: data.path || 'assets/audio'
+          });
+        }
+
+        const seoSnap = await getDoc(doc(db, 'settings', 'seo'));
+        if (seoSnap.exists()) {
+          const data = seoSnap.data();
+          setSeoConfig({
+            title: data.title || '',
+            description: data.description || '',
+            imageUrl: data.imageUrl || '',
+            faviconUrl: data.faviconUrl || ''
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching settings:", err);
+      }
+    };
+    
     const fetchAbout = async () => {
       try {
         const snap = await getDoc(doc(db, 'settings', 'about'));
@@ -157,7 +231,11 @@ export default function AdminDashboard() {
         console.error("Admin: fetchAbout error:", e);
       }
     };
-    fetchAbout();
+
+    if (isAdmin) {
+      fetchSettings();
+      fetchAbout();
+    }
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -166,11 +244,6 @@ export default function AdminDashboard() {
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => console.error("Admin: apps listener error:", err));
-
-    const unsubGuests = onSnapshot(collection(db, 'guests'), (snapshot) => {
-      const gData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setGuests(gData.sort((a, b) => (b.lastSeen?.toMillis() || 0) - (a.lastSeen?.toMillis() || 0)));
-    }, (err) => console.error("Admin: guests listener error:", err));
 
     const unsubCategories = onSnapshot(collection(db, 'app_categories'), (snapshot) => {
       const cats: any = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -201,15 +274,67 @@ export default function AdminDashboard() {
     return () => {
       unsubToolPerms();
       unsubContacts();
-      unsubSystem();
-      unsubGithubIntegration();
       unsubAllUtils();
       unsubApps();
       unsubCategories();
       unsubStats();
-      unsubGuests();
     };
-  }, [userData]);
+  }, []);
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+    const token = githubGlobalConfig.token || githubIntegrationConfig.token || '';
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setUploadProgress(prev => ({ ...prev, avatar: 0 }));
+    const toastId = toast.loading('Đang tải ảnh đại diện lên GitHub...');
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+      
+      const filename = `avatar_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const uploadPath = `avatars/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Update admin avatar ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, avatar: Math.round(progress) }))
+      );
+
+      setAboutConfig(prev => ({ ...prev, adminPhoto: result.url }));
+      toast.success('Đã tải lên ảnh đại diện thành công!', { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi tải ảnh: ${e.message}`, { id: toastId });
+    } finally {
+      setIsUploadingAvatar(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.avatar;
+        return next;
+      });
+      e.target.value = '';
+    }
+  };
 
   const saveAboutConfig = async () => {
     try {
@@ -249,7 +374,7 @@ export default function AdminDashboard() {
   const handleSaveGithubGlobal = async () => {
     try {
       // Save global & auto sync to fileManager & imageUpload configs in standard systems doc
-      await updateDoc(doc(db, 'settings', 'system'), {
+      await setDoc(doc(db, 'settings', 'system'), {
         githubGlobalConfig,
         fileManagerConfig: {
           ...fileManagerConfig,
@@ -261,7 +386,7 @@ export default function AdminDashboard() {
           username: githubGlobalConfig.username,
           token: githubGlobalConfig.token
         }
-      });
+      }, { merge: true });
 
       // Synchronize key to github_integration settings as well
       await setDoc(doc(db, 'settings', 'github_integration'), {
@@ -278,25 +403,147 @@ export default function AdminDashboard() {
 
   const handleSaveImageUploadConfig = async () => {
     try {
-      await updateDoc(doc(db, 'settings', 'system'), {
+      await setDoc(doc(db, 'settings', 'system'), {
         imageUploadConfig: {
           ...imageUploadConfig,
-          username: githubGlobalConfig.username,
-          token: githubGlobalConfig.token
+          username: githubGlobalConfig.username || imageUploadConfig.username || '',
+          token: githubGlobalConfig.token || imageUploadConfig.token || ''
         }
-      });
+      }, { merge: true });
       toast.success('Đã cập nhật cấu hình kho lưu trữ hình ảnh');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình kho hình ảnh');
     }
   };
 
+  const handleSaveStampConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        stampConfig
+      }, { merge: true });
+      toast.success('Đã cập nhật cấu hình con dấu bản quyền thành công!');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình con dấu');
+    }
+  };
+
+  const handleSaveMaintenanceStampConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        maintenanceStampConfig
+      }, { merge: true });
+      toast.success('Đã cập nhật cấu hình con dấu bảo trì thành công!');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình con dấu bảo trì');
+    }
+  };
+
+  const handleUploadStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Vui lòng hoàn thành Cấu hình GitHub trung tâm / Kho hình ảnh trước khi tải ảnh lên.');
+      return;
+    }
+
+    setIsUploadingStamp(true);
+    const originalId = toast.loading('Đang tải ảnh con dấu lên GitHub...');
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `system/stamp_${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload System Stamp: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, stampImage: Math.round(progress) }))
+      );
+
+      setStampConfig(prev => ({
+        ...prev,
+        imageUrl: githubData.url
+      }));
+
+      toast.success('Đã tải con dấu lên thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải con dấu: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingStamp(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.stampImage;
+        return next;
+      });
+    }
+  };
+
+  const handleUploadMaintenanceStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Vui lòng hoàn thành Cấu hình GitHub trung tâm / Kho hình ảnh trước khi tải ảnh lên.');
+      return;
+    }
+
+    setIsUploadingMaintenanceStamp(true);
+    const originalId = toast.loading('Đang tải ảnh con dấu bảo trì lên GitHub...');
+    try {
+      const ghConfig = { owner: username, repo, token, branch };
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `system/maintenance_stamp_${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload System Maintenance Stamp: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, maintenanceStamp: Math.round(progress) }))
+      );
+
+      setMaintenanceStampConfig(prev => ({ ...prev, imageUrl: githubData.url }));
+      toast.success('Đã tải con dấu bảo trì lên thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải con dấu: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingMaintenanceStamp(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.maintenanceStamp;
+        return next;
+      });
+    }
+  };
+
   const handleSaveGithubIntegration = async () => {
     try {
+      const mergedUsername = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+      const mergedToken = githubGlobalConfig.token || githubIntegrationConfig.token || '';
       await setDoc(doc(db, 'settings', 'github_integration'), {
-        username: githubGlobalConfig.username,
-        owner: githubGlobalConfig.username,
-        token: githubGlobalConfig.token,
+        username: mergedUsername,
+        owner: mergedUsername,
+        token: mergedToken,
         repo: githubIntegrationConfig.repo,
         branch: githubIntegrationConfig.branch || 'main',
         path: githubIntegrationConfig.path || 'assets/uploads'
@@ -304,6 +551,218 @@ export default function AdminDashboard() {
       toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveAppVersion = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { appVersion }, { merge: true });
+      toast.success('Đã lưu phiên bản hệ thống thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu phiên bản');
+    }
+  };
+
+  const handleSaveAudioConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'audio'), {
+        musicUrl: audioConfig.musicUrl,
+        title: audioConfig.title,
+        repo: audioConfig.repo,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      }, { merge: true });
+      toast.success('Đã lưu cấu hình Nhạc nền hệ thống thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình nhạc nền');
+    }
+  };
+
+  const handleSaveSeoConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'seo'), seoConfig, { merge: true });
+      toast.success('Đã lưu cấu hình SEO thành công');
+    } catch (e) {
+      toast.error('Lỗi khi lưu cấu hình SEO');
+    }
+  };
+
+  const handleUploadSeoImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingSeoImg(true);
+    setUploadProgress(prev => ({ ...prev, seoImage: 0 }));
+    const originalId = toast.loading(`Đang tải ảnh SEO "${file.name}" lên GitHub...`);
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `seo/${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload SEO Cover Image: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, seoImage: Math.round(progress) }))
+      );
+
+      setSeoConfig(prev => ({
+        ...prev,
+        imageUrl: githubData.url
+      }));
+
+      toast.success('Đã tải lên ảnh SEO thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải ảnh SEO: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingSeoImg(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.seoImage;
+        return next;
+      });
+    }
+  };
+
+  const handleUploadSeoIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || imageUploadConfig.username;
+    const token = githubGlobalConfig.token || imageUploadConfig.token;
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    setIsUploadingSeoIcon(true);
+    setUploadProgress(prev => ({ ...prev, seoIcon: 0 }));
+    const originalId = toast.loading(`Đang tải Icon/Favicon "${file.name}" lên GitHub...`);
+
+    try {
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `seo/${Date.now()}_icon_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig,
+        file,
+        uploadPath,
+        `Upload SEO Favicon: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, seoIcon: Math.round(progress) }))
+      );
+
+      setSeoConfig(prev => ({
+        ...prev,
+        faviconUrl: githubData.url
+      }));
+
+      toast.success('Đã tải lên Icon/Favicon SEO thành công!', { id: originalId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi tải Icon/Favicon SEO: ${err.message}`, { id: originalId });
+    } finally {
+      setIsUploadingSeoIcon(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.seoIcon;
+        return next;
+      });
+    }
+  };
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!githubGlobalConfig.username || !githubGlobalConfig.token) {
+      toast.error('Vui lòng hoàn tất cấu hình GitHub trung tâm (Tài khoản và Token) trước!');
+      return;
+    }
+
+    if (!audioConfig.repo) {
+      toast.error('Vui lòng nhập tên Repository lưu trữ tệp nhạc nền!');
+      return;
+    }
+
+    setAudioUploading(true);
+    setUploadProgress(prev => ({ ...prev, audio: 0 }));
+    const originalId = toast.loading(`Đang tải lên tệp âm thanh "${file.name}" lên GitHub...`);
+    
+    try {
+      const ghConfig = {
+        owner: githubGlobalConfig.username,
+        repo: audioConfig.repo,
+        token: githubGlobalConfig.token,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      };
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const uploadPath = `${audioConfig.path || 'assets/audio'}/${Date.now()}_${cleanFileName}`;
+
+      const githubData = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Upload MP3 audio file: ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, audio: Math.round(progress) }))
+      );
+
+      setAudioConfig(prev => ({
+        ...prev,
+        musicUrl: githubData.url
+      }));
+
+      // Auto save to settings/audio in Firestore!
+      await setDoc(doc(db, 'settings', 'audio'), {
+        musicUrl: githubData.url,
+        title: audioConfig.title || file.name.substring(0, file.name.lastIndexOf('.')),
+        repo: audioConfig.repo,
+        branch: audioConfig.branch || 'main',
+        path: audioConfig.path || 'assets/audio'
+      }, { merge: true });
+
+      toast.success('Đã tải lên nhập file MP3 thành công và đồng bộ nhạc nền hệ thống!', { id: originalId });
+    } catch (err: any) {
+      console.error('Audio upload error:', err);
+      toast.error('Lỗi khi tải nhạc lên GitHub: ' + (err.message || 'Thất bại'), { id: originalId });
+    } finally {
+      setAudioUploading(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.audio;
+        return next;
+      });
+      e.target.value = '';
     }
   };
 
@@ -358,14 +817,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.')) return;
-    try {
-      await deleteDoc(doc(db, 'app_categories', id));
-      toast.success('Đã xóa danh mục');
-    } catch (e) {
-      toast.error('Lỗi khi xóa');
-    }
+  const handleDeleteCategory = (id: string) => {
+    openConfirm({
+      title: 'Xóa danh mục ứng dụng',
+      message: 'Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.',
+      confirmText: 'Xóa ngay',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'app_categories', id));
+          toast.success('Đã xóa danh mục');
+        } catch (e) {
+          toast.error('Lỗi khi xóa');
+        }
+      }
+    });
   };
 
   const handleEditCategory = async (id: string, currentName: string) => {
@@ -497,55 +963,41 @@ export default function AdminDashboard() {
     }
 
     setIsUploadingLogo(true);
+    setUploadProgress(prev => ({ ...prev, logo: 0 }));
     const toastId = toast.loading('Đang xử lý tải tệp lên GitHub...');
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = (reader.result as string).split(',')[1];
-          const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-          const path = `logos/${filename}`;
-          const url = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
-
-          const res = await fetch(url, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Token ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              message: `Upload logo ${file.name} from admin UI`,
-              content: base64Data,
-              branch: branch
-            })
-          });
-
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Lỗi HTTP');
-          }
-
-          const rawUrl = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${path}`;
-          setAppForm(prev => ({ ...prev, logoUrl: rawUrl }));
-          toast.success('Đã tải lên logo thành công!', { id: toastId });
-        } catch (innerError: any) {
-          console.error(innerError);
-          toast.error(`GitHub Upload Failed: ${innerError.message || innerError}`, { id: toastId });
-        } finally {
-          setIsUploadingLogo(false);
-        }
+      const ghConfig = {
+        owner: username,
+        repo: repo,
+        token: token,
+        branch: branch
       };
-      reader.onerror = () => {
-        toast.error('Lỗi khi đọc file logo', { id: toastId });
-        setIsUploadingLogo(false);
-      };
-      reader.readAsDataURL(file);
+      
+      const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const uploadPath = `logos/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Upload logo ${file.name} from admin UI`,
+        (progress) => setUploadProgress(prev => ({ ...prev, logo: Math.round(progress) }))
+      );
+
+      setAppForm(prev => ({ ...prev, logoUrl: result.url }));
+      toast.success('Đã tải lên logo thành công!', { id: toastId });
     } catch (e: any) {
       console.error(e);
       toast.error(`Lỗi: ${e.message}`, { id: toastId });
+    } finally {
       setIsUploadingLogo(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.logo;
+        return next;
+      });
+      e.target.value = '';
     }
   };
 
@@ -821,16 +1273,16 @@ export default function AdminDashboard() {
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
-            { id: 'tasks', label: 'Công việc', icon: CheckSquare },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
             { id: 'system', label: 'Hệ thống', icon: Settings },
+            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
             { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
             { id: 'about', label: 'About Setup', icon: Info },
-            { id: 'admin_system', label: 'Hệ thống (Data)', icon: Server }
+            { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <tab.icon className="w-5 h-5" />
@@ -843,17 +1295,17 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống (Data)'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
                     <Activity size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hôm nay</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Hôm nay</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.today.toLocaleString()}</div>
            </div>
@@ -862,7 +1314,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                     <Globe size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tháng này</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tháng này</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.month.toLocaleString()}</div>
            </div>
@@ -871,7 +1323,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
                     <LineChart size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Năm nay</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Năm nay</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.year.toLocaleString()}</div>
            </div>
@@ -880,7 +1332,7 @@ export default function AdminDashboard() {
                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                     <Activity size={18} />
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tổng cộng</span>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tổng cộng</span>
               </div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.total.toLocaleString()}</div>
            </div>
@@ -931,13 +1383,33 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1 ml-1">Ảnh (URL)</label>
-                    <input 
-                      type="text" 
-                      value={aboutConfig.adminPhoto}
-                      onChange={(e) => setAboutConfig({...aboutConfig, adminPhoto: e.target.value})}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-                    />
+                    <label className="block text-xs font-bold mb-1 ml-1 flex items-center justify-between">
+                      <span>Ảnh (URL)</span>
+                      <label className="cursor-pointer text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                        <Upload size={12} />
+                        <span className="text-[10px]">Tải lên GitHub</span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadAvatarToGithub} disabled={isUploadingAvatar} />
+                      </label>
+                    </label>
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        value={aboutConfig.adminPhoto}
+                        onChange={(e) => setAboutConfig({...aboutConfig, adminPhoto: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white pr-12"
+                        placeholder="Link ảnh đại diện..."
+                      />
+                      {aboutConfig.adminPhoto && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm pointer-events-none">
+                          <img src={aboutConfig.adminPhoto} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {isUploadingAvatar && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Bio (Giới thiệu bản thân)</label>
@@ -1125,22 +1597,6 @@ export default function AdminDashboard() {
 
       {activeTab === 'users' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          <div className="flex items-center gap-2 mb-4 bg-slate-100 dark:bg-white/5 p-1 rounded-xl w-fit">
-            <button
-              onClick={() => setUserTab('registered')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${userTab === 'registered' ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300'}`}
-            >
-              Đã Đăng Ký
-            </button>
-            <button
-              onClick={() => setUserTab('guests')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${userTab === 'guests' ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300'}`}
-            >
-              Khách (Trực Truy cập)
-            </button>
-          </div>
-
-          {userTab === 'registered' ? (
             <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
               <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
@@ -1291,64 +1747,7 @@ export default function AdminDashboard() {
               </table>
              )}
             </div>
-          </div>
-          ) : (
-            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                  <Users className="w-5 h-5 text-indigo-500" /> Lịch sử đăng nhập Khách Truy cập
-                </h2>
-                <div className="text-sm text-slate-500 font-medium">Tổng số: {guests.length} thiết bị/khách</div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
-                  <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
-                    <tr>
-                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">ID / User Agent</th>
-                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">IP Address</th>
-                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Location</th>
-                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Số lần Truy cập</th>
-                      <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Lần Truy cập Cuối</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
-                    {guests.map((g) => (
-                      <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-mono text-xs text-slate-900 dark:text-white max-w-[200px] truncate" title={g.id}>{g.id}</div>
-                          <div className="text-[10px] text-slate-500 max-w-[200px] truncate mt-1" title={g.userAgent}>{g.userAgent}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-xs font-mono text-slate-600 dark:text-slate-400">
-                            {g.ip || 'Unknown'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-xs text-slate-600 dark:text-slate-400">
-                            {[g.city, g.region, g.country].filter(Boolean).join(', ') || 'Unknown'}
-                            {g.latitude && g.longitude && (
-                               <div className="text-[10px] font-mono text-slate-400 mt-0.5">({g.latitude}, {g.longitude})</div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                           <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                             {g.visits || 1}
-                           </span>
-                        </td>
-                         <td className="px-6 py-4 text-slate-600 min-w-[160px]">
-                          <div className="text-xs">
-                            {g.lastSeen ? format(toSafeDate(g.lastSeen), 'HH:mm - dd/MM/yyyy') : 'N/A'}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+           </div>
         </motion.div>
       )}
 
@@ -1419,6 +1818,8 @@ export default function AdminDashboard() {
                 { key: 'profile', label: 'Hồ sơ / Tài khoản', icon: UserCircle, page: 'Hệ thống' },
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
+                { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
+                { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -1464,6 +1865,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {[
+                { id: 'avatar-frame', title: 'Khung Ảnh Đại Diện', icon: ImageIcon },
                 { id: 'file-manager', title: 'Quản Lý File Cá Nhân', icon: Laptop },
                 { id: 'kho-van-ban', title: 'Kho Văn Bản', icon: FolderOpen },
                 { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
@@ -1653,6 +2055,52 @@ export default function AdminDashboard() {
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.isEmergency ? 'translate-x-6' : 'translate-x-1'}`}/>
                     </button>
                   </div>
+
+                  <div className="border-t border-slate-200 dark:border-white/10 pt-6 mt-6 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest ml-1">
+                      Thông báo mở đầu trang (Popup Welcome)
+                    </h4>
+                    <p className="text-[11px] text-slate-400 ml-1 leading-relaxed">
+                      Hiển thị hộp thoại (Modal popup) thông báo mỗi khi mở hoặc tải lại website. Người dùng nhấn Đóng để không hiển thị lại cho đến lần tải trang tiếp theo.
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">Bật/Tắt Thông báo mở đầu trang</span>
+                      <button 
+                          type="button"
+                          onClick={() => setNotificationConfig({...notificationConfig, popupActive: !notificationConfig.popupActive})}
+                          disabled={!isSuperAdmin}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${notificationConfig.popupActive ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                      >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationConfig.popupActive ? 'translate-x-6' : 'translate-x-1'}`}/>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề thông báo popup</label>
+                      <input 
+                        type="text"
+                        value={notificationConfig.popupTitle || ''}
+                        onChange={(e) => setNotificationConfig({...notificationConfig, popupTitle: e.target.value})}
+                        disabled={!isSuperAdmin}
+                        placeholder="Chào mừng bạn đến với BMASS Ecosystem"
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold mb-1 ml-1 text-slate-500 uppercase tracking-widest">Nội dung thông báo popup (Hỗ trợ xuống dòng)</label>
+                      <textarea 
+                        rows={4}
+                        value={notificationConfig.popupMessage || ''}
+                        onChange={(e) => setNotificationConfig({...notificationConfig, popupMessage: e.target.value})}
+                        disabled={!isSuperAdmin}
+                        placeholder="Hệ thống đã nâng cấp toàn diện phân hệ bảo mật và tối ưu hóa hiệu năng truy vấn..."
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
                   <div className="pt-4 flex justify-end">
                     <button 
                       onClick={handleSaveNotification}
@@ -1695,9 +2143,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'global' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'global' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'global' && (
@@ -1759,9 +2205,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'vault' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'vault' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'vault' && (
@@ -1833,9 +2277,7 @@ export default function AdminDashboard() {
                            </p>
                          </div>
                        </div>
-                       <span className="text-[11px] font-bold text-slate-400">
-                         {expandedSetting === 'personal' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                       </span>
+                       <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'personal' ? 'rotate-180' : ''}`} />
                      </button>
                      
                      {expandedSetting === 'personal' && (
@@ -1897,9 +2339,7 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {expandedSetting === 'image' ? 'Thu gọn ▲/▼' : 'Cấu hình ▼'}
-                        </span>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'image' ? 'rotate-180' : ''}`} />
                       </button>
 
                       {expandedSetting === 'image' && (
@@ -1920,23 +2360,558 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Branch (Nhánh)</label>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Đường dẫn folder lưu trữ</label>
                               <input 
                                 type="text"
                                 className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
-                                value={imageUploadConfig.branch}
-                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, branch: e.target.value})}
-                                placeholder="main"
+                                value={imageUploadConfig.path || ''}
+                                onChange={(e) => setImageUploadConfig({...imageUploadConfig, path: e.target.value})}
+                                placeholder="assets/images"
                               />
                             </div>
                           </div>
                           <div className="pt-2 flex justify-end">
                             <button 
+                              type="button"
                               onClick={handleSaveImageUploadConfig}
                               disabled={!isSuperAdmin}
                               className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
                             >
                               <Save size={14} /> Lưu Cấu Hình Ảnh
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. Setup MP3 & Nhạc nền Hệ thống */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'audio' ? null : 'audio')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                            <Music className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">5. Setup MP3 &amp; Nhạc nền Hệ thống</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {audioConfig.musicUrl ? `Đang có: ${audioConfig.title}` : 'Chưa cấu hình nhạc nền'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'audio' ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedSetting === 'audio' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Kho dùng chung:</strong> Phân hệ setup MP3/âm thanh sử dụng chung Token + Username từ Cấu hình GitHub trung tâm. Chỉ cần điền Tên repository, thư mục và đẩy nhạc lên GitHub trực tiếp.</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề (Yêu cầu)</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={audioConfig.title}
+                                onChange={(e) => setAudioConfig({...audioConfig, title: e.target.value})}
+                                placeholder="Tên bản nhạc nền (vd: Nhạc tết sôi động)"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Repository nhạc nền</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={audioConfig.repo}
+                                onChange={(e) => setAudioConfig({...audioConfig, repo: e.target.value})}
+                                placeholder="vd: app-audios-vault"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Thư mục chứa (Path)</label>
+                            <input 
+                              type="text"
+                              className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                              value={audioConfig.path}
+                              onChange={(e) => setAudioConfig({...audioConfig, path: e.target.value})}
+                              placeholder="assets/audio"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải file âm thanh (.mp3)</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="audio/*"
+                                onChange={handleAudioUpload}
+                                disabled={audioUploading || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2 animate-bounce" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {audioUploading ? `Đang tải lên... ${uploadProgress.audio || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải file nhạc mới'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Hỗ trợ file định dạng .mp3, .wav... dưới 40MB</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {audioConfig.musicUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Link nhạc nền hiện tại:</span>
+                              <div className="flex gap-2 items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={audioConfig.musicUrl}
+                                />
+                                <audio src={audioConfig.musicUrl} controls className="h-8 max-w-[150px] md:max-w-xs scale-90" />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveAudioConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập Nhạc nền
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. Cấu hình SEO Website */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'seo' ? null : 'seo')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-550 flex items-center justify-center">
+                            <Globe className="w-4 h-4 text-indigo-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">6. Cấu hình SEO Website (Tiêu đề, Mô tả, Ảnh bài viết)</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {seoConfig.title ? `Tiêu đề SEO: ${seoConfig.title}` : 'Chưa cấu hình SEO'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'seo' ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedSetting === 'seo' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Cấu hình SEO:</strong> Cho phép hiệu chỉnh Meta Title, Description và Ảnh bìa SEO (OpenGraph tag). Ảnh bìa được tải lên và lưu trữ trực tiếp trên GitHub qua phân hệ lưu trữ ảnh.</span>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiêu đề Website (Title)</label>
+                              <input 
+                                type="text"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={seoConfig.title}
+                                onChange={(e) => setSeoConfig({...seoConfig, title: e.target.value})}
+                                placeholder="Nhập tiêu đề website SEO"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Mô tả Website (Description)</label>
+                              <textarea 
+                                rows={3}
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white resize-none"
+                                value={seoConfig.description}
+                                onChange={(e) => setSeoConfig({...seoConfig, description: e.target.value})}
+                                placeholder="Nhập mô tả website chi tiết cho công cụ tìm kiếm..."
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải Logo Icon / Web Favicon (sử dụng Github)</label>
+                              
+                              <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                                <input 
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleUploadSeoIcon}
+                                  disabled={isUploadingSeoIcon || !isSuperAdmin}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <div className="flex flex-col items-center justify-center p-2">
+                                  <Upload size={32} className="text-zinc-400 mb-2" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                    {isUploadingSeoIcon ? `Đang tải Icon/Favicon... ${uploadProgress.seoIcon || 0}%` : 'Nhấp hoặc kéo thả để tải Icon/Favicon mới'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Sử dụng làm biểu tượng Web trên thanh trình duyệt (Favicon)</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {seoConfig.faviconUrl && (
+                              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn Icon/Favicon hiện tại:</span>
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                  <input 
+                                    type="text"
+                                    readOnly
+                                    className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                    value={seoConfig.faviconUrl}
+                                  />
+                                  {seoConfig.faviconUrl && (
+                                    <img src={seoConfig.faviconUrl} alt="Favicon Preview" className="h-12 w-12 rounded-lg object-contain bg-white border border-slate-200 dark:border-white/10 shadow-sm p-1" referrerPolicy="no-referrer" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải ảnh bìa SEO (sử dụng Github)</label>
+                              
+                              <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-indigo-500 dark:hover:border-purple-500 transition-colors relative">
+                                <input 
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleUploadSeoImage}
+                                  disabled={isUploadingSeoImg || !isSuperAdmin}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                />
+                                <div className="flex flex-col items-center justify-center p-2">
+                                  <Upload size={32} className="text-zinc-400 mb-2" />
+                                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                    {isUploadingSeoImg ? `Đang tải ảnh SEO... ${uploadProgress.seoImage || 0}%` : 'Nhấp hoặc kéo thả để tải ảnh bìa SEO mới'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Hỗ trợ các tệp ảnh tiêu chuẩn qua GitHub</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {seoConfig.imageUrl && (
+                              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn ảnh bìa SEO hiện tại:</span>
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                  <input 
+                                    type="text"
+                                    readOnly
+                                    className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                    value={seoConfig.imageUrl}
+                                  />
+                                  {seoConfig.imageUrl && (
+                                    <img src={seoConfig.imageUrl} alt="SEO Preview" className="h-16 rounded-lg object-cover border border-slate-200 dark:border-white/10 shadow-sm" referrerPolicy="no-referrer" />
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="pt-2 flex justify-end gap-3">
+                              <button 
+                                type="button"
+                                onClick={handleSaveSeoConfig}
+                                disabled={!isSuperAdmin}
+                                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                              >
+                                <Save size={14} /> Lưu thiết lập SEO
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 7. Cấu hình Con Dấu Bản Quyền (Dấu Mọc Đỏ) */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'stamp' ? null : 'stamp')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
+                            <Shield className="w-4 h-4 text-red-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-white">7. Cấu hình Con Dấu Toàn Trang (Dấu mọc đỏ)</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {stampConfig.imageUrl ? 'Đã tải lên ảnh con dấu bản quyền' : 'Chưa cấu hình con dấu'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'stamp' ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedSetting === 'stamp' && (
+                        <div className="p-5 border-t border-slate-200 dark:border-white/10 space-y-4 bg-slate-50/50 dark:bg-black/10">
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs rounded-xl flex items-start gap-2 leading-relaxed">
+                            <Info size={16} className="shrink-0 mt-0.5" />
+                            <span><strong>Con dấu mọc đỏ:</strong> Cho phép hiển thị một con dấu (mọc đỏ) đè mờ ở một góc trên toàn bộ các trang của hệ thống, điều khiển độ mờ và kích thước linh hoạt. </span>
+                          </div>
+
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">Kích hoạt hiển thị con con dấu toàn trang</span>
+                            <button 
+                              type="button"
+                              onClick={() => setStampConfig({...stampConfig, active: !stampConfig.active})}
+                              disabled={!isSuperAdmin}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${stampConfig.active ? 'bg-red-650' : 'bg-slate-300 dark:bg-slate-700'}`}
+                            >
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${stampConfig.active ? 'translate-x-6' : 'translate-x-1'}`}/>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Góc hiển thị (Vị trí)</label>
+                              <select
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={stampConfig.position}
+                                onChange={(e) => setStampConfig({...stampConfig, position: e.target.value})}
+                                disabled={!isSuperAdmin}
+                              >
+                                <option value="top-left">Góc trên - bên trái (Top-Left)</option>
+                                <option value="top-right">Góc trên - bên phải (Top-Right)</option>
+                                <option value="bottom-left">Góc dưới - bên trái (Bottom-Left)</option>
+                                <option value="bottom-right">Góc dưới - bên phải (Bottom-Right)</option>
+                                <option value="center">Giữa màn hình (Center / Watermark)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Kích thước con dấu (pixel)</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={stampConfig.width}
+                                onChange={(e) => setStampConfig({...stampConfig, width: parseInt(e.target.value) || 120})}
+                                placeholder="120"
+                                min={40}
+                                max={500}
+                                disabled={!isSuperAdmin}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="block text-[10px] font-bold ml-1 text-slate-500 uppercase tracking-widest">Độ hiển thị mờ/rõ nét (%): {stampConfig.opacity || 50}%</label>
+                            </div>
+                            <input 
+                              type="range"
+                              min="5"
+                              max="100"
+                              value={stampConfig.opacity || 50}
+                              onChange={(e) => setStampConfig({...stampConfig, opacity: parseInt(e.target.value)})}
+                              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-red-650"
+                              disabled={!isSuperAdmin}
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                              <span>Mờ ảo nhất (5%)</span>
+                              <span>Mặc định (50%)</span>
+                              <span>Rõ nét nhất (100%)</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải lên Con dấu mọc đỏ của bạn (qua GitHub)</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-red-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="image/*"
+                                onChange={handleUploadStamp}
+                                disabled={isUploadingStamp || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {isUploadingStamp ? `Đang tải con dấu lên... ${uploadProgress.stampImage || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải ảnh con dấu'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Khuyên dùng hình ảnh nền trong suốt (PNG/WebP dạng tròn mọc đỏ)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {stampConfig.imageUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn con dấu hiện tại:</span>
+                              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={stampConfig.imageUrl}
+                                />
+                                {stampConfig.imageUrl && (
+                                  <div className="relative p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-white/10 rounded-lg shrink-0">
+                                    <img 
+                                      src={stampConfig.imageUrl} 
+                                      alt="Stamp Preview" 
+                                      className="h-16 w-16 object-contain" 
+                                      style={{ opacity: (stampConfig.opacity || 50) / 100 }}
+                                      referrerPolicy="no-referrer" 
+                                    />
+                                    <div className="absolute inset-0 border border-red-500/20 pointer-events-none rounded-lg" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveStampConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập con dấu
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 8. Cấu hình Con Dấu Bảo Trì */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-white/5 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSetting(expandedSetting === 'maintenanceStamp' ? null : 'maintenanceStamp')}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                            <ImageIcon className="w-4 h-4 text-orange-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">8.Thiết Lập Con Dấu Bảo Trì</h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              {maintenanceStampConfig.imageUrl ? 'Đã tải lên ảnh con dấu bảo trì' : 'Chưa cấu hình con dấu bảo trì'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandedSetting === 'maintenanceStamp' ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {expandedSetting === 'maintenanceStamp' && (
+                        <div className="p-4 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20 space-y-5">
+                          <div className="p-4 bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-2xl mb-4">
+                            <div className="flex items-start gap-3">
+                              <Lightbulb className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                              <div className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+                                <span><strong>Con dấu bảo trì:</strong> Hình ảnh này sẽ tự động đóng đè lên (trải mờ một góc) các Tiện ích và Ứng dụng khi chúng được đặt ở chế độ bảo trì.</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Kích thước con dấu (pixel)</label>
+                              <input 
+                                type="number"
+                                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                value={maintenanceStampConfig.width}
+                                onChange={(e) => setMaintenanceStampConfig({...maintenanceStampConfig, width: parseInt(e.target.value) || 80})}
+                                placeholder="80"
+                                min={20}
+                                max={300}
+                                disabled={!isSuperAdmin}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="block text-[10px] font-bold ml-1 text-slate-500 uppercase tracking-widest">Độ hiển thị mờ/rõ nét (%): {maintenanceStampConfig.opacity || 80}%</label>
+                            </div>
+                            <input 
+                              type="range"
+                              min="5"
+                              max="100"
+                              value={maintenanceStampConfig.opacity || 80}
+                              onChange={(e) => setMaintenanceStampConfig({...maintenanceStampConfig, opacity: parseInt(e.target.value)})}
+                              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-700 accent-orange-500"
+                              disabled={!isSuperAdmin}
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                              <span>Mờ ảo nhất (5%)</span>
+                              <span>Mặc định (80%)</span>
+                              <span>Rõ nét nhất (100%)</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tải lên Con dấu bảo trì của bạn</label>
+                            
+                            <div className="border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl p-6 text-center hover:border-orange-500 transition-colors relative">
+                              <input 
+                                type="file"
+                                accept="image/*"
+                                onChange={handleUploadMaintenanceStamp}
+                                disabled={isUploadingMaintenanceStamp || !isSuperAdmin}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <div className="flex flex-col items-center justify-center p-2">
+                                <Upload size={32} className="text-zinc-400 mb-2" />
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+                                  {isUploadingMaintenanceStamp ? `Đang tải con dấu lên... ${uploadProgress.maintenanceStamp || 0}%` : 'Kéo thả hoặc nhấn vào đây để tải ảnh con dấu bảo trì'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">Khuyên dùng hình nền trong suốt (PNG/WebP)</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {maintenanceStampConfig.imageUrl && (
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-xl space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">Đường dẫn con dấu hiện tại:</span>
+                              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                <input 
+                                  type="text"
+                                  readOnly
+                                  className="w-full bg-slate-200/50 dark:bg-black/20 text-xs px-3 py-2 rounded-lg outline-none cursor-text truncate text-slate-600 dark:text-zinc-400"
+                                  value={maintenanceStampConfig.imageUrl}
+                                />
+                                {maintenanceStampConfig.imageUrl && (
+                                  <div className="relative p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-white/10 rounded-lg shrink-0">
+                                    <img 
+                                      src={maintenanceStampConfig.imageUrl} 
+                                      alt="Maintenance Stamp Preview" 
+                                      className="h-16 w-16 object-contain" 
+                                      style={{ opacity: (maintenanceStampConfig.opacity || 80) / 100 }}
+                                      referrerPolicy="no-referrer" 
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex justify-end gap-3">
+                            <button 
+                              type="button"
+                              onClick={handleSaveMaintenanceStampConfig}
+                              disabled={!isSuperAdmin}
+                              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                            >
+                              <Save size={14} /> Lưu thiết lập con dấu
                             </button>
                           </div>
                         </div>
@@ -1948,9 +2923,40 @@ export default function AdminDashboard() {
 
       )}
 
-      {activeTab === 'tasks' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminTasks />
+      {activeTab === 'versions' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
+          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <RefreshCcw className="w-6 h-6 text-indigo-500" />
+                Quản lý Phiên bản Hệ thống
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">Cập nhật phiên bản hệ thống (Ví dụ: v1.0, v2). Khi có thay đổi, người dùng sẽ được nhắc Làm mới ứng dụng.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Tiền tố / Số Phiên Bản *</label>
+                <input 
+                  type="text" 
+                  value={appVersion}
+                  onChange={(e) => setAppVersion(e.target.value)}
+                  placeholder="Ví dụ: v2.0"
+                  className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button 
+                onClick={handleSaveAppVersion}
+                disabled={!isSuperAdmin}
+                className="flex-1 py-3.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Save size={16} /> Lưu Phiên Bản
+              </button>
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -2033,7 +3039,7 @@ export default function AdminDashboard() {
                             htmlFor="logo-upload-input-admin"
                             className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-white/5 dark:hover:bg-white/10 text-indigo-600 dark:text-zinc-300 border border-indigo-200/40 dark:border-white/5 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center gap-1"
                           >
-                            {isUploadingLogo ? 'Đang tải lên...' : 'Tải Logo lên Github'}
+                            {isUploadingLogo ? `Đang tải lên... ${uploadProgress.logo || 0}%` : 'Tải Logo lên Github'}
                           </label>
                           <p className="text-[9px] text-slate-400">Tự động đẩy tệp ảnh lên Git repository và sinh URL thô.</p>
                        </div>
