@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
@@ -24,11 +24,12 @@ import AdminLogin from './pages/admin/AdminLogin';
 import ComingSoon from './pages/ComingSoon';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
+import GuidePage from './pages/GuidePage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
-import TasksPage from './pages/TasksPage';
 import CalendarPage from './pages/CalendarPage';
+import HrmPage from './pages/HrmPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -202,8 +203,8 @@ export default function App() {
           if (docSnap.exists()) {
             setUserData(docSnap.data() as UserData);
           } else {
-            // Document doesn't exist yet, fallback to local user data representation based on auth
-            setUserData({
+            // Document doesn't exist yet, fallback to local user data representation based on auth and auto-create it
+            const fallbackUser: UserData = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               displayName: firebaseUser.displayName || 'User',
@@ -212,7 +213,10 @@ export default function App() {
               status: 'active',
               createdAt: Date.now(),
               lastLoginAt: Date.now()
-            });
+            };
+            setUserData(fallbackUser);
+            setDoc(doc(db, 'users', firebaseUser.uid), fallbackUser, { merge: true })
+              .catch((error) => console.error("Error auto-creating missing user document:", error));
           }
         }, (err) => {
           console.error("Error listening to user data:", err);
@@ -312,8 +316,10 @@ export default function App() {
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
-              <Route path="/tasks" element={<TabGuard tabKey="tasks"><TasksPage /></TabGuard>} />
+              <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
+              <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
+              <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

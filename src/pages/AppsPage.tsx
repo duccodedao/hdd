@@ -7,6 +7,7 @@ import { Helmet } from 'react-helmet-async';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import toast from 'react-hot-toast';
+import LoadingScreen from '../components/ui/LoadingScreen';
 
 interface AppItem {
   id: string;
@@ -103,6 +104,10 @@ export default function AppsPage() {
     }
     window.open(url, '_blank');
   };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="max-w-[1800px] mx-auto py-8 lg:py-12 space-y-8 animate-fade-in no-scrollbar px-4 bg-transparent min-h-screen">

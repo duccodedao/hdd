@@ -8,6 +8,15 @@ export default function ReleaseNotesPage() {
 
   const versions = [
     {
+      version: 'v2.5.0',
+      date: '27/05/2026',
+      changes: [
+        { type: 'feature', val: 'Cập nhật tài liệu Hướng Dẫn Sử Dụng trên toàn hệ thống.' },
+        { type: 'fix', val: 'Cải tiến hiệu ứng loading chờ trên toàn page khi đang tải dữ liệu.' },
+        { type: 'fix', val: 'Cập nhật lại viết tắt Nhân Viên (NV) & Cộng Tác Viên (CTV) trên module nhân sự.' }
+      ]
+    },
+    {
       version: 'v2.4.0',
       date: '09/05/2026',
       changes: [

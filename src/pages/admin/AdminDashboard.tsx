@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
+import { Shield, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -17,7 +17,6 @@ import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
-import AdminTasks from './AdminTasks';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -30,7 +29,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'tasks' | 'versions'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -1274,7 +1273,6 @@ export default function AdminDashboard() {
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
-            { id: 'tasks', label: 'Công việc', icon: CheckSquare },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
@@ -1297,7 +1295,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', tasks: 'Công việc', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
@@ -1820,8 +1818,9 @@ export default function AdminDashboard() {
                 { key: 'profile', label: 'Hồ sơ / Tài khoản', icon: UserCircle, page: 'Hệ thống' },
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
-                { key: 'tasks', label: 'Trang Công việc', icon: CheckSquare, page: 'Hệ thống' },
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
+                { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
+                { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -1872,7 +1871,9 @@ export default function AdminDashboard() {
                 { id: 'kho-van-ban', title: 'Kho Văn Bản', icon: FolderOpen },
                 { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
                 { id: 'image-to-pdf', title: 'Ảnh sang PDF', icon: FileImage },
-                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText }
+                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText },
+                { id: 'pdf-merger', title: 'Ghép PDF', icon: FilePlus },
+                { id: 'pdf-splitter', title: 'Tách PDF', icon: Scissors }
               ].map((util) => (
                 <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2 min-w-0">
@@ -2804,7 +2805,7 @@ export default function AdminDashboard() {
                             <ImageIcon className="w-4 h-4 text-orange-500" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">Thiết Lập Con Dấu Bảo Trì</h4>
+                            <h4 className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">8.Thiết Lập Con Dấu Bảo Trì</h4>
                             <p className="text-[10px] text-slate-500 mt-0.5">
                               {maintenanceStampConfig.imageUrl ? 'Đã tải lên ảnh con dấu bảo trì' : 'Chưa cấu hình con dấu bảo trì'}
                             </p>
@@ -2959,12 +2960,6 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
-        </motion.div>
-      )}
-
-      {activeTab === 'tasks' && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <AdminTasks />
         </motion.div>
       )}
 

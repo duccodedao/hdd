@@ -403,7 +403,7 @@ export default function Topbar() {
         <AnimatePresence>
           {showResetConfirm && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setShowResetConfirm(false)}
+              onClick={(e) => { if (e.target === e.currentTarget) setShowResetConfirm(false); }}
             >
                <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -418,7 +418,7 @@ export default function Topbar() {
                    </div>
                    <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">Làm mới phiên bản?</h2>
                    <p className="text-slate-500 dark:text-zinc-400 text-sm text-center mt-2">
-                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn.
+                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn{needsUpdate && systemVersion ? ` và cập nhật lên phiên bản ${systemVersion}` : ''}.
                    </p>
                  </div>
                  <div className="p-6 flex gap-3">

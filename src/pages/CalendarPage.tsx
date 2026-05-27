@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, setDoc, getDoc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Trash2, Edit2, AlertCircle, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Trash2, Edit2, AlertCircle, Clock, RefreshCw, ListTodo, Search } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { createPortal } from 'react-dom';
+import AppLogo from '../components/ui/AppLogo';
+import LoadingScreen from '../components/ui/LoadingScreen';
 
 interface CalendarEvent {
   id: string;
@@ -18,11 +20,21 @@ interface CalendarEvent {
   importance: 'low' | 'medium' | 'high';
   description?: string;
   createdAt: number;
+  syncedFromTasks?: boolean;
+  syncedFromTaskId?: string;
 }
 
 export default function CalendarPage() {
   const { userData, isSuperAdmin, isAdmin } = useAuthStore();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'calendar' | 'all-tasks'>('calendar');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [filterSource, setFilterSource] = useState<'all' | 'calendar' | 'tasks'>('all');
+  const [filterImportance, setFilterImportance] = useState<'all' | 'low' | 'medium' | 'high'>('all');
+  const [filterDate, setFilterDate] = useState<'all' | 'has-date' | 'no-date'>('all');
+  const [filterDescription, setFilterDescription] = useState<'all' | 'has-desc' | 'no-desc'>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   
@@ -41,7 +53,7 @@ export default function CalendarPage() {
   const canEdit = isSuperAdmin || isAdmin;
 
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'calendar_events'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const unsubEvents = onSnapshot(query(collection(db, 'calendar_events'), orderBy('createdAt', 'desc')), (snapshot) => {
       const items: CalendarEvent[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent));
       setEvents(items);
       setLoading(false);
@@ -50,7 +62,18 @@ export default function CalendarPage() {
       toast.error('Không thể tải dữ liệu lịch');
       setLoading(false);
     });
-    return () => unsub();
+
+    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTasks(items);
+    }, (err) => {
+      console.error("Tasks fetch error:", err);
+    });
+
+    return () => {
+      unsubEvents();
+      unsubTasks();
+    };
   }, []);
 
   const monthStart = startOfMonth(currentDate);
@@ -136,6 +159,127 @@ export default function CalendarPage() {
     }
   };
 
+  const handleSyncFromTasks = async () => {
+    setIsSyncing(true);
+    const toastId = toast.loading('Đang đồng bộ dữ liệu từ Công việc...');
+    try {
+      // Fetch all from tasks
+      const tasksSnapshot = await getDocs(collection(db, 'tasks'));
+      const tasksData = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+      // Fetch existing events to prevent duplicates
+      const eventsSnapshot = await getDocs(collection(db, 'calendar_events'));
+      const existingEvents = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      for (const t of tasksData) {
+        const title = t.title || 'Không tên';
+        let dateStr = format(new Date(), 'yyyy-MM-dd');
+        if (t.deadline) {
+          try {
+            dateStr = format(parseISO(t.deadline), 'yyyy-MM-dd');
+          } catch {
+            dateStr = t.deadline;
+          }
+        }
+        
+        const description = t.note || '';
+        const importance = t.priority === 'high' ? 'high' : t.priority === 'medium' ? 'medium' : 'low';
+
+        // Check duplicate or previously synced event
+        const duplicateEvent = existingEvents.find(ev => 
+          ev.id === `task_sync_${t.id}` || 
+          ev.syncedFromTaskId === t.id ||
+          (ev.title?.trim().toLowerCase() === title.trim().toLowerCase() && ev.date === dateStr)
+        );
+
+        if (duplicateEvent) {
+          // Update the existing document with the latest info
+          await setDoc(doc(db, 'calendar_events', duplicateEvent.id), {
+            title,
+            description,
+            importance,
+            date: dateStr,
+            syncedFromTasks: true,
+            syncedFromTaskId: t.id
+          }, { merge: true });
+          updatedCount++;
+        } else {
+          // Create the document with a deterministic duplicate-proof index key ID
+          const newDocId = `task_sync_${t.id}`;
+          await setDoc(doc(db, 'calendar_events', newDocId), {
+            title,
+            description,
+            importance,
+            date: dateStr,
+            createdAt: Date.now(),
+            syncedFromTasks: true,
+            syncedFromTaskId: t.id
+          });
+          addedCount++;
+        }
+      }
+
+      toast.success(`Đồng bộ thành công! Thêm mới: ${addedCount}, Cập nhật: ${updatedCount}`, { id: toastId });
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast.error('Có lỗi xảy ra trong quá trình đồng bộ.', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSyncAndEdit = async (item: any) => {
+    setIsSyncing(true);
+    const toastId = toast.loading('Đang đồng bộ và mở chỉnh sửa...');
+    try {
+      const title = item.title || 'Không tên';
+      let dateStr = item.date || format(new Date(), 'yyyy-MM-dd');
+      const description = item.description || '';
+      const importance = item.importance || 'medium';
+
+      const docId = `task_sync_${item.id}`;
+
+      // Insert or update directly using the deterministic key ID to avoid duplication
+      await setDoc(doc(db, 'calendar_events', docId), {
+        title,
+        description,
+        importance,
+        date: dateStr,
+        createdAt: Date.now(),
+        syncedFromTasks: true,
+        syncedFromTaskId: item.id
+      }, { merge: true });
+
+      const newEvent = {
+        id: docId,
+        title,
+        description,
+        importance,
+        date: dateStr,
+        createdAt: Date.now(),
+        syncedFromTasks: true,
+        syncedFromTaskId: item.id
+      } as CalendarEvent;
+      
+      toast.success('Đồng bộ thành công! Đang mở chỉnh sửa...', { id: toastId });
+      
+      // Open modal
+      try {
+        handleOpenModal(parseISO(dateStr), newEvent);
+      } catch {
+        handleOpenModal(new Date(dateStr), newEvent);
+      }
+    } catch (err) {
+      console.error("Sync and edit error:", err);
+      toast.error('Có lỗi xảy ra khi đồng bộ.', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const tooltipError = (msg: string) => toast.error(msg);
 
   const getEventsForDay = (date: Date) => {
@@ -158,6 +302,79 @@ export default function CalendarPage() {
     if (eventsForDay.length > 0) return 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/30';
     return 'bg-white dark:bg-transparent border-slate-100 dark:border-white/5';
   };
+
+  const combinedTasks = [
+    ...events.map(ev => ({
+      id: ev.id,
+      title: ev.title,
+      date: ev.date,
+      importance: ev.importance,
+      description: ev.description || '',
+      source: 'Lịch làm việc',
+      isEvent: true,
+      raw: ev
+    })),
+    ...tasks
+      .filter(t => !events.some(ev => ev.syncedFromTaskId === t.id))
+      .map(t => {
+        let dateStr = '';
+        if (t.deadline) {
+          try {
+            dateStr = format(parseISO(t.deadline), 'yyyy-MM-dd');
+          } catch {
+            dateStr = t.deadline;
+          }
+        }
+        return {
+          id: t.id,
+          title: t.title || 'Không tên',
+          date: dateStr,
+          importance: t.priority === 'high' ? 'high' : t.priority === 'medium' ? 'medium' : 'low',
+          description: t.note || '',
+          source: 'Tab Công việc',
+          isEvent: false,
+          raw: t
+        };
+      })
+  ];
+
+  const filteredCombined = combinedTasks.filter(item => {
+    const matchesSearch = 
+      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.source?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesSource = 
+      filterSource === 'all' ||
+      (filterSource === 'calendar' && item.isEvent) ||
+      (filterSource === 'tasks' && !item.isEvent);
+
+    const matchesImportance =
+      filterImportance === 'all' ||
+      (item.importance === filterImportance);
+
+    const matchesDate =
+      filterDate === 'all' ||
+      (filterDate === 'has-date' && !!item.date) ||
+      (filterDate === 'no-date' && !item.date);
+
+    const matchesDesc =
+      filterDescription === 'all' ||
+      (filterDescription === 'has-desc' && !!item.description?.trim()) ||
+      (filterDescription === 'no-desc' && !item.description?.trim());
+
+    return matchesSearch && matchesSource && matchesImportance && matchesDate && matchesDesc;
+  });
+
+  filteredCombined.sort((a, b) => {
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return a.date.localeCompare(b.date);
+  });
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50/50 dark:bg-black/20 overflow-y-auto no-scrollbar relative min-h-screen">
@@ -195,120 +412,359 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden flex flex-col">
-          {/* Days of week */}
-          <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-950/50">
-            {weekDays.map(day => (
-              <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest">
-                {day}
-              </div>
-            ))}
+        {/* Navigation Tabs (Lịch làm việc vs Danh sách tất cả) & Đồng bộ */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl p-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <button 
+              onClick={() => setViewMode('calendar')}
+              className={cn(
+                "px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-2",
+                viewMode === 'calendar' 
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/10" 
+                  : "text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-white/5"
+              )}
+            >
+              <CalendarIcon className="w-4 h-4" /> Lịch làm việc
+            </button>
+            <button 
+              onClick={() => setViewMode('all-tasks')}
+              className={cn(
+                "px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center gap-2",
+                viewMode === 'all-tasks' 
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/10" 
+                  : "text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-white/5"
+              )}
+            >
+              <ListTodo className="w-4 h-4" /> Danh sách công việc tất cả
+            </button>
           </div>
 
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 auto-rows-fr">
-            {days.map((day, dayIdx) => {
-              const dayEvents = getEventsForDay(day);
-              const isCurrentMonth = isSameMonth(day, monthStart);
-              const isTodayDate = isToday(day);
-              
-              return (
-                <div 
-                  key={day.toString()} 
-                  onClick={() => setSelectedDay(day)}
-                  className={cn(
-                    "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-white/5 relative group transition-colors cursor-pointer",
-                    !isCurrentMonth ? "bg-slate-50/50 dark:bg-zinc-950/30 text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-zinc-200",
-                    isTodayDate ? "bg-blue-50/30 dark:bg-indigo-500/5" : "bg-white dark:bg-transparent",
-                    isSameDay(day, selectedDay) && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/20 dark:bg-indigo-500/10",
-                    "hover:bg-slate-50 dark:hover:bg-white/5"
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <span className={cn(
-                      "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full mt-1 ml-1",
-                      isTodayDate && "bg-indigo-600 text-white shadow-md",
-                      !isTodayDate && !isCurrentMonth && "opacity-50"
-                    )}>
-                      {format(day, dateFormat)}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-1 px-1">
-                    {dayEvents.map(ev => (
-                      <div 
-                        key={ev.id}
-                        className={cn(
-                          "w-2.5 h-2.5 rounded-full shadow-sm",
-                          ev.importance === 'high' ? 'bg-rose-500' : ev.importance === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
-                        )}
-                        title={ev.title}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {canEdit && (
+            <button
+              onClick={handleSyncFromTasks}
+              disabled={isSyncing}
+              className={cn(
+                "px-4 py-2 hover:opacity-90 active:scale-[0.98] border border-transparent cursor-pointer rounded-xl text-xs font-bold uppercase tracking-widest text-indigo-700 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/10 flex items-center gap-2 transition-all self-start sm:self-auto disabled:opacity-50"
+              )}
+              title="Đồng bộ tất cả dữ liệu từ Tab Công việc cũ sang Lịch làm việc"
+            >
+              <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+              Đồng bộ từ Công việc
+            </button>
+          )}
         </div>
 
-        {/* Selected Day Events List */}
-        <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-[250px]">
-          <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              Công việc ngày {format(selectedDay, 'dd/MM/yyyy')}
-            </h3>
-            {canEdit && (
-              <button 
-                onClick={() => handleOpenModal(selectedDay)}
-                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-md"
-              >
-                <Plus className="w-4 h-4" /> Thêm mới
-              </button>
-            )}
-          </div>
-          
-          <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar pr-1">
-            {getEventsForDay(selectedDay).length === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-slate-500 dark:text-zinc-500 text-sm">Không có công việc nào trong ngày này.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getEventsForDay(selectedDay).map(ev => (
-                  <div 
-                    key={ev.id}
-                    onClick={() => canEdit && handleOpenModal(selectedDay, ev)}
-                    className={cn(
-                      "p-4 rounded-xl border shadow-sm transition-all flex flex-col gap-2",
-                      getImportanceColor(ev.importance),
-                      canEdit && "cursor-pointer hover:scale-[1.02] hover:opacity-95"
-                    )}
-                  >
-                     <h4 className="font-bold text-sm leading-tight">{ev.title}</h4>
-                     {ev.description && <p className="text-xs opacity-90 line-clamp-3 mt-1 leading-relaxed">{ev.description}</p>}
+        {viewMode === 'calendar' ? (
+          <>
+            {/* Calendar Grid */}
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden flex flex-col">
+              {/* Days of week */}
+              <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-950/50">
+                {weekDays.map(day => (
+                  <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest">
+                    {day}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400 justify-center pb-8 pt-4">
-           <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-rose-500" /> Quan trọng</div>
-           <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-500" /> Trung bình</div>
-           <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-indigo-500" /> Thấp</div>
-        </div>
+              {/* Days Grid */}
+              <div className="grid grid-cols-7 auto-rows-fr">
+                {days.map((day, dayIdx) => {
+                  const dayEvents = getEventsForDay(day);
+                  const isCurrentMonth = isSameMonth(day, monthStart);
+                  const isTodayDate = isToday(day);
+                  
+                  return (
+                    <div 
+                      key={day.toString()} 
+                      onClick={() => setSelectedDay(day)}
+                      className={cn(
+                        "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-white/5 relative group transition-colors cursor-pointer",
+                        !isCurrentMonth ? "bg-slate-50/50 dark:bg-zinc-950/30 text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-zinc-200",
+                        isTodayDate ? "bg-blue-50/30 dark:bg-indigo-500/5" : "bg-white dark:bg-transparent",
+                        isSameDay(day, selectedDay) && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/20 dark:bg-indigo-500/10",
+                        "hover:bg-slate-50 dark:hover:bg-white/5"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className={cn(
+                          "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full mt-1 ml-1",
+                          isTodayDate && "bg-indigo-600 text-white shadow-md",
+                          !isTodayDate && !isCurrentMonth && "opacity-50"
+                        )}>
+                          {format(day, dateFormat)}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1 px-1">
+                        {dayEvents.map(ev => (
+                          <div 
+                            key={ev.id}
+                            className={cn(
+                              "w-2.5 h-2.5 rounded-full shadow-sm",
+                              ev.importance === 'high' ? 'bg-rose-500' : ev.importance === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
+                            )}
+                            title={ev.title}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selected Day Events List */}
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-[250px]">
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/5 pb-4">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  Công việc ngày {format(selectedDay, 'dd/MM/yyyy')}
+                </h3>
+                {canEdit && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleOpenModal(selectedDay); }}
+                    className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-md cursor-pointer pointer-events-auto"
+                  >
+                    <Plus className="w-4 h-4" /> Thêm mới
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex-1 overflow-x-auto no-scrollbar">
+                {getEventsForDay(selectedDay).length === 0 ? (
+                  <div className="h-full min-h-[150px] flex items-center justify-center">
+                    <p className="text-slate-500 dark:text-zinc-500 text-sm">Không có công việc nào trong ngày này.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse min-w-[500px]">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
+                        <th className="py-3 px-4">Tiêu đề</th>
+                        <th className="py-3 px-4 w-32">Mức độ</th>
+                        <th className="py-3 px-4">Mô tả chi tiết</th>
+                        {canEdit && <th className="py-3 px-4 text-right w-24">Thao tác</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+                      {getEventsForDay(selectedDay).map(ev => (
+                        <tr 
+                          key={ev.id}
+                          onClick={() => canEdit && handleOpenModal(selectedDay, ev)}
+                          className={cn(
+                            "group transition-colors hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-300",
+                            canEdit && "cursor-pointer"
+                          )}
+                        >
+                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                            {ev.title}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                              ev.importance === 'high' 
+                                ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30' 
+                                : ev.importance === 'medium'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-400 dark:border-indigo-500/30'
+                            )}>
+                              {ev.importance === 'high' ? 'Quan trọng' : ev.importance === 'medium' ? 'Trung bình' : 'Thấp'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 max-w-sm font-medium leading-relaxed truncate">
+                            {ev.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
+                          </td>
+                          {canEdit && (
+                            <td className="py-3.5 px-4 text-right">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenModal(selectedDay, ev); }}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
+                                title="Chỉnh sửa"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400 justify-center pb-8 pt-4">
+               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-rose-500" /> Quan trọng</div>
+               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-500" /> Trung bình</div>
+               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-indigo-500" /> Thấp</div>
+            </div>
+          </>
+        ) : (
+          /* All integrated tasks list mode */
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-[400px] space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-white/5">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                  Danh sách công việc tất cả
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                  Dữ liệu tích hợp của "TAB công việc" và "Lịch làm việc" ({filteredCombined.length} đầu việc).
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Search input */}
+                <div className="relative w-full sm:w-72 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="Tìm tên, mô tả hoặc nguồn..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl pl-11 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
+                  />
+                </div>
+
+                {/* Filter Mức độ */}
+                <select
+                  value={filterImportance}
+                  onChange={e => setFilterImportance(e.target.value as any)}
+                  className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all shadow-sm"
+                >
+                  <option value="all">Tất cả mức độ</option>
+                  <option value="high">Mức độ: Quan trọng</option>
+                  <option value="medium">Mức độ: Trung bình</option>
+                  <option value="low">Mức độ: Thấp</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto no-scrollbar">
+              {filteredCombined.length === 0 ? (
+                <div className="h-full min-h-[250px] flex flex-col items-center justify-center">
+                  <p className="text-slate-500 dark:text-zinc-500 text-sm">Không tìm thấy công việc nào phù hợp.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
+                      <th className="py-3 px-4">Tiêu đề</th>
+                      <th className="py-3 px-4 w-36">Ngày / Thời hạn</th>
+                      <th className="py-3 px-4 w-40">Nguồn dữ liệu</th>
+                      <th className="py-3 px-4 w-32">Mức độ</th>
+                      <th className="py-3 px-4">Mô tả chi tiết</th>
+                      {canEdit && <th className="py-3 px-4 text-right w-36">Thao tác</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+                    {filteredCombined.map(item => (
+                      <tr 
+                        key={item.id + '-' + item.source}
+                        onClick={() => {
+                          if (canEdit) {
+                            if (item.isEvent) {
+                              try {
+                                handleOpenModal(parseISO(item.date), item.raw);
+                              } catch {
+                                handleOpenModal(new Date(item.date), item.raw);
+                              }
+                            } else {
+                              handleSyncAndEdit(item);
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "group transition-colors hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-300",
+                          canEdit && "cursor-pointer"
+                        )}
+                      >
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                          {item.title}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-zinc-400">
+                          {item.date ? (
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                              {format(parseISO(item.date), 'dd/MM/yyyy')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Chưa thiết lập</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={cn(
+                            "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold",
+                            item.isEvent 
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20' 
+                              : 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+                          )}>
+                            {item.source}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={cn(
+                            "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                            item.importance === 'high' 
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30' 
+                              : item.importance === 'medium'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-400 dark:border-indigo-500/30'
+                          )}>
+                            {item.importance === 'high' ? 'Quan trọng' : item.importance === 'medium' ? 'Trung bình' : 'Thấp'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 max-w-sm font-medium leading-relaxed truncate">
+                          {item.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
+                        </td>
+                        {canEdit && (
+                          <td className="py-3.5 px-4 text-right">
+                            {item.isEvent ? (
+                              <button 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  try {
+                                    handleOpenModal(parseISO(item.date), item.raw); 
+                                  } catch {
+                                    handleOpenModal(new Date(item.date), item.raw);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
+                                title="Chỉnh sửa"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSyncAndEdit(item);
+                                }}
+                                className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:hover:bg-indigo-500/20 rounded-xl transition-all shadow-sm shrink-0"
+                              >
+                                Đồng bộ & Sửa
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
 
       {/* Modal Edit/Add */}
-      <AnimatePresence>
-        {isModalOpen && canEdit && createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
-            <motion.div
+      {createPortal(
+        <AnimatePresence>
+          {isModalOpen && canEdit && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
+              onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+            >
+              <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -390,17 +846,19 @@ export default function CalendarPage() {
                 </div>
               </form>
             </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+          </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-      <AnimatePresence>
-        {eventToDelete && createPortal(
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
-            onClick={() => setEventToDelete(null)}
-          >
-             <motion.div
+      {createPortal(
+        <AnimatePresence>
+          {eventToDelete && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
+              onClick={(e) => { if (e.target === e.currentTarget) setEventToDelete(null); }}
+            >
+               <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -431,10 +889,11 @@ export default function CalendarPage() {
                  </button>
                </div>
              </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
