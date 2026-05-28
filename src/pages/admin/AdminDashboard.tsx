@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
+import { Shield, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -49,7 +49,10 @@ export default function AdminDashboard() {
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
-    email: 'contact@system.com'
+    email: 'contact@system.com',
+    phone: '',
+    zalo: '',
+    address: ''
   });
 
   const [notificationConfig, setNotificationConfig] = useState({
@@ -1269,7 +1272,7 @@ export default function AdminDashboard() {
             Quản trị Hệ thống
         </h1>
         
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-hide">
+        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
@@ -1452,6 +1455,37 @@ export default function AdminDashboard() {
                       value={aboutConfig.email}
                       onChange={(e) => setAboutConfig({...aboutConfig, email: e.target.value})}
                       className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: contact@domain.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Số điện thoại</label>
+                    <input 
+                      type="tel" 
+                      value={aboutConfig.phone}
+                      onChange={(e) => setAboutConfig({...aboutConfig, phone: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: 09xx.xxx.xxx"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Zalo Link / Số Zalo</label>
+                    <input 
+                      type="text" 
+                      value={aboutConfig.zalo}
+                      onChange={(e) => setAboutConfig({...aboutConfig, zalo: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: https://zalo.me/..."
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold mb-1 ml-1">Địa chỉ (Trụ sở/Văn phòng) - Xã/Phường, Quận/Huyện, Tỉnh/TP</label>
+                    <input 
+                      type="text" 
+                      value={aboutConfig.address}
+                      onChange={(e) => setAboutConfig({...aboutConfig, address: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: 123 Đường ABC, Phường X, Quận Y, Tỉnh Z"
                     />
                   </div>
                 </div>
@@ -1605,7 +1639,7 @@ export default function AdminDashboard() {
                 <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto no-scrollbar scroll-smooth">
                 {loading ? (
                   <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
                 ) : (
@@ -1820,6 +1854,7 @@ export default function AdminDashboard() {
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
                 { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
+                { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -1870,7 +1905,9 @@ export default function AdminDashboard() {
                 { id: 'kho-van-ban', title: 'Kho Văn Bản', icon: FolderOpen },
                 { id: 'ai-scanner', title: 'Quét Văn Bản AI', icon: Scan },
                 { id: 'image-to-pdf', title: 'Ảnh sang PDF', icon: FileImage },
-                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText }
+                { id: 'pdf-to-word', title: 'PDF sang Word', icon: FileText },
+                { id: 'pdf-merger', title: 'Ghép PDF', icon: FilePlus },
+                { id: 'pdf-splitter', title: 'Tách PDF', icon: Scissors }
               ].map((util) => (
                 <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2 min-w-0">

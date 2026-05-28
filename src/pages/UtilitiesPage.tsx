@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
 import ImageToPdf from './utilities/ImageToPdf';
 import PdfToWord from './utilities/PdfToWord';
+import PdfMerger from './utilities/PdfMerger';
+import PdfSplitter from './utilities/PdfSplitter';
 import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
 import PersonalFileManager from './utilities/PersonalFileManager';
@@ -15,6 +17,7 @@ import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
+import LoadingScreen from '../components/ui/LoadingScreen';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -195,6 +198,22 @@ const nativeUtilities: UtilityItem[] = [
     icon: FileText,
     type: 'tool',
     createdAt: Date.now() - 2000
+  },
+  {
+    id: 'pdf-merger',
+    title: 'Ghép PDF',
+    description: 'Ghép nhiều tệp tài liệu PDF trở thành một tệp tài liệu duy nhất.',
+    icon: FilePlus,
+    type: 'tool',
+    createdAt: Date.now() - 3000
+  },
+  {
+    id: 'pdf-splitter',
+    title: 'Tách PDF',
+    description: 'Tách một file PDF lớn thành các trang nhỏ hoặc trích xuất riêng các trang bạn cần.',
+    icon: Scissors,
+    type: 'tool',
+    createdAt: Date.now() - 4500
   }
 ];
 
@@ -202,6 +221,7 @@ export default function UtilitiesPage() {
   const { sessionId, utilityId } = useParams();
   const navigate = useNavigate();
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
   const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
@@ -291,11 +311,13 @@ export default function UtilitiesPage() {
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
+      setLoading(false);
     }, (err) => {
       console.error("UtilitiesPage utilities listener error:", err);
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -303,6 +325,10 @@ export default function UtilitiesPage() {
   const { maintenanceTabs } = useAppStore();
 
   const filteredItems = [...nativeUtilities, ...utilities];
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   if (activeUtility) {
     const isMaintenanceActive = maintenanceTabs[`utility_${activeUtility.id}`];
@@ -348,6 +374,14 @@ export default function UtilitiesPage() {
       return <PdfToWord onBack={handleBack} />;
     }
  
+    if (activeUtility.id === 'pdf-merger') {
+      return <PdfMerger onBack={handleBack} />;
+    }
+ 
+    if (activeUtility.id === 'pdf-splitter') {
+      return <PdfSplitter onBack={handleBack} />;
+    }
+
     if (activeUtility.id === 'ai-scanner') {
       return <AiScanner onBack={handleBack} />;
     }

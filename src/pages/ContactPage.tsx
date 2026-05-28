@@ -60,6 +60,33 @@ export default function ContactPage() {
       desc: 'Technical Support'
     },
     { 
+      name: 'Số điện thoại', 
+      value: socialConfig.phone || '09xx.xxx.xxx', 
+      icon: Phone, 
+      url: `tel:${socialConfig.phone}`, 
+      color: 'from-emerald-500/10 to-teal-500/10',
+      iconColor: 'text-emerald-500',
+      desc: 'Hotline Support'
+    },
+    { 
+      name: 'Zalo', 
+      value: 'Nhắn tin Zalo', 
+      icon: MessageCircle, 
+      url: socialConfig.zalo || '#', 
+      color: 'from-blue-400/10 to-blue-600/10',
+      iconColor: 'text-blue-500',
+      desc: 'Zalo Platform'
+    },
+    { 
+      name: 'Địa chỉ', 
+      value: socialConfig.address || 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức', 
+      icon: MapPin, 
+      url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(socialConfig.address || 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức')}`, 
+      color: 'from-rose-500/10 to-orange-500/10',
+      iconColor: 'text-rose-500',
+      desc: 'Office Location'
+    },
+    { 
       name: 'Facebook', 
       value: 'Sơn Lý Hồng Đức', 
       icon: Facebook, 

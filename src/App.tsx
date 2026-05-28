@@ -24,6 +24,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import ComingSoon from './pages/ComingSoon';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
+import GuidePage from './pages/GuidePage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
@@ -318,6 +319,7 @@ export default function App() {
               <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
               <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
+              <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

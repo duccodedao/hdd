@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
-  Image as ImageIcon, Calendar, Users
+  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -20,6 +20,8 @@ const subUtilities = [
   { id: 'ai-scanner', name: 'Quét Văn Bản AI', path: '/utilities/ai-scanner', icon: Scan, maintenanceKey: 'utility_ai-scanner' },
   { id: 'image-to-pdf', name: 'Ảnh sang PDF', path: '/utilities/image-to-pdf', icon: FileImage, maintenanceKey: 'utility_image-to-pdf' },
   { id: 'pdf-to-word', name: 'PDF sang Word', path: '/utilities/pdf-to-word', icon: FileText, maintenanceKey: 'utility_pdf-to-word' },
+  { id: 'pdf-merger', name: 'Ghép PDF', path: '/utilities/pdf-merger', icon: FilePlus, maintenanceKey: 'utility_pdf-merger' },
+  { id: 'pdf-splitter', name: 'Tách PDF', path: '/utilities/pdf-splitter', icon: Scissors, maintenanceKey: 'utility_pdf-splitter' },
 ];
 
 export default function Sidebar({ className }: { className?: string }) {
@@ -281,6 +283,34 @@ export default function Sidebar({ className }: { className?: string }) {
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
                       )}
                       {maintenanceTabs['hrm'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
+
+                {/* Guide Tab */}
+                {(!systemTools['guide']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/guide"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <BookOpen className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/guide' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/guide' && "font-semibold")}>Hướng dẫn sử dụng</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['guide']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['guide'] && (
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
                       )}
                     </div>

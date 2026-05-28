@@ -80,7 +80,7 @@ export default function HomePage() {
              <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="font-black text-xl tracking-tighter text-white leading-none">BMASS</span>
+            <span className="font-black text-xl tracking-tighter bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 bg-clip-text text-transparent leading-normal pb-1">BMASS</span>
             <span className="text-[10px] font-bold tracking-[0.3em] text-indigo-400 uppercase mt-0.5">Digital Platform</span>
           </div>
         </div>
@@ -141,11 +141,11 @@ export default function HomePage() {
               <div className="space-y-6 flex-1">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] border border-indigo-100 dark:border-indigo-500/20 ring-4 ring-indigo-50/50 dark:ring-indigo-500/5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  Founder & Lead Architect
+                  Quản trị viên
                 </div>
                 <div>
-                  <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{aboutConfig.adminName || 'Sơn Lý Hồng Đức'}</h2>
-                  <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs uppercase mt-2">BMASS Digital Platform</p>
+                  <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent pb-2">{aboutConfig.adminName?.trim() || 'Sơn Lý Hồng Đức'}</h2>
+                  <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs uppercase">BMASS Digital Platform</p>
                 </div>
                 <p className="text-slate-600 dark:text-zinc-400 text-lg leading-relaxed max-w-xl font-medium">
                   {aboutConfig.adminBio || 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.'}
@@ -188,7 +188,7 @@ export default function HomePage() {
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500 cursor-pointer">
             <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Footer Logo" className="h-8 w-auto" />
-            <span className="font-black text-sm tracking-tighter uppercase">BMASS</span>
+            <span className="font-black text-sm tracking-tighter uppercase bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent pb-0.5">BMASS</span>
           </div>
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
             <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>

@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/authStore';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import LoadingScreen from '../components/ui/LoadingScreen';
 
 interface Employee {
   id: string;
@@ -203,12 +204,8 @@ export default function HrmPage() {
     };
   }, [canEdit, authLoading]);
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+  if (authLoading || loading) {
+    return <LoadingScreen />;
   }
 
   if (!canEdit) {
@@ -615,7 +612,7 @@ export default function HrmPage() {
                   : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300'
               }`}
             >
-              Nhân Viên ({employees.length})
+              NV ({employees.length})
               {activeTab === 'employees' && (
                 <motion.div layoutId="hrm-active-tab-indicator" className="absolute bottom-0 left-4 right-4 h-0.5 bg-indigo-500 dark:bg-white" />
               )}
@@ -628,7 +625,7 @@ export default function HrmPage() {
                   : 'text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-zinc-300'
               }`}
             >
-              Cộng Tác Viên ({collaborators.length})
+              CTV ({collaborators.length})
               {activeTab === 'collaborators' && (
                 <motion.div layoutId="hrm-active-tab-indicator" className="absolute bottom-0 left-4 right-4 h-0.5 bg-indigo-500 dark:bg-white" />
               )}
@@ -666,8 +663,8 @@ export default function HrmPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto no-scrollbar scroll-smooth">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead>
                   <tr className="bg-slate-50/50 dark:bg-black/25 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-white/5">
                     <th className="py-4 px-6 w-16">STT</th>

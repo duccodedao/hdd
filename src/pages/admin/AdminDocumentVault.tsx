@@ -570,7 +570,7 @@ export default function AdminDocumentVault() {
                 <input type="file" className="hidden" accept=".json" onChange={handleImport} />
              </label>
            </div>
-           <div className="overflow-x-auto -mx-6">
+           <div className="overflow-x-auto -mx-6 no-scrollbar scroll-smooth">
              <table className="w-full text-left min-w-[1000px]">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
@@ -665,7 +665,7 @@ export default function AdminDocumentVault() {
                 <button onClick={handleBulkPermanentDelete} className="text-xs px-3 py-1 bg-rose-100 dark:bg-rose-500/20 text-rose-600 rounded-lg">Xóa vĩnh viễn tất cả</button>
              )}
            </h3>
-           <div className="overflow-x-auto -mx-6">
+           <div className="overflow-x-auto -mx-6 no-scrollbar scroll-smooth">
              <table className="w-full text-left min-w-[800px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-white/5">

@@ -138,7 +138,7 @@ export default function Topbar() {
         try {
           const [wRes, gRes] = await Promise.all([
             fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
           ]);
           const wData = await wRes.json();
           const gData = await gRes.json();
@@ -150,7 +150,16 @@ export default function Topbar() {
             });
           }
           if (gData?.address) {
-            setLocationName(gData.address.city || gData.address.town || gData.address.state || 'Trái đất');
+            const addr = gData.address;
+            const parts = [];
+            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+            const district = addr.city_district || addr.county || addr.district || addr.town;
+            const city = addr.city || addr.state || addr.province;
+            if (ward) parts.push(ward);
+            if (district) parts.push(district);
+            if (city) parts.push(city);
+            
+            setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
           }
         } catch {}
       }, () => setLocationName('Việt Nam'));
@@ -418,7 +427,7 @@ export default function Topbar() {
                    </div>
                    <h2 className="text-xl font-bold text-slate-900 dark:text-white text-center">Làm mới phiên bản?</h2>
                    <p className="text-slate-500 dark:text-zinc-400 text-sm text-center mt-2">
-                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn.
+                     Đồng bộ ứng dụng mới nhất. Thao tác này sẽ xóa cache trình duyệt của bạn{needsUpdate && systemVersion ? ` và cập nhật lên phiên bản ${systemVersion}` : ''}.
                    </p>
                  </div>
                  <div className="p-6 flex gap-3">

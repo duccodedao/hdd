@@ -62,7 +62,7 @@ export default function AboutPage() {
            className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full w-fit"
         >
           <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
-          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-[0.2em]">System Active • v2.4.0</span>
+          <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-[0.2em]">System Active • v2.5.0</span>
         </motion.div>
  
         <div className="space-y-4 lg:space-y-6">

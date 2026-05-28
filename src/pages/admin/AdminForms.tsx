@@ -988,8 +988,8 @@ export default function AdminForms() {
                    </button>
                  </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto no-scrollbar scroll-smooth">
+                <table className="w-full text-left border-collapse min-w-[1200px]">
                    <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
                       <tr>
                          <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Thời gian</th>
