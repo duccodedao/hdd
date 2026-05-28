@@ -15,7 +15,8 @@ import {
   FileJson, 
   Info,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FolderOpen
 } from 'lucide-react';
 
 interface CollectionStatus {
@@ -44,6 +45,10 @@ export default function AdminSystem() {
     { name: 'form_responses', count: null, loading: false, selected: true },
     { name: 'document_categories', count: null, loading: false, selected: true },
     { name: 'documents', count: null, loading: false, selected: true },
+    { name: 'calendar_events', count: null, loading: false, selected: true },
+    { name: 'recurring_events', count: null, loading: false, selected: true },
+    { name: 'hrm_employees', count: null, loading: false, selected: true },
+    { name: 'hrm_collaborators', count: null, loading: false, selected: true },
     { name: 'avatar_frames', count: null, loading: false, selected: true },
     { name: 'apps', count: null, loading: false, selected: true },
     { name: 'app_categories', count: null, loading: false, selected: true },
@@ -56,6 +61,11 @@ export default function AdminSystem() {
   const [importFile, setImportFile] = useState<any | null>(null);
   const [importFileName, setImportFileName] = useState('');
   const [importPreviewCollections, setImportPreviewCollections] = useState<{ name: string; count: number }[]>([]);
+
+  // Toggle all selections
+  const toggleAll = (select: boolean) => {
+    setCollections(prev => prev.map(c => ({ ...c, selected: select })));
+  };
 
   // Batch query to load document count for each collection
   const loadCollectionCounts = async () => {
@@ -465,6 +475,46 @@ export default function AdminSystem() {
           <p className="text-xs text-slate-500 mt-1">
             Nhập file JSON đã sao lưu để ghi đè và phục hồi cấu trúc dữ liệu. Điểm vượt trội: Tự động phát hiện và khôi phục toàn bộ các collection động, các utility mới mà không cần cập nhật code.
           </p>
+        </div>
+
+        {/* Status Summary & Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <FolderOpen size={16} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Cấu trúc Bộ Dữ liệu</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">{collections.length} Collections</div>
+              <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-tighter">Đã đăng ký trong hệ thống rà soát</p>
+           </div>
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                    <Database size={16} />
+                 </div>
+                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Số lượng chọn sao lưu</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                {collections.filter(c => c.selected).length} / {collections.length}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-tighter">Tương ứng {((collections.filter(c => c.selected).length / collections.length) * 100).toFixed(0)}% hạ tầng</p>
+           </div>
+           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm flex flex-col justify-center gap-2">
+              <button 
+                onClick={() => toggleAll(true)}
+                className="w-full py-2 bg-slate-900 dark:bg-white/10 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Chọn Tất Cả Bộ Dữ Liệu
+              </button>
+              <button 
+                onClick={() => toggleAll(false)}
+                className="w-full py-2 bg-slate-100 dark:bg-white/5 text-slate-500 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Bỏ Chọn Tất Cả
+              </button>
+           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

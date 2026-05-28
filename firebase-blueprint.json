@@ -152,6 +152,32 @@
         "createdAt": { "type": "number" }
       },
       "required": ["fullName", "birthDate", "gender", "region", "phone"]
+    },
+    "GitHubConfig": {
+      "title": "GitHub Config",
+      "description": "Credentials for GitHub CDN storage",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "owner": { "type": "string" },
+        "repo": { "type": "string" }
+      },
+      "required": ["token", "owner", "repo"]
+    },
+    "RecurringEvent": {
+      "title": "Recurring Event",
+      "description": "Calendar recurring events/tasks details",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "enum": ["yearly", "monthly"] },
+        "day": { "type": "number" },
+        "month": { "type": "number" },
+        "importance": { "enum": ["low", "medium", "high"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "type", "day", "importance"]
     }
   },
   "firestore": {
@@ -198,19 +224,10 @@
     "hrm_collaborators": {
       "schema": "HrmCollaborator",
       "description": "Official store collaborator personnel record details"
-    }
-  },
-  "entities": {
-    "GitHubConfig": {
-      "title": "GitHub Config",
-      "description": "Credentials for GitHub CDN storage",
-      "type": "object",
-      "properties": {
-        "token": { "type": "string" },
-        "owner": { "type": "string" },
-        "repo": { "type": "string" }
-      },
-      "required": ["token", "owner", "repo"]
+    },
+    "recurring_events": {
+      "schema": "RecurringEvent",
+      "description": "Store custom recurring tasks of the organization"
     }
   }
 }

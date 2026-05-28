@@ -49,7 +49,10 @@ export default function AdminDashboard() {
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
-    email: 'contact@system.com'
+    email: 'contact@system.com',
+    phone: '',
+    zalo: '',
+    address: ''
   });
 
   const [notificationConfig, setNotificationConfig] = useState({
@@ -1269,7 +1272,7 @@ export default function AdminDashboard() {
             Quản trị Hệ thống
         </h1>
         
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-hide">
+        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
           {[
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
@@ -1452,6 +1455,37 @@ export default function AdminDashboard() {
                       value={aboutConfig.email}
                       onChange={(e) => setAboutConfig({...aboutConfig, email: e.target.value})}
                       className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: contact@domain.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Số điện thoại</label>
+                    <input 
+                      type="tel" 
+                      value={aboutConfig.phone}
+                      onChange={(e) => setAboutConfig({...aboutConfig, phone: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: 09xx.xxx.xxx"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1">Zalo Link / Số Zalo</label>
+                    <input 
+                      type="text" 
+                      value={aboutConfig.zalo}
+                      onChange={(e) => setAboutConfig({...aboutConfig, zalo: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: https://zalo.me/..."
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold mb-1 ml-1">Địa chỉ (Trụ sở/Văn phòng) - Xã/Phường, Quận/Huyện, Tỉnh/TP</label>
+                    <input 
+                      type="text" 
+                      value={aboutConfig.address}
+                      onChange={(e) => setAboutConfig({...aboutConfig, address: e.target.value})}
+                      className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                      placeholder="vd: 123 Đường ABC, Phường X, Quận Y, Tỉnh Z"
                     />
                   </div>
                 </div>
@@ -1605,27 +1639,27 @@ export default function AdminDashboard() {
                 <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto no-scrollbar scroll-smooth">
                 {loading ? (
                   <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
                 ) : (
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Tài khoản</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Số điện thoại</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vai trò</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Trạng thái</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Địa chỉ IP</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vị trí (Location)</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right">Quản trị</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Đăng nhập lần cuối</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Địa chỉ IP</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vị trí (Location)</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Quản trị</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
                   {users.map((u) => (
                     <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 border border-slate-300 dark:border-white/20">
                             {u.photoURL ? (
@@ -1640,17 +1674,17 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
                           {u.phoneNumber || 'N/A'}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 text-[10px]  font-bold rounded-full ${u.role?.includes('admin') ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                           {u.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="flex items-center gap-1">
                           <div className={`w-2 h-2 rounded-full ${u.isBanned ? 'bg-red-500' : (u.status === 'active' ? 'bg-green-500' : 'bg-amber-500')}`}></div>
                           <span className={u.isBanned ? 'text-red-500 font-medium' : 'text-slate-600 dark:text-slate-300'}>
@@ -1658,12 +1692,12 @@ export default function AdminDashboard() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px] whitespace-nowrap">
                         <div className="text-xs">
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px] whitespace-nowrap">
                         <div className="text-[11px] leading-relaxed flex items-center gap-2 group/ip">
                           <div className="flex items-center gap-1.5 font-bold mb-0.5 text-blue-500">
                             <Globe className="w-3 h-3" />
@@ -1681,7 +1715,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[180px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[180px] whitespace-nowrap">
                         <div className="text-[11px] leading-relaxed">
                           {u.location ? (
                             <a 
@@ -1695,7 +1729,7 @@ export default function AdminDashboard() {
                                 <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
                               </div>
                               {u.location.address ? (
-                                <div className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic leading-tight">
+                                <div className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic leading-tight whitespace-normal">
                                   {u.location.address}
                                 </div>
                               ) : (
@@ -1712,7 +1746,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2 opacity-100 transition-opacity">
                           <button
                             onClick={() => handleBanUser(u.uid, !!u.isBanned)}
@@ -3202,19 +3236,19 @@ export default function AdminDashboard() {
                        <p className="text-xs text-slate-400 max-w-sm mt-1">Dùng bảng bên cạnh để đăng ký ứng dụng liên kết và phân phối lên Thực đơn phía người dùng.</p>
                      </div>
                    ) : (
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                      <div className="overflow-x-auto no-scrollbar scroll-smooth">
+                        <table className="w-full text-left border-collapse min-w-[1200px]">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
-                              <th className="py-3 px-2">Ứng dụng / Logo</th>
-                              <th className="py-3 px-2">Đường dẫn mở</th>
-                              <th className="py-3 px-2 text-right">Thao tác</th>
+                              <th className="py-3 px-2 whitespace-nowrap">Ứng dụng / Logo</th>
+                              <th className="py-3 px-2 whitespace-nowrap">Đường dẫn mở</th>
+                              <th className="py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {adminApps.map((app) => (
                               <tr key={app.id} className="text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
-                                <td className="py-4 px-2">
+                                <td className="py-4 px-2 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
                                       {app.logoUrl ? (
@@ -3236,16 +3270,16 @@ export default function AdminDashboard() {
                                         {app.internalOnly && <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[8px] font-bold uppercase rounded-md">Nội bộ</span>}
                                         {maintenanceTabs[`app_${app.id}`] && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 text-[8px] font-bold uppercase rounded-md">Bảo trì</span>}
                                       </div>
-                                      {app.description && <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{app.description}</p>}
+                                      {app.description && <p className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">{app.description}</p>}
                                     </div>
                                   </div>
                                 </td>
-                                <td className="py-4 px-2 font-mono text-xs max-w-[200px] truncate select-all text-slate-500">
+                                <td className="py-4 px-2 font-mono text-xs select-all text-slate-500 whitespace-nowrap">
                                   <a href={app.appUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1 text-indigo-500">
                                     {app.appUrl} <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
                                   </a>
                                 </td>
-                                <td className="py-4 px-2 text-right">
+                                <td className="py-4 px-2 text-right whitespace-nowrap">
                                   <div className="flex justify-end gap-1.5">
                                     <button 
                                       onClick={() => toggleTabMaintenance(`app_${app.id}`)}

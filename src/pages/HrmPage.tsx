@@ -663,35 +663,35 @@ export default function HrmPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto no-scrollbar scroll-smooth">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead>
                   <tr className="bg-slate-50/50 dark:bg-black/25 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-white/5">
-                    <th className="py-4 px-6 w-16">STT</th>
-                    <th className="py-4 px-6">Họ và tên</th>
-                    <th className="py-4 px-6">Ngày tháng năm sinh</th>
-                    <th className="py-4 px-6">Giới tính</th>
+                    <th className="py-4 px-6 w-16 whitespace-nowrap">STT</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Họ và tên</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Ngày tháng năm sinh</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Giới tính</th>
                     {activeTab === 'employees' ? (
-                      <th className="py-4 px-6">Số CCCD</th>
+                      <th className="py-4 px-6 whitespace-nowrap">Số CCCD</th>
                     ) : (
-                      <th className="py-4 px-6">Địa bàn quản lý</th>
+                      <th className="py-4 px-6 whitespace-nowrap">Địa bàn quản lý</th>
                     )}
-                    <th className="py-4 px-6">Số điện thoại</th>
-                    <th className="py-4 px-6">Chế độ hiển thị</th>
-                    <th className="py-4 px-6 text-right w-32">Thao tác</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Số điện thoại</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Chế độ hiển thị</th>
+                    <th className="py-4 px-6 text-right w-32 whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150/40 dark:divide-white/5 text-sm">
                   {filteredList.map((item, index) => (
                     <tr key={item.id} className="hover:bg-slate-50/20 dark:hover:bg-white/[0.01] transition-all group">
-                      <td className="py-4 px-6 font-mono text-xs text-slate-400">{index + 1}</td>
-                      <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
+                      <td className="py-4 px-6 font-mono text-xs text-slate-400 whitespace-nowrap">{index + 1}</td>
+                      <td className="py-4 px-6 font-bold text-slate-900 dark:text-white whitespace-nowrap">
                         {item.fullName}
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-500 dark:text-zinc-400">
+                      <td className="py-4 px-6 font-medium text-slate-500 dark:text-zinc-400 whitespace-nowrap">
                         {safeFormatDate(item.birthDate)}
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span className={`inline-flex px-2.5 py-1 text-[11px] font-bold rounded-full ${
                           item.gender === 'Nam' 
                             ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' 
@@ -701,21 +701,21 @@ export default function HrmPage() {
                         </span>
                       </td>
                       {activeTab === 'employees' ? (
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-700 dark:text-zinc-300">
                             <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                             <span>{(item as Employee).idCard || 'N/A'}</span>
                           </div>
                         </td>
                       ) : (
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
                             <MapPin className="w-3.5 h-3.5 text-violet-500" />
                             <span>{(item as Collaborator).region || 'N/A'}</span>
                           </div>
                         </td>
                       )}
-                      <td className="py-4 px-6 font-medium text-slate-500 dark:text-zinc-400">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2 group/phone">
                           <Phone className="w-3.5 h-3.5 text-slate-400" />
                           <span className="font-mono">{item.phone}</span>
@@ -728,7 +728,7 @@ export default function HrmPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         {item.visibility === 'public' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-550 animate-pulse"></span>
@@ -741,7 +741,7 @@ export default function HrmPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {canEdit ? (
                             <>
@@ -971,29 +971,29 @@ export default function HrmPage() {
               </div>
 
               {/* Preview table body */}
-              <div className="max-h-[300px] overflow-y-auto border border-slate-150 dark:border-white/5 rounded-2xl no-scrollbar">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="max-h-[300px] overflow-y-auto overflow-x-auto border border-slate-150 dark:border-white/5 rounded-2xl no-scrollbar scroll-smooth">
+                <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-black/25 text-slate-400 font-bold uppercase sticky top-0 border-b border-slate-150 dark:border-white/5">
-                      <th className="py-2.5 px-4">Tên</th>
-                      <th className="py-2.5 px-4">Ngày sinh</th>
-                      <th className="py-2.5 px-4">Giới tính</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Tên</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Ngày sinh</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Giới tính</th>
                       {activeTab === 'employees' ? (
-                        <th className="py-2.5 px-4">CCCD</th>
+                        <th className="py-2.5 px-4 whitespace-nowrap">CCCD</th>
                       ) : (
-                        <th className="py-2.5 px-4">Địa bàn quản lý</th>
+                        <th className="py-2.5 px-4 whitespace-nowrap">Địa bàn quản lý</th>
                       )}
-                      <th className="py-2.5 px-4">Số điện thoại</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Số điện thoại</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                     {importPreviewData.map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
-                        <td className="py-2.5 px-4 font-bold text-slate-800 dark:text-white">{item.fullName}</td>
-                        <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400">
+                        <td className="py-2.5 px-4 font-bold text-slate-800 dark:text-white whitespace-nowrap">{item.fullName}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400 whitespace-nowrap">
                           {safeFormatDate(item.birthDate)}
                         </td>
-                        <td className="py-2.5 px-4">
+                        <td className="py-2.5 px-4 whitespace-nowrap">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                             item.gender === 'Nam' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'
                           }`}>
@@ -1001,11 +1001,11 @@ export default function HrmPage() {
                           </span>
                         </td>
                         {activeTab === 'employees' ? (
-                          <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400">{item.idCard || 'N/A'}</td>
+                          <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400 whitespace-nowrap">{item.idCard || 'N/A'}</td>
                         ) : (
-                          <td className="py-2.5 px-4 font-medium text-slate-700 dark:text-zinc-300">{item.region || 'N/A'}</td>
+                          <td className="py-2.5 px-4 font-medium text-slate-700 dark:text-zinc-300 whitespace-nowrap">{item.region || 'N/A'}</td>
                         )}
-                        <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400">{item.phone}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-zinc-400 whitespace-nowrap">{item.phone}</td>
                       </tr>
                     ))}
                   </tbody>

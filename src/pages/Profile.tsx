@@ -85,11 +85,24 @@ export default function Profile() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=10&addressdetails=1&email=sonlyhongduc@gmail.com`, {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, {
             headers: { 'Accept-Language': 'vi' }
           });
           const data = await res.json();
-          setCurrentLocationName(data.display_name || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+          if (data?.address) {
+            const addr = data.address;
+            const parts = [];
+            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+            const district = addr.city_district || addr.county || addr.district || addr.town;
+            const city = addr.city || addr.state || addr.province;
+            if (ward) parts.push(ward);
+            if (district) parts.push(district);
+            if (city) parts.push(city);
+            
+            setCurrentLocationName(parts.length > 0 ? parts.join(', ') : (data.display_name || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`));
+          } else {
+            setCurrentLocationName(data.display_name || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+          }
         } catch (e) {
           setCurrentLocationName(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
         }

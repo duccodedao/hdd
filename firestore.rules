@@ -181,6 +181,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /recurring_events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /hrm_employees/{empId} {
       allow read, write: if isAdmin();
     }

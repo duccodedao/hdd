@@ -64,12 +64,26 @@ export default function LocationGuard({ children }: LocationGuardProps) {
         try {
           let address = '';
           try {
-            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=10&addressdetails=1&email=sonlyhongduc@gmail.com`, {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, {
               headers: { 'Accept-Language': 'vi' }
             });
             if (geoRes.ok) {
               const geoData = await geoRes.json();
-              if (mounted) address = geoData.display_name;
+              if (mounted) {
+                if (geoData?.address) {
+                  const addr = geoData.address;
+                  const parts = [];
+                  const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+                  const district = addr.city_district || addr.county || addr.district || addr.town;
+                  const city = addr.city || addr.state || addr.province;
+                  if (ward) parts.push(ward);
+                  if (district) parts.push(district);
+                  if (city) parts.push(city);
+                  address = parts.length > 0 ? parts.join(', ') : (geoData.display_name || '');
+                } else {
+                  address = geoData.display_name;
+                }
+              }
             }
           } catch (e) {
             console.warn("Geocoding unvailable");

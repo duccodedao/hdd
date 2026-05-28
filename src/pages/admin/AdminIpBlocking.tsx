@@ -88,30 +88,30 @@ export default function AdminIpBlocking() {
       </div>
 
       <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-900 min-w-[800px]">
+        <div className="overflow-x-auto no-scrollbar scroll-smooth">
+          <table className="w-full text-left text-sm text-slate-900 min-w-[1000px]">
             <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="px-6 py-4">Địa chỉ IP</th>
-                <th className="px-6 py-4">Lý do</th>
-                <th className="px-6 py-4">Ngày chặn</th>
-                <th className="px-6 py-4">Bởi</th>
-                <th className="px-6 py-4 text-right">Thao tác</th>
+                <th className="px-6 py-4 whitespace-nowrap">Địa chỉ IP</th>
+                <th className="px-6 py-4 whitespace-nowrap">Lý do</th>
+                <th className="px-6 py-4 whitespace-nowrap">Ngày chặn</th>
+                <th className="px-6 py-4 whitespace-nowrap">Bởi</th>
+                <th className="px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {bannedIps.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">Chưa có IP nào bị chặn.</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium whitespace-nowrap">Chưa có IP nào bị chặn.</td>
                 </tr>
               ) : (
                 bannedIps.map(b => (
                   <tr key={b.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-mono font-medium text-rose-600">{b.ip}</td>
-                    <td className="px-6 py-4 text-slate-600">{b.reason || '-'}</td>
-                    <td className="px-6 py-4 text-slate-600">{format(toSafeDate(b.blockedAt), 'dd/MM/yyyy HH:mm')}</td>
-                    <td className="px-6 py-4 font-medium">{b.blockedBy}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 font-mono font-medium text-rose-600 whitespace-nowrap">{b.ip}</td>
+                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{b.reason || '-'}</td>
+                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{format(toSafeDate(b.blockedAt), 'dd/MM/yyyy HH:mm')}</td>
+                    <td className="px-6 py-4 font-medium whitespace-nowrap">{b.blockedBy}</td>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
                       <button onClick={() => handleUnblockIp(b.id, b.ip)} className="inline-flex items-center justify-center p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Bỏ chặn">
                         <Trash2 className="w-4 h-4" />
                       </button>

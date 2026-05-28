@@ -165,25 +165,27 @@ export default function AdminUtilities() {
         <div className="p-4 border-b border-slate-200 dark:border-white/10">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Danh sách</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-900 dark:text-white min-w-[700px]">
+        <div className="overflow-x-auto no-scrollbar scroll-smooth">
+          <table className="w-full text-left text-sm text-slate-900 dark:text-white min-w-[1000px]">
             <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-500">
               <tr>
-                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Tên</th>
-                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Mô tả</th>
-                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal">Link nhúng</th>
-                <th className="px-6 py-5 text-[10px] font-medium  tracking-normal text-right">Thao tác</th>
+                <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tên</th>
+                <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Mô tả</th>
+                <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Link nhúng</th>
+                <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-white/10">
               {utilities.map(u => (
                 <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
-                  <td className="px-6 py-4 font-medium">{u.title}</td>
-                  <td className="px-6 py-4 text-slate-500 max-w-[200px] truncate">{u.description}</td>
-                  <td className="px-6 py-4 text-blue-500 truncate max-w-[200px]"><a href={u.embedUrl} target="_blank" rel="noreferrer">{u.embedUrl}</a></td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => startEdit(u)} className="text-blue-500 hover:text-blue-600 p-2"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => handleDelete(u.id)} className="text-red-500 hover:text-red-600 p-2"><Trash2 className="w-4 h-4" /></button>
+                  <td className="px-6 py-4 font-medium whitespace-nowrap text-slate-900 dark:text-white">{u.title}</td>
+                  <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{u.description}</td>
+                  <td className="px-6 py-4 text-blue-500 whitespace-nowrap">
+                    <a href={u.embedUrl} target="_blank" rel="noreferrer" className="hover:underline">{u.embedUrl}</a>
+                  </td>
+                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <button onClick={() => startEdit(u)} className="text-blue-500 hover:text-blue-600 p-2" title="Sửa"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(u.id)} className="text-red-500 hover:text-red-600 p-2" title="Xóa"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}

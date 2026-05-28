@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -16,6 +16,70 @@ export default function Topbar() {
   const { user, userData } = useAuthStore();
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
+  const [networkSpeed, setNetworkSpeed] = useState<{ ping: number | null, downlink: number | null }>({ ping: null, downlink: null });
+
+  useEffect(() => {
+    let isMounted = true;
+    let tick = 0;
+
+    const measurePing = async () => {
+      try {
+        const start = performance.now();
+        // Use a 204 No Content endpoint that is fast and global to avoid ServiceWorker cache
+        await fetch('https://www.gstatic.com/generate_204?_=' + Date.now(), { mode: 'no-cors', cache: 'no-store' });
+        return Math.round(performance.now() - start);
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const measureSpeed = async () => {
+      try {
+        const start = performance.now();
+        // Fetch a known ~600KB file to accurately measure real download speed
+        const res = await fetch(`https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js?_=${Date.now()}`);
+        const blob = await res.blob();
+        const duration = (performance.now() - start) / 1000;
+        
+        // Convert to Mbps (Megabits per second)
+        const bits = blob.size * 8;
+        const mbps = +(bits / 1_000_000 / duration).toFixed(1);
+        return mbps;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const updateNetwork = async () => {
+      if (!isMounted) return;
+      
+      const actPing = await measurePing();
+      
+      if (actPing === null) {
+        setNetworkSpeed({ ping: null, downlink: null });
+        return;
+      }
+
+      setNetworkSpeed(prev => ({ ...prev, ping: actPing }));
+
+      // Perform a real speed test on the first load and every 6 ticks (30s)
+      if (tick % 6 === 0) {
+        const actSpeed = await measureSpeed();
+        if (actSpeed !== null && isMounted) {
+          setNetworkSpeed(prev => ({ ...prev, downlink: actSpeed }));
+        }
+      }
+      tick++;
+    };
+
+    updateNetwork();
+    const interval = setInterval(updateNetwork, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
   const [locationName, setLocationName] = useState<string>('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -138,7 +202,7 @@ export default function Topbar() {
         try {
           const [wRes, gRes] = await Promise.all([
             fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
           ]);
           const wData = await wRes.json();
           const gData = await gRes.json();
@@ -150,7 +214,16 @@ export default function Topbar() {
             });
           }
           if (gData?.address) {
-            setLocationName(gData.address.city || gData.address.town || gData.address.state || 'Trái đất');
+            const addr = gData.address;
+            const parts = [];
+            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+            const district = addr.city_district || addr.county || addr.district || addr.town;
+            const city = addr.city || addr.state || addr.province;
+            if (ward) parts.push(ward);
+            if (district) parts.push(district);
+            if (city) parts.push(city);
+            
+            setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
           }
         } catch {}
       }, () => setLocationName('Việt Nam'));
@@ -210,6 +283,19 @@ export default function Topbar() {
                     <span className="text-[11px] font-bold tabular-nums text-slate-900 dark:text-zinc-200">{weather.temp}°C</span>
                     <span className="text-[9px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-tight">{weather.description}</span>
                  </div>
+               </div>
+             )}
+             {(networkSpeed.ping !== null || networkSpeed.downlink !== null) && (
+               <div className="flex items-center gap-2 pl-4 border-l border-slate-200 dark:border-white/5" title={networkSpeed.downlink ? `Tốc độ tải: ${networkSpeed.downlink} Mbps` : 'Tốc độ mạng'}>
+                 <Wifi className={cn(
+                   "w-3.5 h-3.5",
+                   (networkSpeed.ping && networkSpeed.ping < 100) ? "text-emerald-500" : (networkSpeed.ping && networkSpeed.ping < 300) ? "text-amber-500" : "text-slate-400 dark:text-zinc-500"
+                 )} />
+                 <span className="text-[11px] font-medium tabular-nums text-slate-600 dark:text-zinc-400">
+                   {networkSpeed.ping !== null ? `${networkSpeed.ping} ms` : ''}
+                   {networkSpeed.ping !== null && networkSpeed.downlink !== null ? ' - ' : ''}
+                   {networkSpeed.downlink !== null ? `${networkSpeed.downlink} Mbps` : ''}
+                 </span>
                </div>
              )}
           </div>

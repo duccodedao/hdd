@@ -570,17 +570,17 @@ export default function AdminDocumentVault() {
                 <input type="file" className="hidden" accept=".json" onChange={handleImport} />
              </label>
            </div>
-           <div className="overflow-x-auto -mx-6">
-             <table className="w-full text-left min-w-[1000px]">
+           <div className="overflow-x-auto no-scrollbar scroll-smooth">
+             <table className="w-full text-left min-w-[1200px]">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Định dạng</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên file gốc</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên hiển thị</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh mục</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày tạo</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ghi chú</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Định dạng</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên file gốc</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên hiển thị</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày tạo</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ghi chú</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -615,7 +615,7 @@ export default function AdminDocumentVault() {
                         <span className="text-xs text-slate-500">{docItem.createdAt?.toDate ? docItem.createdAt.toDate().toLocaleDateString('vi-VN') : 'N/A'}</span>
                      </td>
                      <td className="px-6 py-4">
-                        <p className="text-xs text-slate-500 dark:text-zinc-500 line-clamp-1 italic max-w-[150px]" title={docItem.note}>
+                        <p className="text-xs text-slate-500 dark:text-zinc-500 italic whitespace-nowrap" title={docItem.note}>
                           {docItem.note || "---"}
                         </p>
                      </td>
@@ -665,31 +665,31 @@ export default function AdminDocumentVault() {
                 <button onClick={handleBulkPermanentDelete} className="text-xs px-3 py-1 bg-rose-100 dark:bg-rose-500/20 text-rose-600 rounded-lg">Xóa vĩnh viễn tất cả</button>
              )}
            </h3>
-           <div className="overflow-x-auto -mx-6">
-             <table className="w-full text-left min-w-[800px]">
+           <div className="overflow-x-auto no-scrollbar scroll-smooth">
+             <table className="w-full text-left min-w-[1000px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-white/5">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên tài liệu</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên gốc</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh mục</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày xóa</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên tài liệu</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên gốc</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày xóa</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                   {documents.filter(d => d.isDeleted).map(docItem => (
                     <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
-                       <td className="px-6 py-4">
+                       <td className="px-6 py-4 whitespace-nowrap">
                          <span className="font-bold text-sm text-slate-700 dark:text-zinc-300">{docItem.name}</span>
                        </td>
-                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500">{docItem.originalName}</td>
-                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500">{docItem.categoryName}</td>
-                       <td className="px-6 py-4">
+                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.originalName}</td>
+                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.categoryName}</td>
+                       <td className="px-6 py-4 whitespace-nowrap">
                          <span className="text-xs text-slate-400 dark:text-zinc-600">
                            {docItem.deletedAt ? new Date(docItem.deletedAt?.seconds * 1000).toLocaleString() : 'N/A'}
                          </span>
                        </td>
-                       <td className="px-6 py-4 text-right">
+                       <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex gap-2 justify-end">
                             <button 
                                onClick={() => handleRestoreFile(docItem)}
