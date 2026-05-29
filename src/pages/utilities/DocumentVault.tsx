@@ -102,7 +102,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       setLoading(false);
     }, (err: any) => {
       setLoading(false);
-      console.error("DocumentVault documents error:", err);
+      console.error("DocumentVault documents error:", err?.message || String(err));
     });
 
     // Fetch Categories
@@ -112,7 +112,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       fetchedCats.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' }));
       setCategories(fetchedCats);
     }, (err: any) => {
-      console.error("DocumentVault categories error:", err);
+      console.error("DocumentVault categories error:", err?.message || String(err));
     });
 
     return () => {
@@ -141,7 +141,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         setHasMore(false);
       }
     } catch (err) {
-      console.error("Load more error:", err);
+      console.error("Load more error:", err?.message || String(err));
       if (err instanceof Error && !err.message.includes('permission-denied')) {
         toast.error("Không thể tải thêm văn bản");
       }
@@ -183,7 +183,11 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       try {
         const configDoc = await getDoc(doc(db, 'settings', 'github_integration'));
         if (configDoc.exists()) {
-          const config = configDoc.data() as import('../../types').GitHubConfig;
+          const resultData = configDoc.data();
+          const config = {
+            ...resultData,
+            owner: resultData.owner || resultData.username || ''
+          } as import('../../types').GitHubConfig;
           try {
             await githubService.deleteFile(config, docObj.githubPath, docObj.githubSha);
           } catch (githubErr: any) {
@@ -250,7 +254,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
           const blob = await response.blob();
           documentFolder?.file(doc.githubPath.split('/').pop() || doc.name, blob);
         } catch (err) {
-          console.error(`Failed to fetch ${doc.name}`, err);
+          console.error(`Failed to fetch ${doc.name}`, err?.message || String(err));
         }
       });
 

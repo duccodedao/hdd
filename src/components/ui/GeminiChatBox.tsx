@@ -90,7 +90,7 @@ export function GeminiChatBox() {
         { id: (Date.now() + 1).toString(), role: 'model', text: data.text || '' }
       ]);
     } catch (error: any) {
-      console.error('Gemini error:', error);
+      console.error('Gemini error:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi gọi AI: ' + (error?.message || 'Lỗi không xác định'));
       setMessages(prev => [
         ...prev,

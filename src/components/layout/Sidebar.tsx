@@ -39,7 +39,7 @@ export default function Sidebar({ className }: { className?: string }) {
       const unsubUtils = onSnapshot(collection(db, 'utilities'), (snap) => {
         setDynamicUtils(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((u: any) => !u.hidden || isAdmin));
       }, (err) => {
-        console.error("Sidebar utilities error:", err);
+        console.error("Sidebar utilities error:", err?.message || String(err));
         if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
           useAppStore.getState().setQuotaExceeded(true);
         }
@@ -49,7 +49,7 @@ export default function Sidebar({ className }: { className?: string }) {
           setSystemTools(docSnap.data());
         }
       }, (err) => {
-        console.error("Sidebar tool_permissions error:", err);
+        console.error("Sidebar tool_permissions error:", err?.message || String(err));
         if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
           useAppStore.getState().setQuotaExceeded(true);
         }

@@ -22,7 +22,7 @@ export default function ContactPage() {
           setSocialConfig(snap.data());
         }
       } catch (e) {
-        console.error("Config fetch failed", e);
+        console.error("Config fetch failed", e?.message || String(e));
       }
     };
     fetchConfig();

@@ -21,7 +21,7 @@ export default function AdminUtilities() {
     const unsubUtils = onSnapshot(qUtils, (snapshot) => {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
-      console.error("AdminUtilities: utilities listener error:", err);
+      console.error("AdminUtilities: utilities listener error:", err?.message || String(err));
     });
 
     // System settings listener for tool permissions
@@ -30,7 +30,7 @@ export default function AdminUtilities() {
         setSystemTools(docSnap.data());
       }
     }, (err) => {
-      console.error("AdminUtilities: settings listener error:", err);
+      console.error("AdminUtilities: settings listener error:", err?.message || String(err));
     });
 
     return () => {

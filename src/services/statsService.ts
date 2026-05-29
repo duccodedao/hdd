@@ -42,14 +42,14 @@ export const statsService = {
           lastUpdated: serverTimestamp()
         }, { merge: true });
       } catch (e) {
-        console.error(`Error adding to batch for ${id}:`, e);
+        console.error(`Error adding to batch for ${id}:`, e?.message || String(e));
       }
     }
 
     try {
       await batch.commit();
     } catch (e) {
-      console.error("Error committing stats batch:", e);
+      console.error("Error committing stats batch:", e?.message || String(e));
     }
   },
 
@@ -72,7 +72,7 @@ export const statsService = {
       }, { merge: true });
       await batch.commit();
     } catch (e) {
-      console.error(`Error incrementing utility stats for ${utilityId}:`, e);
+      console.error(`Error incrementing utility stats for ${utilityId}:`, e?.message || String(e));
     }
   }
 };

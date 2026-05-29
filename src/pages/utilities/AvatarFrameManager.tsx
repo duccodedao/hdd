@@ -48,8 +48,10 @@ interface Point {
 }
 
 import { useConfirmStore } from '../../store/confirmStore';
+import { useAppStore } from '../../store/appStore';
 
 export default function AvatarFrameManager({ onBack }: { onBack: () => void }) {
+  const { webLogo } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const { openConfirm } = useConfirmStore();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -120,7 +122,7 @@ export default function AvatarFrameManager({ onBack }: { onBack: () => void }) {
         }
       }
     }, (err) => {
-      console.error('Error fetching frames:', err);
+      console.error('Error fetching frames:', err?.message || String(err));
       setLoadingFrames(false);
     });
 
@@ -583,7 +585,7 @@ export default function AvatarFrameManager({ onBack }: { onBack: () => void }) {
             setSelectedFrame(null);
           }
         } catch (e: any) {
-          console.error('Delete Event Error:', e);
+          console.error('Delete Event Error:', e?.message || String(e));
           toast.error(e.message || 'Lỗi khi xóa khung');
         }
       }
@@ -720,7 +722,7 @@ export default function AvatarFrameManager({ onBack }: { onBack: () => void }) {
                     >
                       {adminUploading ? (
                         <motion.img 
-                          src="https://tytpht.hdd.io.vn/img/bmassloadings.png"
+                          src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"}
                           alt="..."
                           className="w-4 h-4 object-contain"
                           animate={{ scale: [0.8, 1.2, 0.8] }}
@@ -936,7 +938,7 @@ export default function AvatarFrameManager({ onBack }: { onBack: () => void }) {
                       className="w-12 h-12 flex items-center justify-center p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-100 dark:border-white/5"
                     >
                       <img 
-                        src="https://tytpht.hdd.io.vn/img/bmassloadings.png" 
+                        src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} 
                         alt="Loading" 
                         className="w-full h-full object-contain"
                         referrerPolicy="no-referrer"

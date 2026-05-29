@@ -83,7 +83,7 @@ const convertToDateInputFormat = (dateStr: any): string => {
 
     return '';
   } catch (err) {
-    console.error("Error converting date to input format:", err);
+    console.error("Error converting date to input format:", err?.message || String(err));
     return '';
   }
 };
@@ -138,7 +138,7 @@ const safeFormatDate = (dateStr: any): string => {
 
     return String(rawVal);
   } catch (err) {
-    console.error("Error formatting date:", err);
+    console.error("Error formatting date:", err?.message || String(err));
     return String(dateStr);
   }
 };
@@ -185,7 +185,7 @@ export default function HrmPage() {
       setEmployees(items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
       setLoading(false);
     }, (error) => {
-      console.error("hrm_employees snapshot error:", error);
+      console.error("hrm_employees snapshot error:", error?.message || String(error));
       handleFirestoreError(error, OperationType.LIST, 'hrm_employees');
       setLoading(false);
     });
@@ -194,7 +194,7 @@ export default function HrmPage() {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Collaborator));
       setCollaborators(items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     }, (error) => {
-      console.error("hrm_collaborators snapshot error:", error);
+      console.error("hrm_collaborators snapshot error:", error?.message || String(error));
       handleFirestoreError(error, OperationType.LIST, 'hrm_collaborators');
     });
 
@@ -313,7 +313,7 @@ export default function HrmPage() {
       }
       handleCloseModal();
     } catch (err) {
-      console.error("Save error:", err);
+      console.error("Save error:", err?.message || String(err));
       handleFirestoreError(err, editingItem ? OperationType.UPDATE : OperationType.CREATE, activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators');
       toast.error('Có lỗi xảy ra khi lưu thông tin.', { id: toastId });
     }
@@ -335,7 +335,7 @@ export default function HrmPage() {
       await deleteDoc(doc(db, colName, id));
       toast.success('Đã xóa dữ liệu thành công!', { id: toastId });
     } catch (err) {
-      console.error("Delete error:", err);
+      console.error("Delete error:", err?.message || String(err));
       handleFirestoreError(err, OperationType.DELETE, activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators');
       toast.error('Có lỗi xảy ra khi xóa dữ liệu.', { id: toastId });
     }

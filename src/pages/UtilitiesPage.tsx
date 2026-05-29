@@ -289,7 +289,7 @@ export default function UtilitiesPage() {
       });
       setUtilityStats(stats);
     }, (err) => {
-      console.error("UtilitiesPage stats listener error:", err);
+      console.error("UtilitiesPage stats listener error:", err?.message || String(err));
     });
     return () => unsub();
   }, []);
@@ -299,7 +299,7 @@ export default function UtilitiesPage() {
     const unsub = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
       if (docSnap.exists()) setSystemTools(docSnap.data());
     }, (err) => {
-      console.error("UtilitiesPage tool_permissions error:", err);
+      console.error("UtilitiesPage tool_permissions error:", err?.message || String(err));
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
@@ -313,7 +313,7 @@ export default function UtilitiesPage() {
       setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
       setLoading(false);
     }, (err) => {
-      console.error("UtilitiesPage utilities listener error:", err);
+      console.error("UtilitiesPage utilities listener error:", err?.message || String(err));
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }

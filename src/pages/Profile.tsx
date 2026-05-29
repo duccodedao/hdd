@@ -77,7 +77,7 @@ export default function Profile() {
         updateState();
         loc.onchange = updateState;
       } catch (e) {
-        console.error("Permission check failed", e);
+        console.error("Permission check failed", e?.message || String(e));
       }
     };
     checkPermissions();

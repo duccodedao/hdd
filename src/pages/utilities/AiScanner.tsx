@@ -86,7 +86,7 @@ export default function AiScanner({ onBack }: AiScannerProps) {
       setResult(data.text || '');
       toast.success('Đã quét và trích xuất bằng AI thành công!');
     } catch (error) {
-      console.error(error);
+      console.error(error?.message || String(error));
       toast.error('Có lỗi xảy ra khi xử lý bằng AI. Vui lòng thử lại.');
     } finally {
       setIsProcessing(false);

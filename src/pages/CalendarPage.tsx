@@ -77,7 +77,7 @@ export default function CalendarPage() {
       setEvents(items);
       setLoading(false);
     }, (err) => {
-      console.error("Calendar fetch error:", err);
+      console.error("Calendar fetch error:", err?.message || String(err));
       toast.error('Không thể tải dữ liệu lịch');
       setLoading(false);
     });
@@ -86,7 +86,7 @@ export default function CalendarPage() {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTasks(items);
     }, (err) => {
-      console.error("Tasks fetch error:", err);
+      console.error("Tasks fetch error:", err?.message || String(err));
     });
 
     const unsubRecurring = onSnapshot(collection(db, 'recurring_events'), (snapshot) => {
@@ -94,7 +94,7 @@ export default function CalendarPage() {
       const sorted = items.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
       setRecurringEvents(sorted);
     }, (err) => {
-      console.error("Recurring fetch error:", err);
+      console.error("Recurring fetch error:", err?.message || String(err));
     });
 
     return () => {
@@ -212,7 +212,7 @@ export default function CalendarPage() {
       XLSX.writeFile(wb, "Mau_Import_Lich_Dinh_Ky.xlsx");
       toast.success('Đã tải xuống file mẫu Excel!');
     } catch (err) {
-      console.error("Download template error:", err);
+      console.error("Download template error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra khi tải xuống file mẫu');
     }
   };
@@ -287,7 +287,7 @@ export default function CalendarPage() {
 
         toast.success(`Import thành công ${successCount} công việc định kỳ! (Lỗi: ${errorCount})`, { id: toastId });
       } catch (err) {
-        console.error("Excel import error:", err);
+        console.error("Excel import error:", err?.message || String(err));
         toast.error('Đã xảy ra lỗi khi đọc file Excel.', { id: toastId });
       }
     };
@@ -454,7 +454,7 @@ export default function CalendarPage() {
 
       toast.success(`Đồng bộ thành công! Thêm mới: ${addedCount}, Cập nhật: ${updatedCount}`, { id: toastId });
     } catch (err) {
-      console.error("Sync error:", err);
+      console.error("Sync error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra trong quá trình đồng bộ.', { id: toastId });
     } finally {
       setIsSyncing(false);
@@ -503,7 +503,7 @@ export default function CalendarPage() {
         handleOpenModal(new Date(dateStr), newEvent);
       }
     } catch (err) {
-      console.error("Sync and edit error:", err);
+      console.error("Sync and edit error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra khi đồng bộ.', { id: toastId });
     } finally {
       setIsSyncing(false);

@@ -18,7 +18,7 @@ export default function NotificationMarquee() {
         setConfig(snap.data().notificationConfig);
       }
     }, (err) => {
-      console.error("NotificationMarquee error:", err);
+      console.error("NotificationMarquee error:", err?.message || String(err));
       // Let global state know if quota limits are hit
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);

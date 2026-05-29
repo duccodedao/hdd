@@ -148,7 +148,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
         throw new Error("Không nhận dạng được định dạng dữ liệu cây thư mục");
       }
     } catch (error: any) {
-      console.error("Lỗi lấy tệp từ GitHub:", error);
+      console.error("Lỗi lấy tệp từ GitHub:", error?.message || String(error));
       toast.error(`Không thể quét repository: ${error.message || 'Lỗi mạng'}`);
     } finally {
       setLoadingFiles(false);
@@ -210,7 +210,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
         setFileContent(data.content || '');
       }
     } catch (error: any) {
-      console.error("Lỗi khi nạp tệp cụ thể:", error);
+      console.error("Lỗi khi nạp tệp cụ thể:", error?.message || String(error));
       toast.error(`Lỗi nạp tệp: ${error.message || 'Không thể tải'}`);
     } finally {
       setLoadingContent(false);

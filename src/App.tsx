@@ -94,7 +94,7 @@ function VisitTracker() {
         try {
           await statsService.incrementVisit(location.pathname);
         } catch (e) {
-          console.error("Failed to increment visit", e);
+          console.error("Failed to increment visit", e?.message || "Unknown error");
         }
       };
       increment();
@@ -106,7 +106,7 @@ function VisitTracker() {
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion, setWebLogo } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
   const [seo, setSeo] = useState({
     title: 'BMASS',
@@ -165,7 +165,7 @@ export default function App() {
         }
       }
     }, (err) => {
-      console.error("Could not fetch system settings", err);
+      console.error("Could not fetch system settings", err?.message || "Unknown error");
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
@@ -183,7 +183,19 @@ export default function App() {
         });
       }
     }, (err) => {
-      console.error("Could not fetch SEO settings", err);
+      console.error("Could not fetch SEO settings", err?.message || "Unknown error");
+    });
+
+    // Real-time about settings listener for Web Logo
+    const unsubscribeAbout = onSnapshot(doc(db, 'settings', 'about'), (aboutDoc) => {
+      if (aboutDoc.exists()) {
+        const data = aboutDoc.data();
+        if (data.webLogo) {
+          setWebLogo(data.webLogo);
+        }
+      }
+    }, (err) => {
+      console.error("Could not fetch About settings", err?.message || "Unknown error");
     });
 
     // Auth listener
@@ -216,10 +228,10 @@ export default function App() {
             };
             setUserData(fallbackUser);
             setDoc(doc(db, 'users', firebaseUser.uid), fallbackUser, { merge: true })
-              .catch((error) => console.error("Error auto-creating missing user document:", error));
+              .catch((error) => console.error("Error auto-creating missing user document:", error?.message || "Unknown error"));
           }
         }, (err) => {
-          console.error("Error listening to user data:", err);
+          console.error("Error listening to user data:", err?.message || "Unknown error");
           if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
             useAppStore.getState().setQuotaExceeded(true);
           }
@@ -235,11 +247,33 @@ export default function App() {
       if (unsubscribeUser) unsubscribeUser();
       unsubscribeSystem();
       unsubscribeSeo();
+      unsubscribeAbout();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, [setUser, setUserData, setLoading, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (!localStorage.getItem('theme')) {
+        document.documentElement.classList.toggle('dark', mediaQuery.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  const darkMode = useAppStore(state => state.darkMode);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // Main UI render logic
   if (loading) {

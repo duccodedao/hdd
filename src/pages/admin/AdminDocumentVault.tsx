@@ -104,11 +104,14 @@ export default function AdminDocumentVault() {
     // Config listener
     const unsubConfig = onSnapshot(doc(db, 'settings', 'github_integration'), (docSn) => {
       if (docSn.exists()) {
-        const data = docSn.data() as GitHubConfig;
-        setGhConfig(data);
+        const data = docSn.data();
+        setGhConfig({
+          ...data,
+          owner: data.owner || data.username || '',
+        } as GitHubConfig);
       }
     }, (err) => {
-      console.error("AdminDocumentVault config listener error:", err);
+      console.error("AdminDocumentVault config listener error:", err?.message || String(err));
     });
 
     // Category listener + Ensure 'Khác' exists
@@ -123,14 +126,14 @@ export default function AdminDocumentVault() {
         });
       }
     }, (err) => {
-      console.error("AdminDocumentVault categories listener error:", err);
+      console.error("AdminDocumentVault categories listener error:", err?.message || String(err));
     });
     
     // Documents listener
     const unsubDocs = onSnapshot(query(collection(db, 'documents'), orderBy('createdAt', 'desc')), (snap) => {
       setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminDocument)));
     }, (err) => {
-      console.error("AdminDocumentVault documents listener error:", err);
+      console.error("AdminDocumentVault documents listener error:", err?.message || String(err));
     });
 
     return () => { unsubConfig(); unsubCat(); unsubDocs(); };

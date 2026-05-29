@@ -46,6 +46,7 @@ export default function AdminDashboard() {
     adminName: 'Quản trị viên',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
     adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    webLogo: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
@@ -156,13 +157,13 @@ export default function AdminDashboard() {
       if (docSnap.exists()) {
         setSystemTools(docSnap.data());
       }
-    }, (err) => console.error("Admin: tool_permissions listener error:", err));
+    }, (err) => console.error("Admin: tool_permissions listener error:", err?.message || String(err)));
 
     let unsubContacts = () => {};
     if (isAdmin) {
       unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
         setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (err) => console.error("Admin: contact_requests listener error:", err));
+      }, (err) => console.error("Admin: contact_requests listener error:", err?.message || String(err)));
     }
     
     // Fetch settings ONCE to avoid overwriting admin inputs while typing
@@ -222,7 +223,7 @@ export default function AdminDashboard() {
           });
         }
       } catch (err) {
-        console.error("Error fetching settings:", err);
+        console.error("Error fetching settings:", err?.message || String(err));
       }
     };
     
@@ -231,7 +232,7 @@ export default function AdminDashboard() {
         const snap = await getDoc(doc(db, 'settings', 'about'));
         if (snap.exists()) setAboutConfig(prev => ({ ...prev, ...snap.data() }));
       } catch (e) {
-        console.error("Admin: fetchAbout error:", e);
+        console.error("Admin: fetchAbout error:", e?.message || String(e));
       }
     };
 
@@ -242,16 +243,16 @@ export default function AdminDashboard() {
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Admin: utilities listener error:", err));
+    }, (err) => console.error("Admin: utilities listener error:", err?.message || String(err)));
 
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Admin: apps listener error:", err));
+    }, (err) => console.error("Admin: apps listener error:", err?.message || String(err)));
 
     const unsubCategories = onSnapshot(collection(db, 'app_categories'), (snapshot) => {
       const cats: any = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAppCategories(cats.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis() || 0));
-    }, (err) => console.error("Admin: categories listener error:", err));
+    }, (err) => console.error("Admin: categories listener error:", err?.message || String(err)));
 
     // Listen to site stats
     const now = new Date();
@@ -271,7 +272,7 @@ export default function AdminDashboard() {
       });
       setSiteStats(stats);
     }, (error) => {
-      console.error("Error listening to site stats:", error);
+      console.error("Error listening to site stats:", error?.message || String(error));
     });
 
     return () => {
@@ -285,6 +286,7 @@ export default function AdminDashboard() {
   }, []);
 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingWebLogo, setIsUploadingWebLogo] = useState(false);
 
   const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -333,6 +335,54 @@ export default function AdminDashboard() {
       setUploadProgress(prev => {
         const next = { ...prev };
         delete next.avatar;
+        return next;
+      });
+      e.target.value = '';
+    }
+  };
+
+  const handleUploadWebLogoToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+    const token = githubGlobalConfig.token || githubIntegrationConfig.token || '';
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    const ghConfig = { owner: username, token, repo, branch };
+    
+    setIsUploadingWebLogo(true);
+    const toastId = toast.loading('Đang tải lên logo web...');
+    
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `logo-${Date.now()}.${ext}`;
+      const uploadPath = `system/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Update system web logo ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, webLogo: Math.round(progress) }))
+      );
+
+      setAboutConfig(prev => ({ ...prev, webLogo: result.url }));
+      toast.success('Đã tải lên logo thành công!', { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi tải logo: ${e.message}`, { id: toastId });
+    } finally {
+      setIsUploadingWebLogo(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.webLogo;
         return next;
       });
       e.target.value = '';
@@ -756,7 +806,7 @@ export default function AdminDashboard() {
 
       toast.success('Đã tải lên nhập file MP3 thành công và đồng bộ nhạc nền hệ thống!', { id: originalId });
     } catch (err: any) {
-      console.error('Audio upload error:', err);
+      console.error('Audio upload error:', err?.message || String(err));
       toast.error('Lỗi khi tải nhạc lên GitHub: ' + (err.message || 'Thất bại'), { id: originalId });
     } finally {
       setAudioUploading(false);
@@ -887,7 +937,7 @@ export default function AdminDashboard() {
       XLSX.writeFile(workbook, "mau_import_ung_dung.xlsx");
       toast.success("Tải tệp mẫu Excel thành công!");
     } catch (err: any) {
-      console.error("Lỗi tạo file mẫu:", err);
+      console.error("Lỗi tạo file mẫu:", err?.message || String(err));
       toast.error("Lỗi khi tạo file mẫu Excel: " + err.message);
     }
   };
@@ -1036,7 +1086,7 @@ export default function AdminDashboard() {
       setUsers(usersData);
       setLoading(false);
     }, (err) => {
-      console.error("Admin: fetchUsers listener error:", err);
+      console.error("Admin: fetchUsers listener error:", err?.message || String(err));
       setLoading(false);
     });
     return unsubscribe;
@@ -1410,6 +1460,35 @@ export default function AdminDashboard() {
                       {isUploadingAvatar && (
                         <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
                           <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1 flex items-center justify-between">
+                      <span>Logo Hệ thống (Web Logo)</span>
+                      <label className="cursor-pointer text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <Upload size={12} />
+                        <span className="text-[10px]">Tải lên Logo</span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadWebLogoToGithub} disabled={isUploadingWebLogo} />
+                      </label>
+                    </label>
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        value={aboutConfig.webLogo}
+                        onChange={(e) => setAboutConfig({...aboutConfig, webLogo: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white pr-12"
+                        placeholder="Link logo hệ thống..."
+                      />
+                      {aboutConfig.webLogo && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm pointer-events-none p-1 bg-white/50">
+                          <img src={aboutConfig.webLogo} alt="Logo Prev" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      {isUploadingWebLogo && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                       )}
                     </div>

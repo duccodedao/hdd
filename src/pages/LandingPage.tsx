@@ -14,8 +14,11 @@ const NavItem = ({ children, href }: { children: React.ReactNode; href: string }
   </a>
 );
 
+import { useAppStore } from '../store/appStore';
+
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { webLogo } = useAppStore();
   const [activeFeature, setActiveFeature] = useState<number | null>(null);
 
   const featuresList = [
@@ -157,7 +160,7 @@ export default function LandingPage() {
                 className="flex items-center gap-8 lg:gap-12 pt-12 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-1000"
              >
                 <img src="https://upload.wikimedia.org/wikipedia/commons/a/a4/Mastercard_2019_logo.svg" className="h-8 lg:h-12" alt="Mastercard" referrerPolicy="no-referrer" />
-                <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" className="h-6 lg:h-8 object-contain opacity-80" alt="BMASS" referrerPolicy="no-referrer" />
+                <img src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} className="h-6 lg:h-8 object-contain opacity-80" alt="BMASS" referrerPolicy="no-referrer" />
                 <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" className="h-6 lg:h-8" alt="PayPal" referrerPolicy="no-referrer" />
              </motion.div>
           </motion.div>
@@ -400,7 +403,7 @@ export default function LandingPage() {
             <span className="text-[8px] lg:text-[11px] font-mono font-bold text-zinc-600 uppercase tracking-[0.3em] lg:tracking-[0.4em] text-center lg:text-left">© 2026 BMASS Ecosystem / Nucleus Labs • ALL RIGHTS RESERVED</span>
             <div className="flex gap-8 lg:gap-16 items-center">
                <img src="https://upload.wikimedia.org/wikipedia/commons/a/a4/Mastercard_2019_logo.svg" className="h-6 lg:h-10" alt="Mastercard" referrerPolicy="no-referrer" />
-               <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" className="h-4 lg:h-6 object-contain opacity-60" alt="BMASS" referrerPolicy="no-referrer" />
+               <img src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} className="h-4 lg:h-6 object-contain opacity-60" alt="BMASS" referrerPolicy="no-referrer" />
             </div>
           </div>
       </footer>

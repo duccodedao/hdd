@@ -9,10 +9,14 @@ async function getGitHubConfig(): Promise<GitHubConfig | null> {
     const docRef = doc(db, 'settings', 'github');
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
-      return snapshot.data() as GitHubConfig;
+      const data = snapshot.data();
+      return {
+        ...data,
+        owner: data.owner || data.username || ''
+      } as GitHubConfig;
     }
   } catch (error) {
-    console.error('Error fetching GitHub config:', error);
+    console.error('Error fetching GitHub config:', error?.message || String(error));
   }
   return null;
 }
@@ -33,7 +37,7 @@ export const githubService = {
     if (onProgress) onProgress(10); // Reader completed
 
     // Clean repo name from possible full URL
-    let rawRepo = config.repo.trim();
+    let rawRepo = (config.repo || '').trim();
     if (rawRepo.includes('github.com/')) {
       const parts = rawRepo.split('github.com/')[1].split('/');
       if (parts.length >= 2) {
@@ -43,8 +47,8 @@ export const githubService = {
     }
 
     const cleanRepo = rawRepo.split('/').pop()?.trim() || rawRepo;
-    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : config.owner).trim();
-    const cleanToken = config.token.trim();
+    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : (config.owner || '')).trim();
+    const cleanToken = (config.token || '').trim();
     const cleanPath = path.startsWith('/') ? path.substring(1) : path;
 
     if (file.size > 25 * 1024 * 1024) {
@@ -118,7 +122,7 @@ export const githubService = {
   },
 
   async deleteFile(config: GitHubConfig, path: string, sha: string): Promise<void> {
-    let rawRepo = config.repo.trim();
+    let rawRepo = (config.repo || '').trim();
     if (rawRepo.includes('github.com/')) {
       const parts = rawRepo.split('github.com/')[1].split('/');
       if (parts.length >= 2) {
@@ -128,8 +132,8 @@ export const githubService = {
     }
 
     const cleanRepo = rawRepo.split('/').pop()?.trim() || rawRepo;
-    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : config.owner).trim();
-    const cleanToken = config.token.trim();
+    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : (config.owner || '')).trim();
+    const cleanToken = (config.token || '').trim();
     const cleanPath = path.startsWith('/') ? path.substring(1) : path;
     
     const encodedPath = cleanPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
@@ -168,7 +172,7 @@ export const uploadToGitHub = async (file: File, message: string, path: string):
     const result = await githubService.uploadFile(config, file, path, message);
     return result.url;
   } catch (error) {
-    console.error('Manual GitHub upload failed:', error);
+    console.error('Manual GitHub upload failed:', error?.message || String(error));
     return null;
   }
 };

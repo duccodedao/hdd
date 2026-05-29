@@ -29,6 +29,6 @@ export async function logActivity(type: ActivityType, description: string, metad
 
     await addDoc(collection(db, 'activities'), activityData);
   } catch (e) {
-    console.error('Error logging activity:', e);
+    console.error('Error logging activity:', e?.message || String(e));
   }
 }

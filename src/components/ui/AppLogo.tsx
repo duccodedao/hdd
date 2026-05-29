@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
+import { useAppStore } from '../../store/appStore';
 
 interface AppLogoProps {
   className?: string;
@@ -7,6 +8,8 @@ interface AppLogoProps {
 }
 
 const AppLogo: React.FC<AppLogoProps> = ({ className, isLoading }) => {
+  const { webLogo } = useAppStore();
+
   return (
     <div className={cn("relative flex items-center justify-center shrink-0", className)}>
       {/* Rotating circle around the logo when loading */}
@@ -21,7 +24,7 @@ const AppLogo: React.FC<AppLogoProps> = ({ className, isLoading }) => {
       )} />
       
       <img 
-        src="https://tytpht.hdd.io.vn/img/bmassloadings.png" 
+        src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} 
         alt="BMASS Logo" 
         className={cn(
           "w-full h-full object-contain relative z-10 transition-all duration-700 p-2",

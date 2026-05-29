@@ -35,7 +35,7 @@ export default function AdminApiKeys() {
         
         setApiKeys((prev) => ({ ...prev, ...fetchedData }));
       } catch (error) {
-        console.error('Failed to fetch API keys:', error);
+        console.error('Failed to fetch API keys:', error?.message || String(error));
       } finally {
         setLoading(false);
       }
@@ -51,7 +51,7 @@ export default function AdminApiKeys() {
       const keys = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setSecondaryKeys(keys);
     } catch (error) {
-      console.error('Failed to fetch secondary keys:', error);
+      console.error('Failed to fetch secondary keys:', error?.message || String(error));
       toast.error('Lỗi khi tải danh sách API Key phụ');
     } finally {
       setLoadingSecondary(false);
@@ -93,7 +93,7 @@ export default function AdminApiKeys() {
       await setDoc(doc(db, 'settings', 'apiKeys'), { geminiApiKey: apiKeys.geminiApiKey }, { merge: true });
       toast.success('Đã lưu cấu hình API Keys thành công');
     } catch (error) {
-      console.error('Failed to save API keys:', error);
+      console.error('Failed to save API keys:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi lưu API Keys');
     } finally {
       setSaving(false);

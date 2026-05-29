@@ -20,7 +20,7 @@ export default function AdminIpBlocking() {
     const unsub = onSnapshot(q, (snap) => {
       setBannedIps(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (err) => {
-      console.error("AdminIpBlocking: blockedIps listener error:", err);
+      console.error("AdminIpBlocking: blockedIps listener error:", err?.message || String(err));
     });
     return () => unsub();
   }, []);

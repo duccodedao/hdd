@@ -285,7 +285,7 @@ export default function Topbar() {
                  </div>
                </div>
              )}
-             {(networkSpeed.ping !== null || networkSpeed.downlink !== null) && (
+             {user && (networkSpeed.ping !== null || networkSpeed.downlink !== null) && (
                <div className="flex items-center gap-2 pl-4 border-l border-slate-200 dark:border-white/5" title={networkSpeed.downlink ? `Tốc độ tải: ${networkSpeed.downlink} Mbps` : 'Tốc độ mạng'}>
                  <Wifi className={cn(
                    "w-3.5 h-3.5",

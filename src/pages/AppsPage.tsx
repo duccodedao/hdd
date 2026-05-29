@@ -40,7 +40,7 @@ export default function AppsPage() {
       setApps(items);
       setLoading(false);
     }, (err) => {
-      console.error("AppsPage apps listener error:", err);
+      console.error("AppsPage apps listener error:", err?.message || String(err));
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
@@ -51,7 +51,7 @@ export default function AppsPage() {
       const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       setCategories(cats.sort((a, b) => (a as any).createdAt?.toMillis() - (b as any).createdAt?.toMillis() || 0));
     }, (err) => {
-      console.error("AppsPage categories listener error:", err);
+      console.error("AppsPage categories listener error:", err?.message || String(err));
     });
 
     return () => {

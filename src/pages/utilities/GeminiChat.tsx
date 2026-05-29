@@ -141,7 +141,7 @@ export default function GeminiChat() {
       localStorage.setItem('ai_chat_sessions', JSON.stringify(sessions));
       localStorage.setItem('ai_current_session', currentSessionId);
     } catch (e) {
-      console.error("Failed to save chat sessions to localStorage due to cyclic data:", e);
+      console.error("Failed to save chat sessions to localStorage due to cyclic data:", e?.message || String(e));
     }
   }, [sessions, currentSessionId]);
 
@@ -259,7 +259,7 @@ export default function GeminiChat() {
         s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
       ));
     } catch (error: any) {
-      console.error('Gemini error:', error);
+      console.error('Gemini error:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi gọi AI: ' + (error?.message || 'Lỗi không xác định'));
 
       const errorMessage: Message = { 

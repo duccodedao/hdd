@@ -45,7 +45,7 @@ export const AccessGuard = ({ children }: AccessGuardProps) => {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
            console.warn("IP check network error, skipping block check");
         } else {
-           console.error("Ban check failed:", err);
+           console.error("Ban check failed:", err?.message || String(err));
         }
         // If ban check fails, don't block by default, let user proceed or handle error
         setIsIpBlocked(false); 

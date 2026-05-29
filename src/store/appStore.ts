@@ -38,9 +38,13 @@ interface AppState {
   setMaintenanceStampConfig: (config: any) => void;
   systemVersion: string;
   setSystemVersion: (v: string) => void;
+  webLogo: string;
+  setWebLogo: (logo: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  webLogo: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+  setWebLogo: (logo) => set({ webLogo: logo }),
   sidebarOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),
@@ -80,13 +84,7 @@ export const useAppStore = create<AppState>((set) => ({
   darkMode: typeof window !== 'undefined' ? (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) : false,
   toggleDarkMode: () => set((state) => {
     const nextMode = !state.darkMode;
-    if (nextMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    localStorage.setItem('theme', nextMode ? 'dark' : 'light');
     return { darkMode: nextMode };
   }),
   googleClientId: null,

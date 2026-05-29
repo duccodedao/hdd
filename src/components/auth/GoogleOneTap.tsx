@@ -45,7 +45,7 @@ export default function GoogleOneTap() {
         }
       });
     } catch (error) {
-      console.error('Google One Tap error:', error);
+      console.error('Google One Tap error:', error?.message || String(error));
     }
   }, [user, googleClientId]);
 
@@ -76,7 +76,7 @@ export default function GoogleOneTap() {
       await logActivity(ActivityType.LOGIN, 'Đăng nhập Google One Tap thành công');
       toast.success('Đăng nhập thành công');
     } catch (error: any) {
-      console.error('Google Auth Error:', error);
+      console.error('Google Auth Error:', error?.message || String(error));
       toast.error('Đăng nhập Google thất bại');
     }
   };
