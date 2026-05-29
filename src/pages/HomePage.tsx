@@ -1,5 +1,5 @@
 import { ArrowRight, ShieldCheck, Zap, Globe, Code } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -93,10 +93,12 @@ function RecentLoginsStream({ logins }: { logins: {id: string, email: string}[] 
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthStore();
   const { stampConfig, webLogo } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
   const [recentLogins, setRecentLogins] = useState<{id: string, email: string}[]>([]);
+  const [partners, setPartners] = useState<{ id: string, name: string, logoUrl: string }[]>([]);
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
@@ -172,9 +174,14 @@ export default function HomePage() {
       setRecentLogins([...users, ...fakeEmails]);
     });
 
+    const unsubPartners = onSnapshot(collection(db, 'partners'), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
+    });
+
     return () => {
       unsubStats();
       unsubLogins();
+      unsubPartners();
     };
   }, []);
 
@@ -194,7 +201,7 @@ export default function HomePage() {
         <div className="flex items-center gap-4">
           {!user && (
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login', { state: { from: location } })}
               className="hidden md:block px-6 py-2.5 text-sm font-bold text-zinc-500 hover:text-white transition-colors"
             >
               Đăng nhập
@@ -301,7 +308,25 @@ export default function HomePage() {
         </motion.div>
       </main>
 
-      <footer className="relative z-10 border-t border-slate-50 py-16 text-center">
+      {partners.length > 0 && (
+        <div className="relative z-10 w-full overflow-hidden py-6 md:py-8">
+          <div className="flex w-full overflow-hidden mask-edges relative group">
+            <motion.div 
+              className="flex gap-8 md:gap-16 items-center px-4 md:px-8 w-max shrink-0"
+              animate={{ x: [0, "-50%"] }}
+              transition={{ repeat: Infinity, ease: "linear", duration: Math.max(20, partners.length * 4) }}
+            >
+              {Array.from({ length: 6 }).flatMap(() => partners).map((p, idx) => (
+                <div key={`${p.id}-${idx}`} className="flex items-center justify-center shrink-0 w-24 md:w-32 h-10 md:h-12 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                  <img src={p.logoUrl} alt={p.name} className="max-w-full max-h-full object-contain" />
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      <footer className="relative z-10 py-8 md:py-12 text-center">
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500 cursor-pointer">
             <img src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Footer Logo" className="h-8 w-auto" />

@@ -117,7 +117,8 @@ export default function Auth() {
       const userCred = await signInWithEmailAndPassword(auth, email, loginPassword);
       await logActivity(ActivityType.LOGIN, `Đã đăng nhập qua ${identifier.includes('@') ? 'Email' : 'Giao thức'}`);
       await checkAndSaveLocation(userCred.user.uid);
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Authentication failed.');
     } finally {
@@ -163,7 +164,8 @@ export default function Auth() {
       });
       await checkAndSaveLocation(userCred.user.uid);
       toast.success('Entity registered.');
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Registration failed.');
     } finally {
@@ -215,7 +217,8 @@ export default function Auth() {
 
       await checkAndSaveLocation(userCred.user.uid);
       await logActivity(ActivityType.LOGIN, 'Đã thiết lập liên kết hệ thống');
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
        toast.error('Neural handshaked failed.');
     } finally {

@@ -32,7 +32,9 @@ interface UtilityItem {
   adminOnly?: boolean;
 }
 
-const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number }) => {
+const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.cc/150?img=${i + 1}`);
+
+const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [] }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[] }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
@@ -40,6 +42,39 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
   const config = systemTools?.[item.id];
   const isInternal = config?.internal || (item as any).internalOnly;
   const Icon = item.icon;
+
+  const userCount = Math.max(0, (visits || 0) > 0 ? (visits || 0) - 1 : 0);
+  
+  const displayAvatars = React.useMemo(() => {
+    if (userCount === 0) return [];
+    const charCode = item.title.charCodeAt(0) + (item.title.charCodeAt(1) || 0) + idx;
+    
+    // Pick 4 real users if we have them, randomly or based on charCode so they are stable
+    const pickedRealUsers: string[] = [];
+    if (realUsers && realUsers.length > 0) {
+        let realStartIdx = charCode % realUsers.length;
+        const maxPick = Math.min(4, userCount);
+        for (let i = 0; i < realUsers.length; i++) {
+           if (pickedRealUsers.length >= maxPick) break;
+           const u = realUsers[(realStartIdx + i) % realUsers.length];
+           if (u?.photoURL && !pickedRealUsers.includes(u.photoURL)) {
+               pickedRealUsers.push(u.photoURL);
+           }
+        }
+    }
+    
+    const maxNeeded = Math.min(4, userCount);
+    const needed = maxNeeded - pickedRealUsers.length;
+    let finalAvatars = [...pickedRealUsers];
+    if (needed > 0) {
+      const startIdx = charCode % Math.max(1, RANDOM_AVATARS.length - needed);
+      finalAvatars = finalAvatars.concat(RANDOM_AVATARS.slice(startIdx, startIdx + needed));
+    }
+    
+    return finalAvatars;
+  }, [item.title, idx, realUsers, userCount]);
+
+  const remainingUsers = userCount > displayAvatars.length ? userCount - displayAvatars.length : 0;
 
   if (item.adminOnly && !isSuperAdmin) {
     return null;
@@ -115,14 +150,34 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
         </div>
       </div>
       
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 space-y-3 flex flex-col">
         <h3 className="text-xl font-semibold text-slate-950 dark:text-white tracking-tight">{item.title}</h3>
-        <p className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 italic">
+        <p className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 italic mb-2">
            {item.description}
         </p>
+        
+        <div className="mt-auto pt-3 flex items-center">
+          <div className="flex -space-x-2">
+            {displayAvatars.map((url, i) => (
+              <img 
+                key={i} 
+                src={url} 
+                className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-900 object-cover relative pointer-events-none" 
+                style={{ zIndex: 4 - i }}
+                alt="User"
+              />
+            ))}
+            {remainingUsers > 0 && (
+              <div className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-900 bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-[8px] font-bold text-slate-600 dark:text-zinc-400 relative" style={{ zIndex: 0 }}>
+                +{remainingUsers}
+              </div>
+            )}
+          </div>
+          <span className="ml-3 text-[10px] font-medium text-slate-500 dark:text-zinc-500">Người sử dụng</span>
+        </div>
       </div>
       
-      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
+      <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
         <span className={cn(
           "text-[10px] font-bold text-slate-500 dark:text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-indigo-400"
@@ -225,6 +280,7 @@ export default function UtilitiesPage() {
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
   const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
+  const [realUsers, setRealUsers] = useState<any[]>([]);
   const { setAiActive } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
 
@@ -319,7 +375,19 @@ export default function UtilitiesPage() {
       }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const userQ = query(collection(db, 'users'));
+    const unsubUsers = onSnapshot(userQ, (snapshot) => {
+      const users = snapshot.docs.map(doc => doc.data());
+      // Lấy các users có ảnh đại diện, lọc trùng lặp và lấy ngẫu nhiên/hoặc 20 user
+      const withAvatars = users.filter((u: any) => u.photoURL);
+      setRealUsers(withAvatars);
+    }, () => {});
+
+    return () => {
+      unsubscribe();
+      unsubUsers();
+    };
   }, []);
 
   const { maintenanceTabs } = useAppStore();
@@ -493,6 +561,7 @@ export default function UtilitiesPage() {
                   onSelect={handleSelect} 
                   systemTools={systemTools} 
                   visits={utilityStats[item.id] || 0}
+                  realUsers={realUsers}
                 />
               ))}
             </div>

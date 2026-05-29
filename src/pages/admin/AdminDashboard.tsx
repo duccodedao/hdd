@@ -17,6 +17,7 @@ import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
+import AdminPartners from './AdminPartners';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -29,7 +30,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners'>('users');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -1331,6 +1332,7 @@ export default function AdminDashboard() {
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
             { id: 'system', label: 'Hệ thống', icon: Settings },
             { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
+            { id: 'partners', label: 'Đối tác', icon: Users },
             { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
@@ -1348,7 +1350,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
+            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
         </h1>
 
         {/* Visitor Stats Row */}
@@ -1693,6 +1695,12 @@ export default function AdminDashboard() {
       {activeTab === 'admin_system' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminSystem />
+        </motion.div>
+      )}
+
+      {activeTab === 'partners' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminPartners ghConfig={{ owner: githubGlobalConfig.username || imageUploadConfig.username, repo: imageUploadConfig.repo, token: githubGlobalConfig.token || imageUploadConfig.token, branch: imageUploadConfig.branch || 'main' }} />
         </motion.div>
       )}
 

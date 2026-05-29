@@ -3,8 +3,8 @@
   "short_name": "BMASS",
   "description": "Hệ điều hành quản trị bảo mật và định danh số thế hệ mới.",
   "start_url": "/",
-  "display": "fullscreen",
-  "background_color": "#ffffff",
+  "display": "standalone",
+  "background_color": "#020617",
   "theme_color": "#4f46e5",
   "orientation": "portrait",
   "icons": [

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Zap, Cpu, ArrowRight, ShieldCheck, Fingerprint, Lock, Globe, Command, Sparkles, Box, CreditCard, ChevronRight, Activity, X } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import AppLogo from '../components/ui/AppLogo';
 
@@ -18,6 +18,7 @@ import { useAppStore } from '../store/appStore';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { webLogo } = useAppStore();
   const [activeFeature, setActiveFeature] = useState<number | null>(null);
 
@@ -74,7 +75,7 @@ export default function LandingPage() {
             className="flex items-center gap-4 lg:gap-8"
           >
             <button 
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/login', { state: { from: location } })}
                 className="text-[10px] lg:text-[12px] font-bold text-zinc-400 hover:text-white uppercase tracking-[0.25em] transition-colors"
             >
                 Đăng nhập
@@ -342,7 +343,7 @@ export default function LandingPage() {
                <div className="space-y-6 lg:space-y-12">
                   <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">HỆ THỐNG</h4>
                   <ul className="space-y-4">
-                     <li><button onClick={() => navigate('/login')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Quản trị</button></li>
+                     <li><button onClick={() => navigate('/login', { state: { from: location } })} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Quản trị</button></li>
                      <li><button onClick={() => navigate('/utilities')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Tiện ích</button></li>
                      <li><button onClick={() => navigate('/releases')} className="text-zinc-500 hover:text-white uppercase text-[10px] tracking-widest transition-colors font-bold">Cập nhật</button></li>
                   </ul>
@@ -369,7 +370,7 @@ export default function LandingPage() {
             <div className="md:col-span-4 space-y-6 lg:space-y-12">
                <h4 className="text-[10px] lg:text-[12px] font-black text-white uppercase tracking-[0.4em] lg:tracking-[0.5em]">XÁC THỰC</h4>
                <button 
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/login', { state: { from: location } })}
                   className="w-full relative group overflow-hidden bg-white/5 border border-white/10 hover:border-[#eb001b]/50 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 flex items-center justify-center gap-4 transition-all duration-300 active:scale-95"
                >
                   <div className="absolute inset-0 bg-gradient-to-r from-[#eb001b]/10 to-[#f79e1b]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

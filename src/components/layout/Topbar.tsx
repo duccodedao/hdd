@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
@@ -86,6 +86,7 @@ export default function Topbar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { systemVersion } = useAppStore();
   const [needsUpdate, setNeedsUpdate] = useState(false);
@@ -478,6 +479,7 @@ export default function Topbar() {
         ) : (
           <Link 
             to="/login"
+            state={{ from: location }}
             className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-zinc-200 text-white dark:text-black rounded-md text-[10px] font-bold uppercase tracking-widest transition-all shadow-md dark:shadow-lg active:scale-95"
           >
             Đăng nhập

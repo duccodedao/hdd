@@ -123,9 +123,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // PRODUCTS / UTILITIES
+    // PRODUCTS / UTILITIES / PARTNERS
     match /products/{id} { allow read: if true; allow write: if isAdmin(); }
     match /utilities/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /partners/{id} { allow read: if true; allow write: if isAdmin(); }
     match /airdrops/{id} { allow read: if true; allow write: if isAdmin(); }
     match /banks/{id} { allow read: if true; allow write: if isAdmin(); }
     match /exchanges/{id} { allow read: if true; allow write: if isAdmin(); }

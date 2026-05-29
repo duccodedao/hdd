@@ -80,14 +80,25 @@
 
   /* Default theme base */
   html {
-    @apply scroll-smooth bg-slate-50 text-slate-900 transition-colors duration-500 overflow-x-hidden;
+    @apply scroll-smooth text-slate-900 transition-colors duration-500 overflow-x-hidden;
     min-height: 100dvh;
     color-scheme: light;
+    background: linear-gradient(-45deg, #f8fafc, #e2e8f0, #e0e7ff, #f3e8ff, #f8fafc);
+    background-size: 400% 400%;
+    animation: gradient-move 15s ease infinite;
+  }
+
+  .mask-edges {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
   }
 
   html.dark {
-    @apply bg-slate-950 text-zinc-300;
+    @apply text-zinc-300;
     color-scheme: dark;
+    background: linear-gradient(-45deg, #020617, #0f172a, #172554, #2e1065, #020617);
+    background-size: 400% 400%;
+    animation: gradient-move 15s ease infinite;
   }
 
   body::before {
