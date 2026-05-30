@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
-  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors
+  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -88,7 +88,7 @@ export default function Sidebar({ className }: { className?: string }) {
   return (
     <aside className={cn("flex flex-col relative z-20 w-64 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
       <div className="p-8 flex items-center gap-4">
-        <AppLogo className="w-8 h-8" />
+        <AppLogo className="w-12 h-12" />
         <div className="flex flex-col">
           <h2 className="font-display font-black text-slate-900 dark:text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
         </div>
@@ -119,6 +119,23 @@ export default function Sidebar({ className }: { className?: string }) {
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden space-y-1"
               >
+                {/* Trang chủ Item */}
+                <NavLink
+                  to="/"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    (isActive || location.pathname === '/')
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm"
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Home className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/' && "font-semibold")}>Trang chủ</span>
+                  </div>
+                </NavLink>
+
                 {/* Tiện ích Item (with nested sub-utility items) */}
                 <div className="space-y-1">
                   <div 
@@ -316,6 +333,23 @@ export default function Sidebar({ className }: { className?: string }) {
                     </div>
                   </NavLink>
                 )}
+
+                {/* Contact Tab */}
+                <NavLink
+                  to="/contact"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    isActive 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/contact' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/contact' && "font-semibold")}>Liên hệ</span>
+                  </div>
+                </NavLink>
               </motion.div>
             )}
           </AnimatePresence>

@@ -304,15 +304,6 @@ export default function Topbar() {
       </div>
 
       <div className="flex items-center gap-3 lg:gap-6">
-        <div className="relative hidden xl:block group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-focus-within:text-blue-500 dark:group-focus-within:text-white transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search commands..." 
-            className="w-64 h-9 pl-10 pr-4 bg-slate-100 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-lg text-[11px] font-medium outline-none focus:border-blue-500 dark:focus:border-white/20 focus:bg-white dark:focus:bg-zinc-900 transition-all text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600"
-          />
-        </div>
-
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Audio Player */}
           {(() => {

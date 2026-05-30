@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
@@ -34,7 +34,7 @@ interface UtilityItem {
 
 const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.cc/150?img=${i + 1}`);
 
-const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [] }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[] }) => {
+const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [], isHot = false }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[], isHot?: boolean }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
@@ -43,7 +43,13 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [] 
   const isInternal = config?.internal || (item as any).internalOnly;
   const Icon = item.icon;
 
-  const userCount = Math.max(0, (visits || 0) > 0 ? (visits || 0) - 1 : 0);
+  const userCount = React.useMemo(() => {
+    if (!visits || visits === 0) return 0;
+    const charCode = item.title.charCodeAt(0) + (item.title.charCodeAt(item.title.length - 1) || 0);
+    const base = Math.floor(visits * 0.08);
+    const randomAddition = (charCode + visits) % 15;
+    return Math.max(1, base + randomAddition);
+  }, [visits, item.title]);
   
   const displayAvatars = React.useMemo(() => {
     if (userCount === 0) return [];
@@ -103,23 +109,44 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [] 
       transition={{ delay: idx * 0.05 }}
       whileHover={isBlocked ? {} : { y: -4 }}
       className={cn(
-        "premium-card flex flex-col h-full cursor-pointer group relative overflow-hidden",
+        "relative rounded-[1.5rem] group h-full cursor-pointer",
         isBlocked && "opacity-75"
       )}
       onClick={handleClick}
     >
-      {isMaintenanceActive && (
-        <div className="absolute top-0 right-0 p-3 z-10">
-           <div className={cn(
-             "p-1.5 rounded-lg border",
-             isSuperAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
-           )}>
-              <Lock className="w-3.5 h-3.5" />
-           </div>
-        </div>
+      {isHot && (
+         <div className="absolute inset-[-2px] rounded-[calc(1.5rem+2px)] overflow-hidden pointer-events-none z-0 bg-transparent">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250%] h-[250%] bg-[conic-gradient(from_0deg,transparent_0_240deg,#f97316_300deg,#ef4444_360deg)] animate-[spin_3s_linear_infinite] opacity-60 dark:opacity-80" />
+         </div>
       )}
 
-      <div className="flex items-start justify-between mb-8">
+      <div className={cn(
+        "premium-card flex flex-col h-full relative z-10 transition-colors",
+        isHot && "border-transparent bg-white dark:bg-zinc-900"
+      )}>
+        {isMaintenanceActive && (
+          <div className="absolute top-0 right-0 p-3 z-10">
+             <div className={cn(
+               "p-1.5 rounded-lg border",
+               isSuperAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
+             )}>
+                <Lock className="w-3.5 h-3.5" />
+             </div>
+          </div>
+        )}
+
+        {isHot && (
+          <div className="absolute -top-3 -right-3 z-20">
+            <div className="relative">
+              <div className="absolute inset-0 bg-orange-500 blur-md opacity-50 animate-pulse rounded-full" />
+              <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-600 outline outline-2 outline-white dark:outline-zinc-900 rounded-full shadow-lg relative z-10 text-white">
+                 <Flame className="w-4 h-4 fill-white" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between mb-8">
         <div className={cn(
           "w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-zinc-400 transition-all duration-500",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-white group-hover:bg-blue-50 dark:group-hover:bg-indigo-500/10 group-hover:border-blue-200 dark:group-hover:border-indigo-500/20 group-hover:scale-110"
@@ -201,6 +228,7 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [] 
           }}
         />
       )}
+      </div>
     </motion.div>
   );
 };
@@ -394,6 +422,28 @@ export default function UtilitiesPage() {
 
   const filteredItems = [...nativeUtilities, ...utilities];
 
+  const allItems = filteredItems.filter(item => {
+    const config = systemTools[item.id];
+    const isInternal = config?.internal || (item as any).internalOnly;
+    if (isInternal) {
+      return isAdmin || isSuperAdmin;
+    }
+    return true;
+  });
+
+  const topHotIds = React.useMemo(() => {
+    return allItems
+      .map(item => ({ id: item.id, visits: utilityStats[item.id] || 0 }))
+      .sort((a, b) => b.visits - a.visits)
+      .filter(item => item.visits > 0)
+      .slice(0, 3)
+      .map(item => item.id);
+  }, [allItems, utilityStats]);
+
+  const totalTools = allItems.length;
+  const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
+  const activeTools = totalTools - maintenanceTools;
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -475,18 +525,6 @@ export default function UtilitiesPage() {
     }
   }
 
-  const allItems = filteredItems.filter(item => {
-    const config = systemTools[item.id];
-    const isInternal = config?.internal || (item as any).internalOnly;
-    if (isInternal) {
-      return isAdmin || isSuperAdmin;
-    }
-    return true;
-  });
-  const totalTools = allItems.length;
-  const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
-  const activeTools = totalTools - maintenanceTools;
-
   let internalTools = 0;
   let publicTools = 0;
   if (isAdmin || isSuperAdmin) {
@@ -562,6 +600,7 @@ export default function UtilitiesPage() {
                   systemTools={systemTools} 
                   visits={utilityStats[item.id] || 0}
                   realUsers={realUsers}
+                  isHot={topHotIds.includes(item.id)}
                 />
               ))}
             </div>

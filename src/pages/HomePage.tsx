@@ -26,8 +26,8 @@ const obfuscateEmail = (email: string) => {
   return name.substring(0, 3).toUpperCase() + '****@' + domain;
 };
 
-function RecentLoginsStream({ logins }: { logins: {id: string, email: string}[] }) {
-  const [items, setItems] = useState<{id: string, email: string}[]>([]);
+function RecentLoginsStream({ logins }: { logins: {id: string, email: string, photoURL?: string}[] }) {
+  const [items, setItems] = useState<{id: string, email: string, photoURL?: string}[]>([]);
 
   useEffect(() => {
     if (logins.length > 0) {
@@ -74,13 +74,17 @@ function RecentLoginsStream({ logins }: { logins: {id: string, email: string}[] 
                    : 'bg-transparent border-transparent'
                }`}
              >
-               <div className={`w-2 h-2 rounded-full shrink-0 ${isTop ? 'bg-indigo-400 animate-pulse' : 'bg-transparent'}`} />
-               <div className="flex-1 min-w-0 truncate">
-                 <span className={`font-mono text-sm tracking-tight ${isTop ? 'text-indigo-600 dark:text-indigo-300 font-bold' : 'text-slate-500'}`}>
+               {item.photoURL ? (
+                 <img src={item.photoURL} alt="Avatar" className={`w-5 h-5 rounded-full object-cover shrink-0 ${isTop ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-transparent' : 'opacity-60'}`} />
+               ) : (
+                 <div className={`w-2 h-2 rounded-full shrink-0 ${isTop ? 'bg-indigo-400 animate-pulse' : 'bg-transparent'}`} />
+               )}
+               <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center -mt-0.5 sm:mt-0">
+                 <span className={`font-mono text-xs sm:text-sm tracking-tight truncate ${isTop ? 'text-indigo-600 dark:text-indigo-300 font-bold' : 'text-slate-500'}`}>
                    {obfuscateEmail(item.email)}
                  </span>
-                 <span className={`text-xs ml-2 hidden sm:inline-block ${isTop ? 'text-indigo-500/80 dark:text-indigo-400/80 font-medium' : 'text-slate-600'}`}>
-                   | Đã đăng ký/Đăng nhập thành công.
+                 <span className={`text-[10px] sm:text-xs sm:ml-2 truncate ${isTop ? 'text-indigo-500/80 dark:text-indigo-400/80 font-medium' : 'text-slate-600'}`}>
+                   <span className="hidden sm:inline">| </span>Đã đăng nhập thành công.
                  </span>
                </div>
              </motion.div>
@@ -97,7 +101,7 @@ export default function HomePage() {
   const { user } = useAuthStore();
   const { stampConfig, webLogo } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
-  const [recentLogins, setRecentLogins] = useState<{id: string, email: string}[]>([]);
+  const [recentLogins, setRecentLogins] = useState<{id: string, email: string, photoURL?: string}[]>([]);
   const [partners, setPartners] = useState<{ id: string, name: string, logoUrl: string }[]>([]);
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
@@ -145,14 +149,15 @@ export default function HomePage() {
     });
 
     const unsubLogins = onSnapshot(query(collection(db, 'users'), orderBy('lastLoginAt', 'desc'), limit(15)), (snapshot) => {
-      const users: {id: string, email: string}[] = [];
+      const users: {id: string, email: string, photoURL?: string}[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
         const email = data.email;
         const role = data.role;
+        const photoURL = data.photoURL;
         // Do not display Admin or Manager accounts
         if (email && role !== 'admin' && role !== 'manager' && email !== 'sonlyhongduc@gmail.com') {
-          users.push({ id: doc.id, email });
+          users.push({ id: doc.id, email, photoURL });
         }
       });
       
@@ -168,7 +173,11 @@ export default function HomePage() {
         "trinhngocdiep@gmail.com",
         "vulamanh@gmail.com",
         "ngodung_88@gmail.com"
-      ].map((email, index) => ({ id: `fake-${index}`, email }));
+      ].map((email, index) => ({ 
+        id: `fake-${index}`, 
+        email,
+        photoURL: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`
+      }));
       
       // Merge and ensure we have items for the stream
       setRecentLogins([...users, ...fakeEmails]);
@@ -328,16 +337,6 @@ export default function HomePage() {
 
       <footer className="relative z-10 py-8 md:py-12 text-center">
         <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500 cursor-pointer">
-            <img src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Footer Logo" className="h-8 w-auto" />
-            <span className="font-black text-sm tracking-tighter uppercase bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent pb-0.5">BMASS</span>
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-            <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>
-            <button onClick={() => navigate('/policy')} className="hover:text-indigo-600 transition-colors">Policy</button>
-            <button onClick={() => navigate('/terms')} className="hover:text-indigo-600 transition-colors">Điều khoản</button>
-            <button onClick={() => navigate('/contact')} className="hover:text-indigo-600 transition-colors">Liên hệ</button>
-          </div>
         </div>
       </footer>
     </div>
