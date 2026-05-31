@@ -125,7 +125,7 @@ export default function AdminOverview({ siteStats, users, allUtilities, activity
             <Activity className="text-emerald-500 w-5 h-5"/>
             <span className="text-xs font-bold text-slate-500">Tiện Ích</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white">{counts.utilities}</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white">{8 + allUtilities.length}</div>
         </div>
         <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3 mb-2">

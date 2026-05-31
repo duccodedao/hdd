@@ -6,7 +6,16 @@ import { auth, db } from './lib/firebase';
 import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
 import { useAppStore } from './store/appStore';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
+import { ShieldAlert, X } from 'lucide-react';
+import AdminPinLockScreen from './components/auth/AdminPinLockScreen';
+import {
+  registerAdminSession,
+  getOrCreateSessionId,
+  logoutAllOtherSessions,
+  approveSession,
+  logoutSessionAndBlockIp
+} from './services/sessionSecurityService';
 
 // Layouts
 import MainLayout from './components/layout/MainLayout';
@@ -52,6 +61,7 @@ import { TabGuard } from './components/guards/TabGuard';
 import { OnboardingGuard } from './components/guards/OnboardingGuard';
 
 import CookieConsentComponent from './components/common/CookieConsent';
+import FloatingAdminButton from './components/layout/FloatingAdminButton';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 import HomePage from './pages/HomePage';
@@ -107,7 +117,7 @@ function VisitTracker() {
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion, setWebLogo } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion, setWebLogo, setHasUnapprovedSessions } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
   const [seo, setSeo] = useState({
     title: 'BMASS',
@@ -115,6 +125,195 @@ export default function App() {
     imageUrl: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     faviconUrl: ''
   });
+
+  const [sessionConflictDetails, setSessionConflictDetails] = useState<any[]>([]);
+  const [expectedPin, setExpectedPin] = useState<string>('1234');
+  const [pinVerified, setPinVerified] = useState<boolean>(() => {
+    return sessionStorage.getItem('admin_pin_verified') === 'true';
+  });
+
+  useEffect(() => {
+    if (!user || !userData) return;
+    
+    const isUserAdmin = userData.role === 'admin' || userData.role === 'superadmin' || isAdmin;
+    if (!isUserAdmin) return;
+    
+    let isSubscribed = true;
+    let unsubscribeSessionListener: (() => void) | null = null;
+    let unsubscribeConflicts: (() => void) | null = null;
+    let unsubscribeUsers: (() => void) | null = null;
+    let unsubscribeBlockedIps: (() => void) | null = null;
+    let unsubscribeAdminSessions: (() => void) | null = null;
+    
+    const listenerStartTime = Date.now();
+    
+    const initSession = async () => {
+      try {
+        const sessId = getOrCreateSessionId();
+        
+        const registered = await registerAdminSession(
+          user.uid,
+          user.email || '',
+          userData.displayName || 'Admin',
+          userData.photoURL || '',
+          userData.role || 'admin'
+        );
+        
+        if (!isSubscribed) return;
+        
+        // 1. Listen to active status of current session
+        unsubscribeSessionListener = onSnapshot(doc(db, 'admin_sessions', sessId), (snap) => {
+          if (!isSubscribed) return;
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.active === false) {
+              toast.error("Phiên đăng nhập này đã bị đăng xuất từ xa!", { duration: 10000 });
+              auth.signOut();
+            }
+          } else {
+            toast.error("Phiên của bạn đã hết hạn hoặc bị xóa!", { duration: 10000 });
+            auth.signOut();
+          }
+        });
+        
+        // 2. Real-time query matching user's other sessions to spot overlaps instantly
+        const qConflicts = query(
+          collection(db, 'admin_sessions'),
+          where('email', '==', user.email || ''),
+          where('active', '==', true)
+        );
+        
+        unsubscribeConflicts = onSnapshot(qConflicts, (snap) => {
+          if (!isSubscribed) return;
+          const confList: any[] = [];
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (
+              data.id !== sessId && 
+              (data.ip !== registered.ip || data.device !== registered.device) && 
+              !data.approved
+            ) {
+              confList.push({ id: docSnap.id, ...data });
+            }
+          });
+          setSessionConflictDetails(confList);
+          setHasUnapprovedSessions(confList.length > 0);
+        });
+
+        // 3. Listen to users collection for new registrations
+        unsubscribeUsers = onSnapshot(collection(db, 'users'), (snap) => {
+          if (!isSubscribed) return;
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              if (data.createdAt && data.createdAt > listenerStartTime) {
+                toast.success(
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="font-bold text-slate-800 dark:text-zinc-100">🎉 Người dùng mới đăng ký!</span>
+                    <span className="text-xs text-slate-500 dark:text-zinc-400">
+                      {data.displayName || 'Tên ẩn danh'} ({data.email || 'Ẩn danh/Không hiển thị'})
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-mono">UID: {change.doc.id.substring(0, 8)}...</span>
+                  </div>,
+                  { duration: 6000, position: 'top-right' }
+                );
+              }
+            }
+          });
+        });
+
+        // 4. Listen to blockedIps for new IP bannings (indicates detected threats/suspicious activity)
+        unsubscribeBlockedIps = onSnapshot(collection(db, 'blockedIps'), (snap) => {
+          if (!isSubscribed) return;
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              const blockedAtMs = data.blockedAt?.toMillis ? data.blockedAt.toMillis() : (data.blockedAt instanceof Date ? data.blockedAt.getTime() : (typeof data.blockedAt === 'number' ? data.blockedAt : null));
+              
+              if (blockedAtMs && blockedAtMs > listenerStartTime) {
+                toast.error(
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="font-bold text-rose-500 flex items-center gap-1">
+                      🚫 ĐÃ CHẶN IP MỚI!
+                    </span>
+                    <span className="text-xs text-slate-750 dark:text-zinc-350">
+                      Hệ thống đã tự động khóa truy cập đối với IP: <strong className="font-mono bg-rose-500/10 px-1 py-0.5 rounded text-rose-500">{data.ip}</strong>
+                    </span>
+                    <span className="text-[11px] text-slate-500 italic">
+                      Lý do: {data.reason || 'Thiết lập bảo mật / Bảo trì thiết bị'}
+                    </span>
+                  </div>,
+                  { duration: 8500, position: 'top-right' }
+                );
+              }
+            }
+          });
+        });
+
+        // 5. Listen to admin_sessions to highlight suspicious admin entry configurations
+        unsubscribeAdminSessions = onSnapshot(collection(db, 'admin_sessions'), (snap) => {
+          if (!isSubscribed) return;
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              const createdAtMs = data.createdAt;
+              const currentSessionId = getOrCreateSessionId();
+              
+              if (createdAtMs && createdAtMs > listenerStartTime && data.id !== currentSessionId) {
+                if (!data.approved) {
+                  toast.error(
+                    <div className="flex flex-col gap-1 text-left border-l-2 border-amber-500 pl-2">
+                      <span className="font-bold text-amber-500 flex items-center gap-1.5 animate-pulse">
+                        ⚠️ ĐĂNG NHẬP ADMIN MỚI CHƯA DUYỆT
+                      </span>
+                      <span className="text-xs text-slate-800 dark:text-zinc-200">
+                        Phát hiện truy cập cổng quản trị từ IP: <strong className="font-mono bg-amber-500/10 px-1 py-0.5 rounded text-amber-600 dark:text-amber-400">{data.ip}</strong>
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Email: {data.email} | Thiết bị: {data.device}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded self-start mt-0.5 uppercase tracking-wide">
+                        Vị trí: {data.location || 'Chưa xác định'}
+                      </span>
+                    </div>,
+                    { duration: 10000, position: 'top-right' }
+                  );
+                } else {
+                  toast.success(
+                    <div className="flex flex-col gap-1 text-left">
+                      <span className="font-bold text-emerald-500">
+                        🔓 THIẾT BỊ ADMIN ĐÃ XÁC MINH
+                      </span>
+                      <span className="text-xs text-slate-800 dark:text-zinc-200">
+                        Tài khoản <span className="font-semibold">{data.email}</span> đã hoàn thành xác thực PIN bảo mật.
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        IP: {data.ip} | Thiết bị: {data.device}
+                      </span>
+                    </div>,
+                    { duration: 6000, position: 'top-right' }
+                  );
+                }
+              }
+            }
+          });
+        });
+      } catch (err) {
+        console.error("Error setting up security sessions:", err);
+      }
+    };
+    
+    initSession();
+    
+    return () => {
+      isSubscribed = false;
+      if (unsubscribeSessionListener) unsubscribeSessionListener();
+      if (unsubscribeConflicts) unsubscribeConflicts();
+      if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeBlockedIps) unsubscribeBlockedIps();
+      if (unsubscribeAdminSessions) unsubscribeAdminSessions();
+    };
+  }, [user, userData, isAdmin]);
 
   useEffect(() => {
     initAudio();
@@ -139,6 +338,11 @@ export default function App() {
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
         setMaintenanceMode(data.maintenanceMode || false);
+        if (data.adminPin) {
+          setExpectedPin(data.adminPin);
+        } else {
+          setExpectedPin('1234');
+        }
         if (data.googleClientId) {
           useAppStore.getState().setGoogleClientId(data.googleClientId);
         }
@@ -239,6 +443,8 @@ export default function App() {
         });
       } else {
         setUserData(null);
+        sessionStorage.removeItem('admin_pin_verified');
+        setPinVerified(false);
       }
       setLoading(false);
     });
@@ -276,9 +482,23 @@ export default function App() {
     }
   }, [darkMode]);
 
+  const isUserAdmin = user && userData && (userData.role === 'admin' || userData.role === 'superadmin' || isAdmin || isSuperAdmin);
+
   // Main UI render logic
   if (loading) {
     return <LoadingScreen />;
+  }
+
+  if (isUserAdmin && !pinVerified) {
+    return (
+      <AdminPinLockScreen 
+        expectedPin={expectedPin} 
+        onVerified={() => {
+          sessionStorage.setItem('admin_pin_verified', 'true');
+          setPinVerified(true);
+        }} 
+      />
+    );
   }
 
   if (maintenanceMode && !isSuperAdmin) {
@@ -301,8 +521,9 @@ export default function App() {
       {/* GLOBAL COPYRIGHT RED SEAL STAMP OVERLAY */}
       {stampConfig && stampConfig.active && stampConfig.imageUrl && (
         <div 
-          className="fixed pointer-events-none select-none z-[9999]"
+          className="fixed pointer-events-none select-none"
           style={{
+            zIndex: stampConfig.zIndex || 9999,
             opacity: (stampConfig.opacity || 50) / 100,
             width: `${stampConfig.width || 120}px`,
             height: 'auto',
@@ -322,6 +543,7 @@ export default function App() {
       <div className="stardust" />
       <GoogleOneTap />
       <OfflineNotification />
+      <FloatingAdminButton />
       <CookieConsentComponent />
       <AuthActionRedirector />
       <Toaster position="top-right" />

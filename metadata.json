@@ -4,7 +4,9 @@
   "requestFramePermissions": [
     "camera",
     "notifications",
-    "geolocation"
+    "geolocation",
+    "identity-credentials-get",
+    "storage-access"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

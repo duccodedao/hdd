@@ -5,6 +5,7 @@ import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from '
 import { Lock, Mail, CheckCircle, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
+import AppLogo from '../components/ui/AppLogo';
 
 export default function AuthActionPage() {
   const [searchParams] = useSearchParams();
@@ -113,7 +114,7 @@ export default function AuthActionPage() {
 
         {status === 'loading' && (
           <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-4" />
+            <AppLogo className="w-16 h-16 mb-4" isLoading={true} />
             <p className="text-zinc-400">Đang xử lý yêu cầu của bạn...</p>
           </div>
         )}

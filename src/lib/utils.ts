@@ -22,3 +22,27 @@ export function formatDate(date: any) {
     timeStyle: "short",
   }).format(toSafeDate(date));
 }
+
+export function safeJsonStringify(obj: any, space?: number | string): string {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (value && typeof value === 'object') {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+      
+      // Handle Firestore DocumentReference (has path & firestore properties)
+      if (value.path && typeof value.path === 'string' && value.firestore) {
+        return { _ref: value.path };
+      }
+      
+      // Handle Firestore Timestamp
+      if (typeof value.toDate === 'function') {
+        return value.toDate().toISOString();
+      }
+    }
+    return value;
+  }, space);
+}
+

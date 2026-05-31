@@ -28,6 +28,7 @@ interface AppState {
     width: number;
     opacity: number;
     position: string;
+    zIndex?: number;
   } | null;
   setStampConfig: (config: any) => void;
   maintenanceStampConfig: {
@@ -40,11 +41,15 @@ interface AppState {
   setSystemVersion: (v: string) => void;
   webLogo: string;
   setWebLogo: (logo: string) => void;
+  hasUnapprovedSessions: boolean;
+  setHasUnapprovedSessions: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   webLogo: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
   setWebLogo: (logo) => set({ webLogo: logo }),
+  hasUnapprovedSessions: false,
+  setHasUnapprovedSessions: (val) => set({ hasUnapprovedSessions: val }),
   sidebarOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),

@@ -35,7 +35,7 @@ export default function MainLayout() {
 
       {!aiActive && (
         <Sidebar className={cn(
-          "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 h-full shrink-0",
+          "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 lg:w-60 h-full shrink-0",
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:pointer-events-none lg:overflow-hidden'
         )} />
       )}

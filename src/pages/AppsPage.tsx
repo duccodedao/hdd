@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
+import AppLogo from '../components/ui/AppLogo';
 
 interface AppItem {
   id: string;
@@ -171,7 +172,7 @@ export default function AppsPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
-          <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin" />
+          <AppLogo className="w-16 h-16" isLoading={true} />
           <p className="text-sm font-medium text-slate-500 dark:text-zinc-400">Đang tải xuống mục lục ứng dụng...</p>
         </div>
       ) : apps.length === 0 ? (

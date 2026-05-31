@@ -6,7 +6,7 @@ import { db, OperationType, handleFirestoreError } from '../../lib/firebase';
 import { GitHubConfig, AdminDocument } from '../../types';
 import { githubService } from '../../services/githubService';
 import { Upload, X, Settings, LayoutGrid, Check, FolderOpen, Save, Trash2, ChevronRight, FileText, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
 import EditCategoryModal from '../../components/EditCategoryModal';
@@ -275,7 +275,7 @@ export default function AdminDocumentVault() {
       deletedAt: doc.deletedAt?.toDate ? doc.deletedAt.toDate().toISOString() : doc.deletedAt
     }));
     const data = { documents: sanitizedDocuments, categories };
-    const dataStr = JSON.stringify(data, null, 2);
+    const dataStr = safeJsonStringify(data, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

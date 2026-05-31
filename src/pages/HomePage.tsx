@@ -216,12 +216,21 @@ export default function HomePage() {
               Đăng nhập
             </button>
           )}
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            animate={{ 
+              boxShadow: ["0px 0px 0px rgba(99, 102, 241, 0)", "0px 0px 20px rgba(99, 102, 241, 0.4)", "0px 0px 0px rgba(99, 102, 241, 0)"] 
+            }}
+            transition={{ 
+              boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+            }}
             onClick={() => navigate('/utilities')}
-            className="px-6 py-2.5 bg-white text-slate-950 hover:bg-indigo-500 hover:text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-indigo-500/10 active:scale-95"
+            className="px-8 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-indigo-500/20 flex items-center gap-2"
           >
             Truy cập
-          </button>
+            <Zap className="w-4 h-4 fill-white/20" />
+          </motion.button>
         </div>
       </nav>
 

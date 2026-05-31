@@ -19,6 +19,7 @@ import { githubService } from '../../services/githubService';
 import { GitHubConfig, Category, AdminDocument } from '../../types';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
+import AppLogo from '../../components/ui/AppLogo';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -335,7 +336,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] bg-transparent">
-        <div className="w-12 h-12 border-4 border-slate-200 dark:border-white/10 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin mb-4" />
+        <AppLogo className="w-16 h-16 mb-4" isLoading={true} />
         <p className="text-slate-500 dark:text-zinc-400 font-medium tracking-wide">Đang đồng bộ dữ liệu...</p>
       </div>
     );

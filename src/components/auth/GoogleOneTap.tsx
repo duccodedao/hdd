@@ -20,32 +20,57 @@ export default function GoogleOneTap() {
 
   useEffect(() => {
     const clientId = googleClientId || (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
-    if (user || !window.google || !clientId) {
-      if (!clientId && !user) {
-        console.warn('Google One Tap: VITE_GOOGLE_CLIENT_ID is not configured in environment variables.');
+    
+    if (user || !clientId) return;
+
+    // Function to initialize and prompt
+    const initializeOneTap = () => {
+      if (!window.google?.accounts?.id) return false;
+
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleCallback,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          itp_support: false, // Disabling ITP support in frames to avoid NotAllowedError/sandbox issues
+          use_fedcm_for_prompt: false, // Keep disabled to fallback to traditional flow
+          state_cookie_domain: window.location.hostname
+        });
+
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed()) {
+            const reason = notification.getNotDisplayedReason();
+            console.log('One Tap not displayed:', reason);
+            if (reason === 'opt_out_or_no_session') {
+              console.log('User might need to log into Google first or has opted out of One Tap.');
+            }
+          } else if (notification.isSkippedMoment()) {
+            console.log('One Tap skipped:', notification.getSkippedReason());
+          } else if (notification.isDismissedMoment()) {
+            console.log('One Tap dismissed:', notification.getDismissedReason());
+          }
+        });
+        return true;
+      } catch (error) {
+        console.error('Google One Tap error:', error?.message || String(error));
+        return false;
       }
-      return;
-    }
+    };
 
-    try {
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleCallback,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-
-      window.google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed()) {
-          console.log('One Tap not displayed:', notification.getNotDisplayedReason());
-        } else if (notification.isSkippedMoment()) {
-          console.log('One Tap skipped:', notification.getSkippedReason());
-        } else if (notification.isDismissedMoment()) {
-          console.log('One Tap dismissed:', notification.getDismissedReason());
+    // Try immediately
+    if (!initializeOneTap()) {
+      // If not ready, poll for Google library
+      const interval = setInterval(() => {
+        if (initializeOneTap()) {
+          clearInterval(interval);
         }
-      });
-    } catch (error) {
-      console.error('Google One Tap error:', error?.message || String(error));
+      }, 1000);
+      
+      // Cleanup after 10 seconds to avoid infinite polling
+      setTimeout(() => clearInterval(interval), 10000);
+      
+      return () => clearInterval(interval);
     }
   }, [user, googleClientId]);
 

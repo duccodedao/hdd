@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import LoadingScreen from '../components/ui/LoadingScreen';
+import AppLogo from '../components/ui/AppLogo';
 
 interface Employee {
   id: string;
@@ -655,7 +656,7 @@ export default function HrmPage() {
         <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4" />
+              <AppLogo className="w-14 h-14 mb-4" isLoading={true} />
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">Đang tải hồ sơ nhân sự...</p>
             </div>
           ) : filteredList.length === 0 ? (

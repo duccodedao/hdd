@@ -8,7 +8,7 @@ import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { format, subDays } from 'date-fns';
-import { toSafeDate } from '../../lib/utils';
+import { toSafeDate, cn } from '../../lib/utils';
 import { vi } from 'date-fns/locale';
 
 import AdminUtilities from './AdminUtilities';
@@ -20,6 +20,7 @@ import AdminSystem from './AdminSystem';
 import AdminPartners from './AdminPartners';
 import AdminOverview from './AdminOverview';
 import AdminAiTools from './AdminAiTools';
+import AdminSecuritySessions from './AdminSecuritySessions';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -27,12 +28,12 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 
 export default function AdminDashboard() {
   const { isSuperAdmin, userData } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices, hasUnapprovedSessions } = useAppStore();
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -69,7 +70,9 @@ export default function AdminDashboard() {
     popupMessage: ''
   });
 
+  const [googleClientId, setGoogleClientIdState] = useState('');
   const [appVersion, setAppVersion] = useState('');
+  const [adminPin, setAdminPin] = useState('1234');
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
     username: '',
@@ -113,6 +116,7 @@ export default function AdminDashboard() {
     opacity: 50,
     position: 'bottom-right',
     width: 120,
+    zIndex: 9999
   });
 
   const [maintenanceStampConfig, setMaintenanceStampConfig] = useState({
@@ -176,7 +180,9 @@ export default function AdminDashboard() {
         const sysSnap = await getDoc(doc(db, 'settings', 'system'));
         if (sysSnap.exists()) {
           const data = sysSnap.data();
+          if (data.googleClientId) setGoogleClientIdState(data.googleClientId);
           if (data.appVersion) setAppVersion(data.appVersion);
+          if (data.adminPin) setAdminPin(data.adminPin);
           if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
           if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
           if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
@@ -429,6 +435,21 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveAdminPin = async () => {
+    try {
+      if (adminPin.length !== 4 || !/^\d+$/.test(adminPin)) {
+        toast.error('Mã PIN bảo mật phải chứa đúng 4 chữ số (0-9)!');
+        return;
+      }
+      await updateDoc(doc(db, 'settings', 'system'), {
+        adminPin
+      });
+      toast.success('Cập nhật mã PIN bảo mật hệ thống thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu mã PIN: ' + e.message);
+    }
+  };
+
   const handleSaveFileManager = async () => {
     try {
       await updateDoc(doc(db, 'settings', 'system'), {
@@ -624,6 +645,15 @@ export default function AdminDashboard() {
       toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveGoogleConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { googleClientId }, { merge: true });
+      toast.success('Cập nhật Google One Tap Client ID thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu Client ID');
     }
   };
 
@@ -1352,6 +1382,7 @@ export default function AdminDashboard() {
             { id: 'forms', label: 'Folders/Form', icon: Files },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
             { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
+            { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
             { id: 'partners', label: 'Đối tác', icon: Users },
             { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
             { id: 'apikeys', label: 'API Keys', icon: Code },
@@ -1359,19 +1390,40 @@ export default function AdminDashboard() {
             { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
             { id: 'about', label: 'About Setup', icon: Info },
             { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
-          ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
-                <tab.icon className="w-5 h-5" />
-                <span className="whitespace-nowrap">{tab.label}</span>
-            </button>
-          ))}
+          ].map(tab => {
+            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+            return (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id as any)} 
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink relative overflow-hidden",
+                  activeTab === tab.id 
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 font-bold" 
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white",
+                  isUnapprovedSecurityTab && "animate-pulse border border-red-500/50 bg-red-500/10 dark:bg-red-500/15 text-red-500 dark:text-red-400 font-bold shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                )}
+              >
+                  <div className="flex items-center gap-3">
+                    <tab.icon className={cn("w-5 h-5", isUnapprovedSecurityTab ? "text-red-500 animate-bounce" : "")} />
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                  </div>
+                  {isUnapprovedSecurityTab && (
+                    <span className="relative flex h-2 w-2 mr-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools'}[activeTab as any] }` }
+            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools'}[activeTab as any] }` }
         </h1>
 
         {activeTab === 'dashboard' && (
@@ -1871,6 +1923,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'security_sessions' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminSecuritySessions />
+        </motion.div>
+      )}
+
       {activeTab === 'system' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           
@@ -1898,9 +1956,38 @@ export default function AdminDashboard() {
 
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-              <AppWindow className="w-6 h-6 text-indigo-500" />
-              Bảo trì theo thiết bị
+              <Shield className="w-6 h-6 text-emerald-500" />
+              Google One Tap Authentication
             </h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl text-xs text-blue-600 dark:text-blue-400 mb-4">
+                Google One Tap cho phép người dùng đăng nhập nhanh bằng tài khoản Google ngay khi truy cập trang web mà không cần nhấn vào nút đăng nhập. 
+                Vui lòng lấy <strong>Client ID</strong> từ Google Cloud Console.
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Google Client ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="flex-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-mono"
+                    value={googleClientId}
+                    onChange={(e) => setGoogleClientIdState(e.target.value)}
+                    placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                    disabled={!isSuperAdmin}
+                  />
+                  <button
+                    onClick={handleSaveGoogleConfig}
+                    disabled={!isSuperAdmin}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md"
+                  >
+                    Lưu ID
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
                 { key: 'pc', label: 'Máy tính (PC/Laptop)', icon: Server },
@@ -2139,6 +2226,41 @@ export default function AdminDashboard() {
                     </button>
                     </div>
                 ))}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-indigo-500" />
+                  Lớp Bảo Mật PIN Admin (4 Số)
+                </h3>
+                <p className="text-xs text-slate-500 mb-6 italic">* Lưu ý: Thiết lập mã PIN gồm đúng 4 chữ số tăng cường bảo mật khi đăng nhập dành riêng cho bộ phận Quản trị viên.</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-2 ml-1 text-slate-500 uppercase tracking-widest">Mã PIN bảo mật hiện tại (4 chữ số)</label>
+                    <input 
+                      type="text"
+                      maxLength={4}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={adminPin}
+                      onChange={(e) => setAdminPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                      disabled={!isSuperAdmin}
+                      placeholder="Nhập 4 số bảo mật, ví dụ: 4321"
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none font-mono tracking-widest font-bold focus:ring-2 focus:ring-indigo-500 dark:text-white disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button 
+                      onClick={handleSaveAdminPin}
+                      disabled={!isSuperAdmin}
+                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                    >
+                      <Save size={14} /> Cập Nhật PIN
+                    </button>
+                  </div>
                 </div>
             </div>
 
@@ -2827,9 +2949,25 @@ export default function AdminDashboard() {
                                 onChange={(e) => setStampConfig({...stampConfig, width: parseInt(e.target.value) || 120})}
                                 placeholder="120"
                                 min={40}
-                                max={500}
+                                max={2000}
                                 disabled={!isSuperAdmin}
                               />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                               <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Lớp hiển thị (Lớp nền)</label>
+                               <select
+                                 className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                 value={stampConfig.zIndex || 9999}
+                                 onChange={(e) => setStampConfig({...stampConfig, zIndex: parseInt(e.target.value)})}
+                                 disabled={!isSuperAdmin}
+                               >
+                                 <option value={9999}>Phía trên cùng (Mặc định)</option>
+                                 <option value={1}>Phía dưới cùng (Nền - Under)</option>
+                                 <option value={50}>Phía sau các nút thao tác (Middle)</option>
+                               </select>
                             </div>
                           </div>
 
@@ -3258,7 +3396,7 @@ export default function AdminDashboard() {
                       {appCategories.map(cat => (
                         <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg group">
                            <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-300">{cat.name}</span>
-                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                           <div className="flex items-center gap-1 opacity-100 transition-opacity ml-1">
                              <button onClick={() => handleEditCategory(cat.id, cat.name)} className="text-slate-400 hover:text-blue-500">
                                 <Edit2 size={12} />
                              </button>

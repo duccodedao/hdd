@@ -191,9 +191,33 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "url"]
+    },
+    "AdminSession": {
+      "title": "Admin Session",
+      "description": "Session tracking for admin logins to monitor multi-device or IP conflicts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string" },
+        "device": { "type": "string" },
+        "ip": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastActiveAt": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "uid", "email", "device", "ip", "createdAt", "active"]
     }
   },
   "firestore": {
+    "admin_sessions": {
+      "schema": "AdminSession",
+      "description": "Admin login sessions tracked for real-time security alerts on multi-device or location conflicts"
+    },
     "ai_tools": {
       "schema": "AiTool",
       "description": "Store recommended AI tools and services"

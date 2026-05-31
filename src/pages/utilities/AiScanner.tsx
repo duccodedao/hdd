@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Scan, FileText, Upload, Loader2, Copy, Check, Sparkles, ArrowLeft, Trash2, Edit3, Box } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 interface AiScannerProps {
@@ -61,7 +61,7 @@ export default function AiScanner({ onBack }: AiScannerProps) {
       const response = await fetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           model: "gemini-3.5-flash",
           contents: {
             parts: [

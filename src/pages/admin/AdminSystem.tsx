@@ -19,6 +19,7 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { useConfirmStore } from '../../store/confirmStore';
+import { safeJsonStringify } from '../../lib/utils';
 
 interface CollectionStatus {
   name: string;
@@ -179,7 +180,7 @@ export default function AdminSystem() {
         data: backupData
       };
 
-      const blob = new Blob([JSON.stringify(backupEnvelope, null, 2)], { type: 'application/json' });
+      const blob = new Blob([safeJsonStringify(backupEnvelope, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       const nowStr = new Date().toISOString().replace(/[:.]/g, '-');

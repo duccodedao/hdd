@@ -25,8 +25,8 @@ const subUtilities = [
 ];
 
 export default function Sidebar({ className }: { className?: string }) {
-  const { isAdmin, isSuperAdmin, userData } = useAuthStore();
-  const { setSidebarOpen, maintenanceTabs } = useAppStore();
+  const { user, isAdmin, isSuperAdmin, userData } = useAuthStore();
+  const { setSidebarOpen, maintenanceTabs, hasUnapprovedSessions } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng']);
@@ -86,11 +86,11 @@ export default function Sidebar({ className }: { className?: string }) {
   ];
 
   return (
-    <aside className={cn("flex flex-col relative z-20 w-64 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
-      <div className="p-8 flex items-center gap-4">
-        <AppLogo className="w-12 h-12" />
+    <aside className={cn("flex flex-col relative z-20 w-64 lg:w-60 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
+      <div className="p-4 flex items-center gap-3 border-b border-slate-200/60 dark:border-white/5">
+        <AppLogo className="w-9 h-9" />
         <div className="flex flex-col">
-          <h2 className="font-display font-black text-slate-900 dark:text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
+          <h2 className="font-display font-black text-slate-900 dark:text-white text-md tracking-tighter uppercase italic leading-none">BMASS.</h2>
         </div>
       </div>
 
@@ -135,6 +135,34 @@ export default function Sidebar({ className }: { className?: string }) {
                     <span className={cn(location.pathname === '/' && "font-semibold")}>Trang chủ</span>
                   </div>
                 </NavLink>
+
+                {/* AI Tools Item */}
+                {(!systemTools['ai_tools']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/ai-tools"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-indigo-700 bg-gradient-to-r from-indigo-50 to-indigo-100/50 dark:from-indigo-500/10 dark:to-indigo-500/5 dark:text-indigo-400 shadow-sm font-semibold whitespace-nowrap"
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02] whitespace-nowrap"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0", location.pathname === '/ai-tools' ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/ai-tools' && "font-semibold")}>AI Tools</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['ai_tools']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['ai_tools'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
 
                 {/* Ứng dụng Item */}
                 {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
@@ -350,22 +378,6 @@ export default function Sidebar({ className }: { className?: string }) {
                   </NavLink>
                 )}
 
-                <NavLink
-                  to="/ai-tools"
-                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[13px] font-medium group mt-2 ${
-                      isActive
-                        ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 text-indigo-700 dark:from-indigo-500/10 dark:to-indigo-500/5 dark:text-indigo-400'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5'
-                    }`
-                  }
-                >
-                  <div className="relative">
-                    <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />
-                  </div>
-                  <span>AI Tools</span>
-                </NavLink>
               </motion.div>
             )}
           </AnimatePresence>
@@ -373,23 +385,7 @@ export default function Sidebar({ className }: { className?: string }) {
 
       </nav>
 
-      {isSuperAdmin ? (
-        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
-          <NavLink
-            to="/admin"
-            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-            className={({ isActive }) => cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[11px] font-bold uppercase tracking-widest",
-              isActive 
-                ? "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" 
-                : "text-slate-500 dark:text-zinc-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-400/5"
-            )}
-          >
-            <Shield className="w-4 h-4" />
-            <span>Admin Center</span>
-          </NavLink>
-        </div>
-      ) : !userData && (
+      {(!userData && !user) && (
         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
           <NavLink
             to="/login"
