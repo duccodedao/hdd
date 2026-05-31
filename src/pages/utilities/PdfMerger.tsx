@@ -4,6 +4,7 @@ import { ArrowLeft, Upload, Loader2, Download, Trash2, GripVertical, FilePlus } 
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import { PDFDocument } from 'pdf-lib';
+import { useConfirmStore } from '../../store/confirmStore';
 
 interface PdfMergerProps {
   onBack: () => void;
@@ -20,6 +21,7 @@ export default function PdfMerger({ onBack }: PdfMergerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultPdfUrl, setResultPdfUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { openConfirm } = useConfirmStore();
 
   const handleFilesChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -89,11 +91,17 @@ export default function PdfMerger({ onBack }: PdfMergerProps) {
   };
 
   const clearAll = () => {
-    if (confirm('Bạn có chắc muốn xóa tất cả file đang chọn?')) {
-      setPdfFiles([]);
-      setResultPdfUrl(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    openConfirm({
+      title: 'Xóa danh sách file',
+      message: 'Bạn có chắc muốn xóa tất cả file đang chọn?',
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy',
+      onConfirm: () => {
+        setPdfFiles([]);
+        setResultPdfUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    });
   };
 
   return (

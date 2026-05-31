@@ -178,9 +178,26 @@
         "createdAt": { "type": "number" }
       },
       "required": ["title", "type", "day", "importance"]
+    },
+    "AiTool": {
+      "title": "AI Tool",
+      "description": "Store recommended AI tools and services",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "url"]
     }
   },
   "firestore": {
+    "ai_tools": {
+      "schema": "AiTool",
+      "description": "Store recommended AI tools and services"
+    },
     "forms": {
       "schema": "Form",
       "description": "Store all dynamic forms (folders)"

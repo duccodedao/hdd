@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import { vi } from 'date-fns/locale';
 
@@ -18,6 +18,8 @@ import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
 import AdminPartners from './AdminPartners';
+import AdminOverview from './AdminOverview';
+import AdminAiTools from './AdminAiTools';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -30,7 +32,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners'>('users');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -38,7 +40,8 @@ export default function AdminDashboard() {
     today: 0,
     month: 0,
     year: 0,
-    total: 0
+    total: 0,
+    last7Days: [] as { date: string, visits: number, devices: number }[]
   });
   
   const [aboutConfig, setAboutConfig] = useState({
@@ -262,15 +265,31 @@ export default function AdminDashboard() {
     const yearId = `year_${format(now, 'yyyy')}`;
 
     const unsubStats = onSnapshot(collection(db, 'site_visitation_stats'), (snapshot) => {
-      const stats: any = { today: 0, month: 0, year: 0, total: 0 };
+      const stats: any = { today: 0, month: 0, year: 0, total: 0, last7Days: [] };
+      const docData: Record<string, number> = {};
+      
       snapshot.docs.forEach(doc => {
-        const id = doc.id;
-        const count = doc.data().count || 0;
-        if (id === 'total') stats.total = count;
-        if (id === todayId) stats.today = count;
-        if (id === monthId) stats.month = count;
-        if (id === yearId) stats.year = count;
+        docData[doc.id] = doc.data().count || 0;
       });
+
+      stats.total = docData['total'] || 0;
+      stats.today = docData[todayId] || 0;
+      stats.month = docData[monthId] || 0;
+      stats.year = docData[yearId] || 0;
+
+      // Calculate last 7 days stats
+      for (let i = 6; i >= 0; i--) {
+        const d = subDays(now, i);
+        const dayStr = format(d, 'yyyy-MM-dd');
+        const displayStr = format(d, 'dd/MM');
+        
+        stats.last7Days.push({
+          date: displayStr,
+          visits: docData[`day_${dayStr}`] || 0,
+          devices: docData[`devices_day_${dayStr}`] || 0,
+        });
+      }
+
       setSiteStats(stats);
     }, (error) => {
       console.error("Error listening to site stats:", error?.message || String(error));
@@ -1325,17 +1344,19 @@ export default function AdminDashboard() {
         
         <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
           {[
+            { id: 'dashboard', label: 'Tổng quan', icon: Activity },
+            { id: 'system', label: 'Hệ thống', icon: Settings },
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
-            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
-            { id: 'system', label: 'Hệ thống', icon: Settings },
-            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
-            { id: 'partners', label: 'Đối tác', icon: Users },
-            { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
+            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
+            { id: 'partners', label: 'Đối tác', icon: Users },
+            { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
+            { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
+            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
             { id: 'about', label: 'About Setup', icon: Info },
             { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
           ].map(tab => (
@@ -1350,48 +1371,20 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
+            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools'}[activeTab as any] }` }
         </h1>
 
-        {/* Visitor Stats Row */}
-         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                    <Activity size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Hôm nay</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.today.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                    <Globe size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tháng này</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.month.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-                    <LineChart size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Năm nay</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.year.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                    <Activity size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tổng cộng</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.total.toLocaleString()}</div>
-           </div>
-        </div>
+        {activeTab === 'dashboard' && (
+           <AdminOverview 
+             siteStats={siteStats} 
+             users={users} 
+             allUtilities={allUtilities} 
+             activityData={activityData} 
+             roleDistribution={roleDistribution} 
+             contacts={contacts} 
+             adminAppsCount={adminApps.length}
+           />
+        )}
 
 
       {activeTab === 'about' && (
@@ -1698,6 +1691,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'ai_tools' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminAiTools />
+        </motion.div>
+      )}
+
       {activeTab === 'partners' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminPartners ghConfig={{ owner: githubGlobalConfig.username || imageUploadConfig.username, repo: imageUploadConfig.repo, token: githubGlobalConfig.token || imageUploadConfig.token, branch: imageUploadConfig.branch || 'main' }} />
@@ -1942,6 +1941,7 @@ export default function AdminDashboard() {
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
                 { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
                 { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
+                { key: 'ai_tools', label: 'AI Tools', icon: Sparkles, page: 'Trang chủ' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">

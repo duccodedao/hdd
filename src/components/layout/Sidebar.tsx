@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
-  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail
+  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail, Sparkles
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -136,6 +136,90 @@ export default function Sidebar({ className }: { className?: string }) {
                   </div>
                 </NavLink>
 
+                {/* Ứng dụng Item */}
+                {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/apps"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['apps']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['apps'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
+
+                {/* Calendar Item */}
+                {(!systemTools['calendar']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/calendar"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/calendar' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/calendar' && "font-semibold")}>Lịch làm việc</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['calendar']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['calendar'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
+
+                {/* Personnel / HR Tab */}
+                {(!systemTools['hrm']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/nhan-su"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Users className={cn("w-4 h-4 transition-colors duration-300", location.pathname.startsWith('/nhan-su') ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname.startsWith('/nhan-su') && "font-semibold")}>Nhân sự</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['hrm']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['hrm'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
+
                 {/* Tiện ích Item (with nested sub-utility items) */}
                 <div className="space-y-1">
                   <div 
@@ -221,90 +305,22 @@ export default function Sidebar({ className }: { className?: string }) {
                   </AnimatePresence>
                 </div>
 
-                {/* Ứng dụng Item */}
-                {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
-                  <NavLink
-                    to="/apps"
-                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                    className={({ isActive }) => cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                      isActive 
-                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <AppWindow className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/apps' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                      <span className={cn(location.pathname === '/apps' && "font-semibold")}>Ứng dụng</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {systemTools['apps']?.internal && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
-                      )}
-                      {maintenanceTabs['apps'] && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
-                      )}
-                    </div>
-                  </NavLink>
-                )}
-
-
-                {/* Calendar Item */}
-                {(!systemTools['calendar']?.internal || isAdmin || isSuperAdmin) && (
-                  <NavLink
-                    to="/calendar"
-                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                    className={({ isActive }) => cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                      isActive 
-                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Calendar className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/calendar' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                      <span className={cn(location.pathname === '/calendar' && "font-semibold")}>Lịch làm việc</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {systemTools['calendar']?.internal && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
-                      )}
-                      {maintenanceTabs['calendar'] && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
-                      )}
-                    </div>
-                  </NavLink>
-                )}
-
-                {/* Personnel / HR Tab */}
-                {(!systemTools['hrm']?.internal || isAdmin || isSuperAdmin) && (
-                  <NavLink
-                    to="/nhan-su"
-                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                    className={({ isActive }) => cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                      isActive 
-                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Users className={cn("w-4 h-4 transition-colors duration-300", location.pathname.startsWith('/nhan-su') ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                      <span className={cn(location.pathname.startsWith('/nhan-su') && "font-semibold")}>Nhân sự</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {systemTools['hrm']?.internal && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
-                      )}
-                      {maintenanceTabs['hrm'] && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
-                      )}
-                    </div>
-                  </NavLink>
-                )}
+                {/* Contact Tab */}
+                <NavLink
+                  to="/contact"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    isActive 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/contact' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/contact' && "font-semibold")}>Liên hệ</span>
+                  </div>
+                </NavLink>
 
                 {/* Guide Tab */}
                 {(!systemTools['guide']?.internal || isAdmin || isSuperAdmin) && (
@@ -334,21 +350,21 @@ export default function Sidebar({ className }: { className?: string }) {
                   </NavLink>
                 )}
 
-                {/* Contact Tab */}
                 <NavLink
-                  to="/contact"
+                  to="/ai-tools"
                   onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                    isActive 
-                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                  )}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[13px] font-medium group mt-2 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 text-indigo-700 dark:from-indigo-500/10 dark:to-indigo-500/5 dark:text-indigo-400'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5'
+                    }`
+                  }
                 >
-                  <div className="flex items-center gap-3">
-                    <Mail className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/contact' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                    <span className={cn(location.pathname === '/contact' && "font-semibold")}>Liên hệ</span>
+                  <div className="relative">
+                    <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />
                   </div>
+                  <span>AI Tools</span>
                 </NavLink>
               </motion.div>
             )}

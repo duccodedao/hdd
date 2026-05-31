@@ -28,6 +28,7 @@ import GuidePage from './pages/GuidePage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
+import AiTools from './pages/AiTools';
 import CalendarPage from './pages/CalendarPage';
 import HrmPage from './pages/HrmPage';
 import BlockedPage from './pages/BlockedPage';
@@ -350,6 +351,7 @@ export default function App() {
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/apps" element={<TabGuard tabKey="apps"><AppsPage /></TabGuard>} />
+              <Route path="/ai-tools" element={<TabGuard tabKey="ai_tools"><AiTools /></TabGuard>} />
               <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
               <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />

@@ -162,6 +162,11 @@ service cloud.firestore {
     }
 
     // APPS & CATEGORIES
+    match /ai_tools/{toolId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /apps/{appId} {
       allow read: if true;
       allow write: if isAdmin();

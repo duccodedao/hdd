@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { useAuthStore } from '../store/authStore';
+import { useConfirmStore } from '../store/confirmStore';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -145,6 +146,7 @@ const safeFormatDate = (dateStr: any): string => {
 
 export default function HrmPage() {
   const { user, userData, isSuperAdmin, isAdmin, loading: authLoading } = useAuthStore();
+  const { openConfirm } = useConfirmStore();
   const canEdit = isSuperAdmin || isAdmin;
 
   const [activeTab, setActiveTab] = useState<'employees' | 'collaborators'>('employees');
@@ -325,20 +327,24 @@ export default function HrmPage() {
       return;
     }
 
-    if (!window.confirm('Bạn có chắc chắn muốn xóa nhân sự này không?')) {
-      return;
-    }
-
-    const toastId = toast.loading('Đang xóa...');
-    try {
-      const colName = activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators';
-      await deleteDoc(doc(db, colName, id));
-      toast.success('Đã xóa dữ liệu thành công!', { id: toastId });
-    } catch (err) {
-      console.error("Delete error:", err?.message || String(err));
-      handleFirestoreError(err, OperationType.DELETE, activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators');
-      toast.error('Có lỗi xảy ra khi xóa dữ liệu.', { id: toastId });
-    }
+    openConfirm({
+      title: 'Xóa nhân sự',
+      message: 'Bạn có chắc chắn muốn xóa nhân sự này không?',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        const toastId = toast.loading('Đang xóa...');
+        try {
+          const colName = activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators';
+          await deleteDoc(doc(db, colName, id));
+          toast.success('Đã xóa dữ liệu thành công!', { id: toastId });
+        } catch (err) {
+          console.error("Delete error:", err?.message || String(err));
+          handleFirestoreError(err, OperationType.DELETE, activeTab === 'employees' ? 'hrm_employees' : 'hrm_collaborators');
+          toast.error('Có lỗi xảy ra khi xóa dữ liệu.', { id: toastId });
+        }
+      }
+    });
   };
 
   // Excel template generator
