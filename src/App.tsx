@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
+import { auth, db, OperationType, handleFirestoreError } from './lib/firebase';
 import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
 import { useAppStore } from './store/appStore';
@@ -174,6 +174,8 @@ export default function App() {
             toast.error("Phiên của bạn đã hết hạn hoặc bị xóa!", { duration: 10000 });
             auth.signOut();
           }
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, `admin_sessions/${sessId}`);
         });
         
         // 2. Real-time query matching user's other sessions to spot overlaps instantly
@@ -198,6 +200,8 @@ export default function App() {
           });
           setSessionConflictDetails(confList);
           setHasUnapprovedSessions(confList.length > 0);
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, 'admin_sessions');
         });
 
         // 3. Listen to users collection for new registrations
@@ -220,6 +224,8 @@ export default function App() {
               }
             }
           });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'users');
         });
 
         // 4. Listen to blockedIps for new IP bannings (indicates detected threats/suspicious activity)
@@ -248,6 +254,8 @@ export default function App() {
               }
             }
           });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'blockedIps');
         });
 
         // 5. Listen to admin_sessions to highlight suspicious admin entry configurations
@@ -297,6 +305,8 @@ export default function App() {
               }
             }
           });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'admin_sessions');
         });
       } catch (err) {
         console.error("Error setting up security sessions:", err);

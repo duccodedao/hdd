@@ -26,8 +26,12 @@ export const PaymentDialog = ({ isOpen, onClose, item, onPaid }: PaymentDialogPr
   const [paymentStatus, setPaymentStatus] = useState<'waiting' | 'paid' | 'expired' | 'error'>('waiting');
   const [errorMessage, setErrorMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState(15 * 60_000);
+  const [bankingConfig, setBankingConfig] = useState({
+    bankCode: 'SACOMBANK',
+    bankAccount: 'STB_060269666879'
+  });
 
-const [retryTrigger, setRetryTrigger] = useState(0);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   useEffect(() => {
     let interval: any;
@@ -35,6 +39,25 @@ const [retryTrigger, setRetryTrigger] = useState(0);
     if (isOpen && item && user) {
       setPaymentStatus('waiting');
       setTimeLeft(15 * 60_000);
+
+      const fetchBankingConfig = async () => {
+        try {
+          const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+          if (sysSnap.exists()) {
+            const data = sysSnap.data();
+            if (data.bankingConfig) {
+              setBankingConfig({
+                bankCode: data.bankingConfig.bankCode || 'SACOMBANK',
+                bankAccount: data.bankingConfig.bankAccount || 'STB_060269666879'
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Error loading banking configurations:", err);
+        }
+      };
+      fetchBankingConfig();
+
       const initPayment = async () => {
         setLoading(true);
         try {
@@ -145,7 +168,7 @@ const [retryTrigger, setRetryTrigger] = useState(0);
                <div className="w-full space-y-6">
                   <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-3xl border border-slate-100 dark:border-white/5">
                      <img 
-                       src={`https://qr.sepay.vn/img?acc=STB_060269666879&bank=SACOMBANK&amount=${invoice.totalAmount}&des=${invoice.paymentDetails.referenceCode}`}
+                       src={`https://qr.sepay.vn/img?acc=${bankingConfig.bankAccount}&bank=${bankingConfig.bankCode}&amount=${invoice.totalAmount}&des=${invoice.paymentDetails.referenceCode}`}
                        alt="VietQR"
                        className="w-full aspect-square rounded-2xl shadow-sm border border-slate-200 dark:border-white/10"
                      />

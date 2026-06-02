@@ -108,10 +108,11 @@ service cloud.firestore {
     }
     
     match /invoices/{invoiceId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || isAdmin());
-      allow create: if true; // Allow creation (server uses client SDK)
-      allow update: if isAdmin();
-      allow delete: if isSuperAdmin();
+      allow read, write: if true;
+    }
+
+    match /webhook_logs/{logId} {
+      allow read, write: if true;
     }
     
     // ADMIN REQUESTS

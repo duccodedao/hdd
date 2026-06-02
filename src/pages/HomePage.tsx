@@ -196,10 +196,14 @@ export default function HomePage() {
       
       // Merge and ensure we have items for the stream
       setRecentLogins([...users, ...fakeEmails]);
+    }, (error) => {
+      console.warn("Logins stream blocked due to local guest rules:", error?.message);
     });
 
     const unsubPartners = onSnapshot(collection(db, 'partners'), (snapshot) => {
       setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
+    }, (error) => {
+      console.warn("Partners stream blocked:", error?.message);
     });
 
     return () => {

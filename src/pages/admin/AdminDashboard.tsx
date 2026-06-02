@@ -73,6 +73,10 @@ export default function AdminDashboard() {
   const [googleClientId, setGoogleClientIdState] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [adminPin, setAdminPin] = useState('1234');
+  const [bankingConfig, setBankingConfig] = useState({
+    bankCode: 'SACOMBANK',
+    bankAccount: 'STB_060269666879'
+  });
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
     username: '',
@@ -190,6 +194,9 @@ export default function AdminDashboard() {
           if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
           if (data.stampConfig) setStampConfig(prev => ({ ...prev, ...data.stampConfig }));
           if (data.maintenanceStampConfig) setMaintenanceStampConfig(prev => ({ ...prev, ...data.maintenanceStampConfig }));
+          if (data.bankingConfig) {
+            setBankingConfig(prev => ({ ...prev, ...data.bankingConfig }));
+          }
         }
 
         const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
@@ -529,6 +536,17 @@ export default function AdminDashboard() {
       toast.success('Đã cập nhật cấu hình con dấu bảo trì thành công!');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình con dấu bảo trì');
+    }
+  };
+
+  const handleSaveBankingConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        bankingConfig
+      }, { merge: true });
+      toast.success('Cập nhật tài khoản ngân hàng thụ thưởng VietQR thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu tài khoản ngân hàng: ' + e.message);
     }
   };
 
@@ -3186,6 +3204,96 @@ export default function AdminDashboard() {
                     </div>
                   </div>
             </div>
+
+          {/* Cấu hình Thanh toán & Tài khoản Ngân hàng (VietQR / SePay) */}
+          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Landmark className="w-6 h-6 text-indigo-500" />
+                Cấu hình Tài khoản Ngân hàng (VietQR / SePay)
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Thiết lập thông tin tài khoản ngân hàng thụ hưởng của bạn để tự động tạo mã QR thanh toán hóa đơn.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-xs text-emerald-600 dark:text-emerald-400">
+                <strong>HƯỚNG DẪN:</strong> Mã QR sẽ được tạo tự động thông qua nền tảng SePay. Bạn có thể sử dụng số tài khoản ngân hàng thông thường của mình (ví dụ: MB Bank, Vietcombank, Sacombank...), hoặc số tài khoản định danh do SePay cung cấp.
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Mã ngân hàng (Bank Code)
+                  </label>
+                  <select
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    value={bankingConfig.bankCode}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, bankCode: e.target.value.toUpperCase() }))}
+                    disabled={!isSuperAdmin}
+                  >
+                    <option value="SACOMBANK">Sacombank (STB)</option>
+                    <option value="MB">MB Bank (MBB)</option>
+                    <option value="VCB">Vietcombank</option>
+                    <option value="ACB">ACB</option>
+                    <option value="TCB">Techcombank</option>
+                    <option value="CTG">VietinBank</option>
+                    <option value="BIDV">BIDV</option>
+                    <option value="VPB">VPBank</option>
+                    <option value="TPB">TPBank</option>
+                    <option value="VIB">VIB</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Chọn hoặc điền mã ngân hàng chuẩn VietQR (ví dụ: SACOMBANK, MB, VCB...)</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Số tài khoản thụ hưởng & Tiền tố (Nếu có)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-mono"
+                    value={bankingConfig.bankAccount}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, bankAccount: e.target.value.trim() }))}
+                    placeholder="ví dụ: STB_060269666879 hoặc 060269666879"
+                    disabled={!isSuperAdmin}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Nhập chính xác số tài khoản ngân hàng của bạn.</p>
+                </div>
+              </div>
+
+              {/* Preview simulated QR */}
+              {bankingConfig.bankAccount && (
+                <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex flex-col md:flex-row items-center gap-6 bg-slate-50/50 dark:bg-white/5 p-4 rounded-3xl">
+                  <div className="w-32 h-32 shrink-0 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                    <img 
+                      src={`https://qr.sepay.vn/img?acc=${bankingConfig.bankAccount}&bank=${bankingConfig.bankCode}&amount=10000&des=DEMO123`}
+                      alt="VietQR Preview"
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">Xem trước mã QR mô phỏng</h4>
+                    <p className="text-xs text-slate-500">Mã QR xem trước ở trên sử dụng số tiền mẫu 10,000đ và nội dung chuyển khoản nháp. Đảm bảo dùng điện thoại quét thử để kiểm tra xem đã nhận diện đúng tài khoản ngân hàng của bạn hay chưa.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSaveBankingConfig}
+                  disabled={!isSuperAdmin}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                >
+                  <Save size={14} />
+                  Lưu cấu hình ngân hàng
+                </button>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
       )}
