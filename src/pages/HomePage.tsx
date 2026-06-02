@@ -96,6 +96,21 @@ function RecentLoginsStream({ logins }: { logins: {id: string, email: string, ph
 }
 
 export default function HomePage() {
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 12) setGreeting('Chào buổi sáng');
+      else if (hour >= 12 && hour < 18) setGreeting('Chào buổi chiều');
+      else if (hour >= 18 && hour < 22) setGreeting('Chào buổi tối');
+      else setGreeting('Chúc bạn đêm ngon giấc');
+    };
+    updateGreeting();
+    const timer = setInterval(updateGreeting, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
@@ -275,6 +290,10 @@ export default function HomePage() {
                   Quản trị viên
                 </div>
                 <div>
+                  <div className="text-xs md:text-sm font-bold text-indigo-500/80 dark:text-indigo-400/80 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                    <Zap className="w-3 h-3" />
+                    {greeting},
+                  </div>
                   <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent pb-1 md:pb-2 leading-tight">{aboutConfig.adminName?.trim() || 'Sơn Lý Hồng Đức'}</h2>
                   <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs md:text-xs uppercase mt-1 md:mt-1">BMASS Digital Platform</p>
                 </div>

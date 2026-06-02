@@ -192,6 +192,20 @@
       },
       "required": ["name", "url"]
     },
+    "WordCover": {
+      "title": "Word Cover",
+      "description": "Information and download links for Word cover page templates",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "previewUrl": { "type": "string" },
+        "docUrl": { "type": "string" },
+        "downloadCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "previewUrl", "docUrl"]
+    },
     "AdminSession": {
       "title": "Admin Session",
       "description": "Session tracking for admin logins to monitor multi-device or IP conflicts",
@@ -269,6 +283,10 @@
     "recurring_events": {
       "schema": "RecurringEvent",
       "description": "Store custom recurring tasks of the organization"
+    },
+    "word_covers": {
+      "schema": "WordCover",
+      "description": "Metadata for Word cover page templates"
     }
   }
 }

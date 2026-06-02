@@ -4,7 +4,7 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc } from "firebase/firestore";
+import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, setDoc } from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
@@ -71,7 +71,7 @@ async function startServer() {
 
       const ai = await getAiClient();
       const response = await ai.models.generateContent({
-        model: model || "gemini-3.5-flash",
+        model: model || "gemini-1.5-flash",
         contents,
         config: config || {}
       });
@@ -85,6 +85,117 @@ async function startServer() {
       });
     }
   });
+
+  // Endpoint to create an invoice
+  app.post("/api/invoices/create", async (req, res) => {
+    try {
+      const { userId, userEmail, items, totalAmount } = req.body;
+      
+      const referenceCode = `BMASS${Math.floor(100000 + Math.random() * 900000)}`;
+      const invoiceRef = doc(collection(db, "invoices"));
+      const invoiceData = {
+        id: invoiceRef.id,
+        userId: userId || "guest",
+        userEmail: userEmail || "guest",
+        items: items || [],
+        totalAmount: totalAmount || 0,
+        status: "pending",
+        paymentMethod: "bank_transfer",
+        paymentDetails: {
+          referenceCode
+        },
+        createdAt: Timestamp.now(),
+      };
+
+      await setDoc(invoiceRef, invoiceData);
+      res.json(invoiceData);
+    } catch (error: any) {
+      console.error("Create Invoice Error:", error);
+      res.status(500).json({ error: "Failed to create invoice: " + (error.message || error) });
+    }
+  });
+
+  // SePay Webhook Endpoint (Main)
+  const handleSepayWebhook = async (req: express.Request, res: express.Response) => {
+    try {
+      // 1. Validate API Key if configured
+      if (process.env.SEPAY_API_KEY) {
+        const authHeader = req.headers.authorization || req.headers.apikey || req.headers["x-api-key"] || "";
+        const token = String(authHeader).replace(/^(Bearer|Apikey)\s+/i, "").trim();
+        if (token !== process.env.SEPAY_API_KEY) {
+          return res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+      }
+
+      const payload = req.body;
+      console.log("SePay Webhook Received:", JSON.stringify(payload, null, 2));
+
+      const transactionId = payload.id || payload.transactionId;
+      if (!transactionId) {
+        return res.json({ success: true }); // Ignore if no transaction ID
+      }
+
+      // 2. Prevent duplicate processing using a webhook_logs collection (Idempotency)
+      const logRef = doc(db, "webhook_logs", String(transactionId));
+      const logSnap = await getDoc(logRef);
+      
+      if (logSnap.exists()) {
+        console.log(`Webhook for transaction ${transactionId} already processed.`);
+        return res.json({ success: true });
+      }
+
+      // 3. Mark as processed immediately (to avoid race conditions)
+      await setDoc(logRef, {
+        payload,
+        createdAt: Timestamp.now()
+      });
+
+      // SePay sends description which contains reference code
+      const description = payload.content || payload.description || "";
+      const amount = Number(payload.transferAmount || payload.amount || 0);
+
+      // Extract reference code like BMASS123456 (matching user's prefix)
+      // The provided documentation says code can be sent in payload.code as well
+      const referenceCodeSearch = payload.code || description.match(/BMASS[0-9]{3,8}/i)?.[0];
+      
+      if (referenceCodeSearch) {
+        const referenceCode = referenceCodeSearch.toUpperCase();
+        
+        // Find pending invoice with this reference code
+        const invoicesSnap = await getDocs(collection(db, "invoices"));
+        const invoiceDoc = invoicesSnap.docs.find(d => {
+          const data = d.data();
+          return data.status === "pending" && data.paymentDetails?.referenceCode === referenceCode;
+        });
+
+        if (invoiceDoc) {
+          const invoiceData = invoiceDoc.data();
+          // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
+          if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
+             await updateDoc(doc(db, "invoices", invoiceDoc.id), {
+               status: "paid",
+               paidAt: Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount
+             });
+             console.log(`Invoice ${invoiceDoc.id} marked as PAID via SePay (Ref: ${referenceCode})`);
+          } else {
+             console.log(`Amount mismatch for invoice ${invoiceDoc.id}: expected ${invoiceData.totalAmount}, got ${amount}`);
+          }
+        } else {
+          console.log(`No pending invoice found for reference code: ${referenceCode}`);
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("SePay Webhook Error:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
+  };
+
+  app.post("/api/webhooks/sepay", handleSepayWebhook);
+  app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
 
   // Endpoint to export all data
   app.get("/dulieu", async (req, res) => {
@@ -144,6 +255,8 @@ async function startServer() {
         res.status(500).json({ error: "Failed to link" });
     }
   });
+
+  // Proxy for Cloud Storage or other APIs would go here
 
   // Chèn Middleware Vite hoặc serve file tĩnh
   if (process.env.NODE_ENV !== "production") {

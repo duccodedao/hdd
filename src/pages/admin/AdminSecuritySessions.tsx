@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Lock, Laptop, Smartphone, HelpCircle, LogOut, CheckCircle2, UserCircle, Globe, Calendar, RefreshCw, AlertTriangle, X, Check, ShieldAlert } from 'lucide-react';
+import { Shield, Lock, Laptop, Smartphone, HelpCircle, LogOut, CheckCircle2, UserCircle, Globe, Calendar, RefreshCw, AlertTriangle, X, Check, ShieldAlert, CheckSquare, Square, Trash } from 'lucide-react';
 import { format } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import toast from 'react-hot-toast';
@@ -31,6 +31,7 @@ export default function AdminSecuritySessions() {
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { openConfirm } = useConfirmStore();
   const { userData } = useAuthStore();
 
@@ -57,6 +58,39 @@ export default function AdminSecuritySessions() {
 
     return () => unsubscribe();
   }, []);
+
+  const toggleSelectAll = () => {
+    const list = filteredSessions.filter(s => !s.active);
+    if (selectedIds.length === list.length && list.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(list.map(s => s.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    openConfirm({
+      title: 'Xóa hàng loạt lịch sử?',
+      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} bản ghi lịch sử phiên đã chọn?`,
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy',
+      variant: 'danger',
+      onConfirm: async () => {
+        const batch = writeBatch(db);
+        selectedIds.forEach(id => {
+          batch.delete(doc(db, 'admin_sessions', id));
+        });
+        await batch.commit();
+        setSelectedIds([]);
+        toast.success(`Đã xóa ${selectedIds.length} lịch sử phiên`);
+      }
+    });
+  };
 
   const handleLogoutAllOtherSessions = () => {
     if (!userData?.email) return;
@@ -149,7 +183,7 @@ export default function AdminSecuritySessions() {
   return (
     <div className="space-y-6">
       {/* Alert Header Banner */}
-      <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-3xl p-6 text-left relative overflow-hidden backdrop-blur-md">
+      <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-3xl p-6 text-left relative overflow-hidden backdrop-blur-md text-left">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center relative z-10 justify-between">
           <div className="space-y-2">
@@ -178,7 +212,7 @@ export default function AdminSecuritySessions() {
       </div>
 
       {/* Control Box */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-50 border border-slate-200 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 p-4 rounded-3xl">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-3xl">
         <div className="relative w-full md:max-w-md">
           <input
             type="text"
@@ -204,13 +238,49 @@ export default function AdminSecuritySessions() {
         </div>
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold font-bold">
+               {selectedIds.length}
+            </div>
+            <span className="text-sm font-bold text-rose-700 dark:text-rose-300">phiên lịch sử đã chọn</span>
+          </div>
+          <button 
+            onClick={handleBulkDelete}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-rose-700 transition-colors"
+          >
+            <Trash size={14} /> Xóa tất cả đã chọn
+          </button>
+        </div>
+      )}
+
       {/* Main Sessions Table */}
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-separate border-spacing-0 table-fixed">
-            <colgroup><col className="w-16 shrink-0" /><col className="w-56" /><col className="w-36" /><col className="w-56" /><col className="w-48" /><col className="w-64" /><col className="w-48" /><col className="w-48 text-right bg-slate-50/50 dark:bg-black/10 shrink-0" /></colgroup>
+        <div className="overflow-x-auto no-scrollbar scroll-smooth">
+          <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1200px]">
+            <colgroup>
+              <col className="w-12" />
+              <col className="w-16" />
+              <col className="w-56" />
+              <col className="w-36" />
+              <col className="w-56" />
+              <col className="w-48" />
+              <col className="w-56" />
+              <col className="w-48" />
+              <col className="w-48 text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 shrink-0" />
+            </colgroup>
             <thead>
               <tr className="bg-slate-50/70 dark:bg-white/[0.02]">
+                <th className="p-4 border-b border-slate-100 dark:border-white/5">
+                   <button 
+                     onClick={toggleSelectAll} 
+                     className="text-slate-400 hover:text-indigo-600 transition-colors"
+                     disabled={filteredSessions.filter(s => !s.active).length === 0}
+                   >
+                      {selectedIds.length === filteredSessions.filter(s => !s.active).length && filteredSessions.filter(s => !s.active).length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
+                   </button>
+                </th>
                 <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 capitalize border-b border-slate-100 dark:border-white/5">Logo</th>
                 <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 capitalize border-b border-slate-100 dark:border-white/5">Gmail</th>
                 <th className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 capitalize border-b border-slate-100 dark:border-white/5">Chức vụ</th>
@@ -218,7 +288,7 @@ export default function AdminSecuritySessions() {
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">IP (Bảo mật)</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Vị trí</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Ngày giờ đăng nhập</th>
-                <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5">Thao tác</th>
+                <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -230,6 +300,15 @@ export default function AdminSecuritySessions() {
                     key={session.id} 
                     className={`hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors group ${!session.active ? 'opacity-60 bg-slate-50/10' : ''}`}
                   >
+                    {/* Checkbox Column */}
+                    <td className="p-4 align-middle">
+                       {!session.active && (
+                         <button onClick={() => toggleSelect(session.id)} className={selectedIds.includes(session.id) ? "text-indigo-600" : "text-slate-300"}>
+                            {selectedIds.includes(session.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                         </button>
+                       )}
+                    </td>
+
                     {/* Logo Column */}
                     <td className="p-4 align-middle">
                       {session.photoURL ? (
@@ -304,7 +383,7 @@ export default function AdminSecuritySessions() {
                     </td>
 
                     {/* Thao tác Column */}
-                    <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10">
+                    <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] backdrop-blur-sm">
                       {session.active ? (
                         <div className="flex items-center justify-end gap-2">
                           {isCurrentSession ? (
@@ -360,7 +439,7 @@ export default function AdminSecuritySessions() {
 
               {filteredSessions.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
+                  <td colSpan={9} className="p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
                     Không tìm thấy phiên đăng nhập nào khớp với điều kiện tìm kiếm.
                   </td>
                 </tr>
@@ -368,7 +447,7 @@ export default function AdminSecuritySessions() {
 
               {loading && (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="p-12 text-center text-slate-400 text-sm">
                     <AppLogo className="w-12 h-12 mx-auto mb-3" isLoading={true} />
                     Đang tải danh sách phiên bảo mật...
                   </td>

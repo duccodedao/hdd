@@ -4,18 +4,52 @@ import { GitHubConfig } from '../types';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-async function getGitHubConfig(): Promise<GitHubConfig | null> {
+export async function getGitHubConfig(type?: 'global' | 'vault'): Promise<GitHubConfig | null> {
   try {
-    const docRef = doc(db, 'settings', 'github');
-    const snapshot = await getDoc(docRef);
-    if (snapshot.exists()) {
-      const data = snapshot.data();
+    // 1. System check (New centralized config)
+    let snap = await getDoc(doc(db, 'settings', 'system'));
+    if (snap.exists()) {
+      const data = snap.data();
+      
+      // If vault is preferred, check fileManagerConfig first
+      if (type === 'vault') {
+        if (data.fileManagerConfig?.token) return {
+          ...data.fileManagerConfig,
+          owner: data.fileManagerConfig.owner || data.fileManagerConfig.username || ''
+        };
+      }
+
+      if (data.githubGlobalConfig?.token) return {
+        ...data.githubGlobalConfig,
+        owner: data.githubGlobalConfig.owner || data.githubGlobalConfig.username || ''
+      };
+
+      if (data.fileManagerConfig?.token) return {
+        ...data.fileManagerConfig,
+        owner: data.fileManagerConfig.owner || data.fileManagerConfig.username || ''
+      };
+    }
+
+    // 2. Integration check (Legacy centralized)
+    snap = await getDoc(doc(db, 'settings', 'github_integration'));
+    if (snap.exists()) {
+      const data = snap.data();
       return {
         ...data,
         owner: data.owner || data.username || ''
       } as GitHubConfig;
     }
-  } catch (error) {
+
+    // 3. Simple github doc check (Original)
+    snap = await getDoc(doc(db, 'settings', 'github'));
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        ...data,
+        owner: data.owner || data.username || ''
+      } as GitHubConfig;
+    }
+  } catch (error: any) {
     console.error('Error fetching GitHub config:', error?.message || String(error));
   }
   return null;

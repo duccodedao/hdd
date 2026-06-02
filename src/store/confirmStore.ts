@@ -6,6 +6,7 @@ interface ConfirmState {
   message: string;
   confirmText: string;
   cancelText: string;
+  variant?: 'danger' | 'warning' | 'info';
   onConfirm: () => void | Promise<void>;
   onCancel?: () => void;
   openConfirm: (options: Omit<ConfirmState, 'isOpen' | 'openConfirm' | 'closeConfirm'>) => void;

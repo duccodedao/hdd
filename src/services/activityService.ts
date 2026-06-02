@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { setDoc, doc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 
 export enum ActivityType {
@@ -14,6 +14,7 @@ export async function logActivity(type: ActivityType, description: string, metad
   if (!user) return;
 
   try {
+    const activityId = `${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
     const activityData: any = {
       userId: user.uid,
       type,
@@ -27,7 +28,7 @@ export async function logActivity(type: ActivityType, description: string, metad
       activityData.metadata = metadata;
     }
 
-    await addDoc(collection(db, 'activities'), activityData);
+    await setDoc(doc(db, 'activities', activityId), activityData);
   } catch (e) {
     console.error('Error logging activity:', e?.message || String(e));
   }

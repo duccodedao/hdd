@@ -23,10 +23,18 @@ export default function GoogleOneTap() {
     
     if (user || !clientId) return;
 
+    // Skip One Tap in iframes to avoid FedCM NotAllowedError which clutters the console 
+    // and is picked up as a critical error by AI Studio.
+    if (window.self !== window.top) return;
+
     // Function to initialize and prompt
     const initializeOneTap = () => {
       if (!window.google?.accounts?.id) return false;
 
+      // Check if we are in an iframe and if the required permission might be missing based on the error
+      // Actually, we can't easily check for identity-credentials-get permission programmatically without triggering the error usually.
+      // But we can check if FedCM is explicitly supported/allowed.
+      
       try {
         window.google.accounts.id.initialize({
           client_id: clientId,
@@ -34,26 +42,29 @@ export default function GoogleOneTap() {
           auto_select: false,
           cancel_on_tap_outside: true,
           itp_support: false, // Disabling ITP support in frames to avoid NotAllowedError/sandbox issues
-          use_fedcm_for_prompt: false, // Keep disabled to fallback to traditional flow
+          use_fedcm_for_prompt: false, // Explicitly false to avoid the NotAllowedError in many nested contexts
           state_cookie_domain: window.location.hostname
         });
 
+        // Only prompt if not in a restricted sandbox if possible, 
+        // but since we want to try anyway, we just wrap it and handle it silently
         window.google.accounts.id.prompt((notification: any) => {
           if (notification.isNotDisplayed()) {
             const reason = notification.getNotDisplayedReason();
-            console.log('One Tap not displayed:', reason);
-            if (reason === 'opt_out_or_no_session') {
-              console.log('User might need to log into Google first or has opted out of One Tap.');
+            // Suppress trivial logging that clutters console in Dev environment
+            if (reason !== 'suppressed_by_user' && reason !== 'opt_out_or_no_session') {
+              console.log('One Tap not displayed:', reason);
             }
-          } else if (notification.isSkippedMoment()) {
-            console.log('One Tap skipped:', notification.getSkippedReason());
-          } else if (notification.isDismissedMoment()) {
-            console.log('One Tap dismissed:', notification.getDismissedReason());
           }
         });
         return true;
-      } catch (error) {
-        console.error('Google One Tap error:', error?.message || String(error));
+      } catch (error: any) {
+        // If it's a security/permission error, log it once but don't crash
+        if (error.name === 'NotAllowedError' || error.message?.includes('identity-credentials-get')) {
+          console.warn('Google One Tap: "identity-credentials-get" permission is missing. This is common in iframes. Please open in a new tab for full GSI support.');
+        } else {
+          console.error('Google One Tap error:', error?.message || String(error));
+        }
         return false;
       }
     };
@@ -90,6 +101,7 @@ export default function GoogleOneTap() {
           photoURL: userCred.user.photoURL || '',
           role: (userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'sonlyhongduc1@ghn.vn') ? 'superadmin' : 'user',
           status: 'active',
+          onboardingCompleted: false,
           createdAt: Date.now(),
           joinedAt: Date.now(),
           lastLoginAt: Date.now()

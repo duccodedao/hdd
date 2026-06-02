@@ -26,20 +26,18 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
+        (request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin'] ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin']
         ))
       );
     }
     function isSuperAdmin() {
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']
-        ))
+        (request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin'
+        )
       );
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -99,7 +97,7 @@ service cloud.firestore {
     }
     
     match /settings/{docId} {
-      allow read: if isAdmin() || (docId != 'github' && docId != 'github_integration');
+      allow read: if (docId == 'tool_permissions' && isSignedIn()) || isAdmin() || (docId != 'github' && docId != 'github_integration');
       allow write: if isAdmin();
 
       // Support nested settings
@@ -107,6 +105,13 @@ service cloud.firestore {
         allow read: if isAdmin();
         allow write: if isSuperAdmin();
       }
+    }
+    
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || isAdmin());
+      allow create: if true; // Allow creation (server uses client SDK)
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
     
     // ADMIN REQUESTS
@@ -190,6 +195,12 @@ service cloud.firestore {
     match /recurring_events/{eventId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /word_covers/{coverId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
     }
 
     match /hrm_employees/{empId} {

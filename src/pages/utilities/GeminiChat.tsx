@@ -232,7 +232,7 @@ export default function GeminiChat() {
       const response = await fetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           model: selectedModel,
           contents: {
             parts: [{ text: historyText }]

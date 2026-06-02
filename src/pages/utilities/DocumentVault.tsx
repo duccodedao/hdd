@@ -6,12 +6,12 @@ import {
   FolderOpen, FileArchive, Settings, ChevronRight, Save,
   MoreVertical, FileIcon, FileSpreadsheet, FileQuestion, 
   BookOpen, LayoutGrid, List as ListIcon, Shield, ExternalLink,
-  ArrowLeft, RefreshCw, Zap, Monitor, ArrowRight
+  ArrowLeft, RefreshCw, Zap, Monitor, ArrowRight, CheckSquare, MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, query, orderBy, onSnapshot, addDoc, 
-  updateDoc, deleteDoc, doc, setDoc, serverTimestamp, increment,
+  updateDoc, deleteDoc, doc, setDoc, serverTimestamp, increment, writeBatch,
   where, getDocs, getDoc, limit, startAfter, type QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db, auth, OperationType, handleFirestoreError } from '../../lib/firebase';
@@ -26,8 +26,34 @@ import { saveAs } from 'file-saver';
 import { useAuthStore } from '../../store/authStore';
 import { useConfirmStore } from '../../store/confirmStore';
 import ConfirmModal from '../../components/ConfirmModal';
+import { PaymentDialog } from '../../components/payment/PaymentDialog';
 
 const DOCS_PER_PAGE = 50;
+
+const TruncatedName = ({ name, maxLength = 30 }: { name: string; maxLength?: number }) => {
+  const [showFull, setShowFull] = useState(false);
+  const isLong = name.length > maxLength;
+
+  if (!isLong) return <span className="text-sm font-bold text-slate-800 dark:text-zinc-200 whitespace-nowrap">{name}</span>;
+
+  return (
+    <div className="flex items-center gap-2 max-w-full">
+      <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">
+        {showFull ? name : `${name.substring(0, maxLength)}...`}
+      </span>
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowFull(!showFull);
+        }}
+        className="shrink-0 p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-indigo-600 dark:text-indigo-400 transition-all group"
+        title={showFull ? "Thu gọn" : "Xem tên đầy đủ"}
+      >
+        <Eye size={14} className={cn(showFull && "fill-current")} />
+      </button>
+    </div>
+  );
+};
 
 interface DocumentVaultProps {
   onBack: () => void;
@@ -52,13 +78,27 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'normal' | 'vip'>('normal');
   const [viewMode, setViewMode] = useState<'list' | 'explorer'>('list');
   const [explorerCategory, setExplorerCategory] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [showOnlyHighlighted, setShowOnlyHighlighted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; doc: AdminDocument | null }>({
+    isOpen: false,
+    doc: null
+  });
   const [editForm, setEditForm] = useState({ name: '', categoryId: '', note: '', hidden: false });
+  const [vipDialog, setVipDialog] = useState<{ isOpen: boolean; doc: AdminDocument | null; code: string; onConfirm: () => void; error?: string }>({
+    isOpen: false,
+    doc: null,
+    code: '',
+    onConfirm: () => {}
+  });
 
   // Confirm Modal State
   const [confirmState, setConfirmState] = useState<{
@@ -204,6 +244,32 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   };
 
   const handlePreview = async (docObj: AdminDocument) => {
+    if (isAdmin) {
+      const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
+      const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+      const url = isOffice 
+        ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(docObj.githubUrl)}`
+        : docObj.githubUrl;
+      window.open(url, '_blank');
+      await updateDoc(doc(db, 'documents', docObj.id), { views: increment(1) });
+      return;
+    }
+
+    if (docObj.isVip) {
+      // No preview for VIP files per user request
+      toast.error('Tài liệu VIP không hỗ trợ xem trước. Vui lòng thanh toán để tải xuống.');
+      return;
+    }
+
+    const price = docObj.salePrice || docObj.price || 0;
+    if (price > 0) {
+      const hasPaid = await checkHasPaid(docObj.id);
+      if (!hasPaid) {
+        setPaymentDialog({ isOpen: true, doc: docObj });
+        return;
+      }
+    }
+
     const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
     const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
     const url = isOffice 
@@ -211,13 +277,44 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       : docObj.githubUrl;
     
     window.open(url, '_blank');
-    
-    await updateDoc(doc(db, 'documents', docObj.id), {
-      views: increment(1)
-    });
+    await updateDoc(doc(db, 'documents', docObj.id), { views: increment(1) });
+  };
+
+  const checkHasPaid = async (docId: string) => {
+    if (!user) return false;
+    try {
+      const q = query(
+        collection(db, 'invoices'), 
+        where('userId', '==', user.uid),
+        where('status', '==', 'paid')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.some(d => {
+        const data = d.data();
+        return data.items?.some((i: any) => i.docId === docId);
+      });
+    } catch (e) {
+      console.error("Check paid error:", e);
+      return false;
+    }
   };
 
   const handleDownload = async (docObj: AdminDocument) => {
+    if (isAdmin) {
+      window.open(docObj.githubUrl, '_blank');
+      await updateDoc(doc(db, 'documents', docObj.id), { downloads: increment(1) });
+      return;
+    }
+
+    const price = docObj.salePrice || docObj.price || 0;
+    if ((price > 0 || docObj.isVip) && !isAdmin) {
+      const hasPaid = await checkHasPaid(docObj.id);
+      if (!hasPaid) {
+        setPaymentDialog({ isOpen: true, doc: docObj });
+        return;
+      }
+    }
+
     window.open(docObj.githubUrl, '_blank');
     await updateDoc(doc(db, 'documents', docObj.id), {
       downloads: increment(1)
@@ -268,6 +365,64 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     }
   };
 
+  const handleBulkDownload = async () => {
+    const selectedDocuments = documents.filter(d => selectedIds.includes(d.id));
+    if (selectedDocuments.length === 0) return;
+
+    // Check if any selected doc has a price (bulk pay not supported yet in UI, so just filter them or warn)
+    const paidDocs = selectedDocuments.filter(d => (d.salePrice || d.price || 0) > 0);
+    if (paidDocs.length > 0 && !isAdmin) {
+      toast.error('Không thể tải xuống hàng loạt các tài liệu có tính phí. Vui lòng tải từng file.');
+      return;
+    }
+    
+    if (selectedDocuments.length === 1) {
+      handleDownload(selectedDocuments[0]);
+      return;
+    }
+
+    const zip = new JSZip();
+    const toastId = toast.loading('Đang nén file...');
+    try {
+      for (const docItem of selectedDocuments) {
+        const response = await fetch(docItem.githubUrl);
+        const blob = await response.blob();
+        const extension = docItem.githubPath.split('.').pop();
+        zip.file(`${docItem.categoryName}---${docItem.name}.${extension}`, blob);
+      }
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `vault_selected_${Date.now()}.zip`);
+      toast.success('Đã nén và tải xuống thành công', { id: toastId });
+    } catch (err) {
+      toast.error('Lỗi khi tải xuống hàng loạt', { id: toastId });
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (!isAdmin) return;
+    openConfirm(
+      "Xóa hàng loạt", 
+      `Bạn có chắc chắn muốn xóa ${selectedIds.length} tài liệu?`, 
+      async () => {
+        const toastId = toast.loading('Đang xử lý...');
+        try {
+          const batch = writeBatch(db);
+          // Importing writeBatch is needed if not available
+          // But it should be in firebase-skill patterns
+          selectedIds.forEach(id => {
+            batch.delete(doc(db, 'documents', id));
+          });
+          await batch.commit();
+          setSelectedIds([]);
+          toast.success('Đã xóa thành công', { id: toastId });
+        } catch (err) {
+          toast.error('Lỗi khi xóa hàng loạt', { id: toastId });
+        }
+      },
+      'danger'
+    );
+  };
+
   const shareLink = (docId: string) => {
     const url = `${window.location.origin}${window.location.pathname}?view=${docId}${window.location.hash}`;
     navigator.clipboard.writeText(url);
@@ -289,7 +444,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     // Non-admin can't see hidden files
     if (!isAdmin && doc.hidden) return false;
     
-    return matchesSearch && matchesCategory && matchesHighlight;
+    const matchesTab = activeTab === 'vip' ? doc.isVip : !doc.isVip;
+    
+    return matchesSearch && matchesCategory && matchesHighlight && matchesTab;
   });
 
   const getFileIcon = (fileName: string) => {
@@ -459,6 +616,74 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
             </div>
           </div>
         </div>
+
+        {/* Tab Switcher */}
+        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-full md:w-fit border border-slate-200 dark:border-white/5">
+           <button 
+             onClick={() => { setActiveTab('normal'); setSelectedIds([]); }}
+             className={cn(
+               "flex-1 md:flex-initial px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+               activeTab === 'normal' 
+                 ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                 : "text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-white"
+             )}
+           >
+             Kho thường
+           </button>
+           <button 
+             onClick={() => { setActiveTab('vip'); setSelectedIds([]); }}
+             className={cn(
+               "flex-1 md:flex-initial px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+               activeTab === 'vip' 
+                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
+                 : "text-slate-500 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400"
+             )}
+           >
+             {activeTab === 'vip' && <Zap size={14} className="fill-white" />}
+             Kho VIP
+           </button>
+           <button
+             onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
+             className={cn(
+               "p-2.5 rounded-xl transition-all",
+               isSelectionMode 
+                 ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400" 
+                 : "text-slate-500 dark:text-zinc-500 hover:bg-slate-50 dark:hover:bg-white/5"
+             )}
+           >
+             <CheckSquare size={16} />
+           </button>
+        </div>
+
+        {selectedIds.length > 0 && (
+          <div className="max-w-4xl mx-auto flex items-center gap-4 p-4 mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl animate-in fade-in slide-in-from-top-4">
+            <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+              Đang chọn {selectedIds.length} mục
+            </span>
+            <div className="flex gap-2 ml-auto">
+              <button 
+                onClick={handleBulkDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 text-indigo-600 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition-all"
+              >
+                <Download size={14} /> Tải xuống
+              </button>
+              {isAdmin && (
+                <button 
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all"
+                >
+                  <Trash2 size={14} /> Xóa
+                </button>
+              )}
+              <button 
+                onClick={() => setSelectedIds([])}
+                className="px-4 py-2 text-slate-500 hover:text-slate-700 text-xs font-bold"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {highlightId && (
@@ -628,40 +853,98 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
              <table className="min-w-[850px] lg:min-w-0 w-full text-left table-auto">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
+                   {isSelectionMode && <th className="px-4 py-4 whitespace-nowrap">
+                     <input 
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        checked={selectedIds.length === filteredDocs.length && filteredDocs.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(filteredDocs.map(d => d.id));
+                          } else {
+                            setSelectedIds([]);
+                          }
+                        }}
+                      />
+                   </th>}
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-20 md:w-24 text-left">Định dạng</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-40 md:w-44">Danh mục</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-24">Giá</th>
+                   {activeTab === 'vip' && isAdmin && (
+                     <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-32">Vip Code</th>
+                   )}
                    <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-48">Ngày tạo</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-36 md:w-44">Thao tác</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-20 sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                  {filteredDocs.map((docItem) => (
-                   <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                   <tr key={docItem.id} className={cn("hover:bg-slate-50 dark:hover:bg-white/5 transition-colors", selectedIds.includes(docItem.id) && "bg-indigo-50/50 dark:bg-indigo-500/5")}>
+                     {isSelectionMode && <td className="px-4 py-4">
+                       <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          checked={selectedIds.includes(docItem.id)}
+                          onChange={() => {
+                            setSelectedIds(prev => prev.includes(docItem.id) ? prev.filter(id => id !== docItem.id) : [...prev, docItem.id]);
+                          }}
+                        />
+                     </td>}
                      <td className="px-2 md:px-4 py-4 text-left w-20 md:w-24">
                        <span className={cn("font-mono text-[9px] md:text-[10px] px-1.5 md:px-2 py-1 rounded uppercase tracking-wider border", getFormatBadgeColor(docItem.githubPath))}>
                          {docItem.githubPath.split('.').pop()?.toUpperCase()}
                        </span>
                      </td>
-                     <td className="px-2 md:px-4 py-4 font-bold text-[13px] md:text-sm text-slate-800 dark:text-zinc-200 truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer max-w-[200px] sm:max-w-xs md:max-w-md lg:max-w-lg" onClick={() => handlePreview(docItem)} title={docItem.name}>
-                       {docItem.name}
+                     <td className={cn("px-2 md:px-4 py-4 font-bold text-[13px] md:text-sm text-slate-800 dark:text-zinc-200 whitespace-nowrap", (!docItem.isVip || isAdmin) && "cursor-pointer hover:text-indigo-600")} onClick={() => (!docItem.isVip || isAdmin) && handlePreview(docItem)}>
+                       <span className="whitespace-nowrap">{docItem.name}</span>
                      </td>
                      <td className="px-2 md:px-4 py-4 text-[11px] md:text-sm text-slate-500 text-left w-40 md:w-44 truncate" title={docItem.categoryName || 'Chưa phân loại'}>
                        {docItem.categoryName || 'Chưa phân loại'}
                      </td>
+                     <td className="px-2 md:px-4 py-4 text-right w-24">
+                       <div className="flex flex-col items-end">
+                         <span className={cn("text-xs font-bold", (docItem.salePrice || docItem.price) ? "text-indigo-600 dark:text-indigo-400" : "text-emerald-600 dark:text-emerald-400")}>
+                           {docItem.salePrice ? docItem.salePrice.toLocaleString() : (docItem.price ? docItem.price.toLocaleString() : 'Free')}
+                         </span>
+                         {docItem.salePrice && docItem.price && (
+                           <span className="text-[9px] text-slate-400 line-through">{docItem.price.toLocaleString()}</span>
+                         )}
+                       </div>
+                     </td>
+                     {activeTab === 'vip' && isAdmin && (
+                        <td className="px-2 md:px-4 py-4 text-left w-32">
+                          <span className="font-mono text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded tracking-widest border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20">
+                            {docItem.vipCode || '---'}
+                          </span>
+                        </td>
+                      )}
                      <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-36 md:w-44 whitespace-nowrap">
-                       <div className="flex justify-end gap-1 md:gap-2">
-                         <button onClick={() => handlePreview(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
-                         <button onClick={() => handleDownload(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
-                         <button onClick={() => shareLink(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
-                         {isAdmin && (
-                           <>
-                             <button onClick={() => handleEditInit(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
-                             <button onClick={() => handleDelete(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
-                           </>
+                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
+                       <div className="flex justify-center">
+                         {expandedRow === docItem.id ? (
+                           <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">
+                             {!docItem.isVip || isAdmin ? (
+                               <button onClick={() => handlePreview(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
+                             ) : (
+                               <div className="p-1.5 md:p-2 text-slate-300 cursor-not-allowed" title="VIP-Lock"><Shield size={16} /></div>
+                             )}
+                             <button onClick={() => handleDownload(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                             <button onClick={() => shareLink(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
+                             {isAdmin && (
+                               <>
+                                 <button onClick={() => handleEditInit(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
+                                 <button onClick={() => handleDelete(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                               </>
+                             )}
+                             <button onClick={() => setExpandedRow(null)} className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 transition-colors" title="Đóng"><X size={16} /></button>
+                           </div>
+                         ) : (
+                           <button onClick={() => setExpandedRow(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tác vụ">
+                             <MoreHorizontal size={16} />
+                           </button>
                          )}
                        </div>
                      </td>
@@ -739,6 +1022,23 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         </Modal>
       )}
 
+      <VipCodeDialog 
+        isOpen={vipDialog.isOpen} 
+        onClose={() => setVipDialog(prev => ({ ...prev, isOpen: false }))}
+        doc={vipDialog.doc}
+        onConfirm={vipDialog.onConfirm}
+      />
+
+      <PaymentDialog 
+        isOpen={paymentDialog.isOpen}
+        onClose={() => setPaymentDialog({ isOpen: false, doc: null })}
+        item={paymentDialog.doc ? { ...paymentDialog.doc, title: paymentDialog.doc.name, price: paymentDialog.doc.price || 0 } : null}
+        onPaid={() => {
+          if (paymentDialog.doc) {
+             handleDownload(paymentDialog.doc);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -771,6 +1071,11 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
           <div className="relative transform group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
              {getFileIcon(docItem.githubPath)}
           </div>
+          {docItem.isVip && (
+            <div className="absolute top-3 left-3 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg z-10 border border-amber-400">
+              <Zap size={10} fill="currentColor" /> VIP
+            </div>
+          )}
           {isHighlighted && (
             <div className="absolute top-3 right-3 bg-indigo-600 text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
               <Zap size={10} fill="currentColor" className="animate-pulse" /> Focus
@@ -789,8 +1094,8 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
             </span>
           </div>
           
-          <h4 className="font-bold text-slate-900 dark:text-white leading-tight line-clamp-2 text-lg group-hover:text-indigo-600 transition-colors break-words w-full" title={docItem.name}>
-            {docItem.name}
+          <h4 className="font-bold text-slate-900 dark:text-white leading-tight text-lg group-hover:text-indigo-600 transition-colors break-words w-full" title={docItem.name}>
+            <TruncatedName name={docItem.name} maxLength={40} />
           </h4>
           
           <p className="text-xs text-slate-500 dark:text-zinc-500 italic line-clamp-2 leading-relaxed break-words">
@@ -800,25 +1105,32 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
 
         <div className="mt-auto pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <div className="flex flex-col">
-                 <span className="text-[8px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Views</span>
-                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.views || 0}</span>
-               </div>
-               <div className="flex flex-col">
-                 <span className="text-[8px] font-black text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Saves</span>
-                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{docItem.downloads || 0}</span>
-               </div>
+            <div className="flex flex-col">
+               <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                  {docItem.salePrice ? docItem.salePrice.toLocaleString() : (docItem.price ? docItem.price.toLocaleString() : 'Free')}
+               </span>
+               {docItem.salePrice && docItem.price && (
+                  <span className="text-[8px] text-slate-400 line-through">{docItem.price.toLocaleString()}</span>
+               )}
             </div>
 
             <div className="flex items-center gap-1.5">
-                <button 
-                  onClick={() => onPreview(docItem)}
-                  className="p-2.5 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all"
-                  title="Xem trước"
-                >
-                  <Eye size={16} />
-                </button>
+                {!docItem.isVip || isAdmin ? (
+                  <button 
+                    onClick={() => onPreview(docItem)}
+                    className="p-2.5 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-all"
+                    title="Xem trước"
+                  >
+                    <Eye size={16} />
+                  </button>
+                ) : (
+                  <div 
+                    className="p-2.5 text-slate-300 dark:text-zinc-700 bg-slate-50/50 dark:bg-white/2 cursor-not-allowed rounded-xl"
+                    title="File VIP không hỗ trợ xem trước"
+                  >
+                    <Shield size={16} />
+                  </div>
+                )}
                 <button 
                   onClick={() => onDownload(docItem)}
                   className="p-2.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-xl transition-all"
@@ -1000,6 +1312,80 @@ const CategoryManagerModal = ({ isOpen, onClose, categories }: any) => {
              )}
           </div>
        </div>
+    </Modal>
+  );
+};
+
+const VipCodeDialog = ({ isOpen, onClose, doc, onConfirm }: any) => {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code === doc?.vipCode) {
+      onConfirm();
+      onClose();
+      setCode('');
+      setError('');
+    } else {
+      setError('Mã code không chính xác. Vui lòng kiểm tra lại!');
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Xác thực truy cập VIP">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex flex-col items-center justify-center p-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-500/20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 mb-6">
+               <Shield size={32} />
+            </div>
+            <h4 className="text-xl font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-tight mb-2">Tài liệu VIP</h4>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium max-w-xs leading-relaxed">
+               Văn bản này được bảo vệ. Vui lòng nhập mã code do Quản trị viên cấp để tiếp tục tải xuống/xem.
+            </p>
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Nhập mã Code</label>
+          <input 
+            type="text"
+            className={cn(
+              "w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border text-sm font-bold tracking-[0.2em] transition-all focus:outline-none focus:ring-2",
+              error 
+                ? "border-rose-500 focus:ring-rose-500/20 text-rose-600" 
+                : "border-slate-200 dark:border-white/10 focus:ring-indigo-500/20 text-indigo-600"
+            )}
+            placeholder="••••••••"
+            autoFocus
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setError('');
+            }}
+          />
+          {error && (
+            <p className="text-[10px] font-bold text-rose-500 ml-1 uppercase tracking-widest animate-shake">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-2">
+           <button 
+             type="button"
+             onClick={onClose}
+             className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+           >
+             Hủy bỏ
+           </button>
+           <button 
+             type="submit"
+             className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+           >
+             Xác nhận
+           </button>
+        </div>
+      </form>
     </Modal>
   );
 };

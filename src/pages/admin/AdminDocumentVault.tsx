@@ -5,7 +5,7 @@ import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serve
 import { db, OperationType, handleFirestoreError } from '../../lib/firebase';
 import { GitHubConfig, AdminDocument } from '../../types';
 import { githubService } from '../../services/githubService';
-import { Upload, X, Settings, LayoutGrid, Check, FolderOpen, Save, Trash2, ChevronRight, FileText, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { Upload, X, Settings, Edit2, LayoutGrid, Check, FolderOpen, Save, Trash2, ChevronRight, FileText, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -26,6 +26,10 @@ interface UploadItem {
   categoryId: string;
   note: string;
   hidden: boolean;
+  isVip: boolean;
+  vipCode: string;
+  price: number;
+  salePrice: number;
   status: 'pending' | 'uploading' | 'scanning' | 'success' | 'error';
   errorMessage?: string;
 }
@@ -43,8 +47,11 @@ export default function AdminDocumentVault() {
   
   // Files State
   const [documents, setDocuments] = useState<AdminDocument[]>([]);
+  const [fileTab, setFileTab] = useState<'normal' | 'vip'>('normal');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Modal State
+  const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null);
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean;
     title: string;
@@ -97,6 +104,14 @@ export default function AdminDocumentVault() {
   };
   
   // Upload State
+  const updateDocVip = async (docId: string, isVip: boolean, vipCode: string) => {
+    await updateDoc(doc(db, 'documents', docId), {
+      isVip,
+      vipCode
+    });
+    toast.success('Đã cập nhật trạng thái Vip');
+  };
+
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -202,6 +217,57 @@ export default function AdminDocumentVault() {
     }, 'danger');
   };
 
+  const handleBulkDelete = () => {
+    openConfirm(
+      "Xóa hàng loạt", 
+      `Bạn có chắc chắn muốn chuyển ${selectedIds.length} tài liệu vào thùng rác?`, 
+      async () => {
+        const toastId = toast.loading('Đang xử lý...');
+        try {
+          const batch = writeBatch(db);
+          selectedIds.forEach(id => {
+            batch.update(doc(db, 'documents', id), {
+              isDeleted: true,
+              deletedAt: serverTimestamp()
+            });
+          });
+          await batch.commit();
+          setSelectedIds([]);
+          toast.success('Đã chuyển vào thùng rác', { id: toastId });
+        } catch (err) {
+          toast.error('Lỗi khi xóa hàng loạt', { id: toastId });
+        }
+      },
+      'warning'
+    );
+  };
+
+  const handleBulkDownload = async () => {
+    const selectedDocuments = documents.filter(d => selectedIds.includes(d.id));
+    if (selectedDocuments.length === 0) return;
+    
+    if (selectedDocuments.length === 1) {
+      downloadDocument(selectedDocuments[0]);
+      return;
+    }
+
+    const zip = new JSZip();
+    const toastId = toast.loading('Đang nén file...');
+    try {
+      for (const docItem of selectedDocuments) {
+        const response = await fetch(docItem.githubUrl);
+        const blob = await response.blob();
+        const extension = docItem.githubPath.split('.').pop();
+        zip.file(`${docItem.categoryName}---${docItem.name}.${extension}`, blob);
+      }
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `vault_selected_${Date.now()}.zip`);
+      toast.success('Đã nén và tải xuống thành công', { id: toastId });
+    } catch (err) {
+      toast.error('Lỗi khi tải xuống hàng loạt', { id: toastId });
+    }
+  };
+
   const handleToggleHidden = async (docObj: AdminDocument) => {
     const action = docObj.hidden ? "Hiện" : "Ẩn";
     openConfirm(`${action} tài liệu`, `Bạn có chắc chắn muốn ${action.toLowerCase()} tài liệu "${docObj.name}"?`, async () => {
@@ -285,6 +351,20 @@ export default function AdminDocumentVault() {
     toast.success('Đã xuất dữ liệu toàn bộ hệ thống');
   };
 
+  const handleUpdateDocument = async (id: string, updates: Partial<AdminDocument>) => {
+    try {
+      await updateDoc(doc(db, 'documents', id), {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+      setEditingDoc(null);
+      toast.success('Đã cập nhật tài liệu');
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi cập nhật tài liệu');
+    }
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -362,6 +442,10 @@ export default function AdminDocumentVault() {
           categoryId,
           note: '',
           hidden: false,
+          isVip: false,
+          vipCode: '',
+          price: 0,
+          salePrice: 0,
           status: 'pending'
         });
       }
@@ -450,6 +534,8 @@ export default function AdminDocumentVault() {
           githubSha: githubData.sha,
           githubPath: githubData.path,
           hidden: item.hidden,
+          isVip: item.isVip,
+          vipCode: item.vipCode,
           isDeleted: false,
           views: 0,
           downloads: 0,
@@ -502,6 +588,8 @@ export default function AdminDocumentVault() {
           githubSha: githubData.sha,
           githubPath: githubData.path,
           hidden: item.hidden,
+          isVip: item.isVip,
+          vipCode: item.vipCode,
           isDeleted: false,
           views: 0,
           downloads: 0,
@@ -546,6 +634,15 @@ export default function AdminDocumentVault() {
         message={confirmState.message}
         type={confirmState.type}
       />
+      {editingDoc && (
+        <EditDocumentModal
+          isOpen={!!editingDoc}
+          onClose={() => setEditingDoc(null)}
+          doc={editingDoc}
+          categories={categories}
+          onConfirm={handleUpdateDocument}
+        />
+      )}
       <div className="flex items-center gap-4 border-b border-slate-200 dark:border-white/10 pb-4 overflow-x-auto">
         <button onClick={() => setActiveTab('upload')} className={cn("px-4 py-2 font-bold text-sm tracking-wide transition-colors whitespace-nowrap", activeTab === 'upload' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white')}>
           <Upload className="w-4 h-4 inline-block mr-2" /> Tải lên Hàng Loạt
@@ -563,7 +660,62 @@ export default function AdminDocumentVault() {
 
       {activeTab === 'files' && (
         <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm overflow-hidden">
-           <h3 className="text-lg font-bold mb-4">Danh sách tài liệu ({documents.filter(d => !d.isDeleted).length})</h3>
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <h3 className="text-lg font-bold">Danh sách tài liệu ({documents.filter(d => !d.isDeleted).length})</h3>
+              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-900 rounded-xl w-fit">
+                <button 
+                  onClick={() => { setFileTab('normal'); setSelectedIds([]); }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    fileTab === 'normal' 
+                      ? "bg-white dark:bg-zinc-800 text-indigo-600 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-zinc-400"
+                  )}
+                >
+                  Kho thường
+                </button>
+                <button 
+                  onClick={() => { setFileTab('vip'); setSelectedIds([]); }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                    fileTab === 'vip' 
+                      ? "bg-indigo-600 text-white shadow-lg" 
+                      : "text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400"
+                  )}
+                >
+                  Kho VIP
+                </button>
+              </div>
+           </div>
+
+           {selectedIds.length > 0 && activeTab === 'files' && (
+             <div className="flex items-center gap-4 p-4 mb-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl animate-in fade-in slide-in-from-top-4">
+               <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                 Đang chọn {selectedIds.length} mục
+               </span>
+               <div className="flex gap-2 ml-auto">
+                 <button 
+                   onClick={handleBulkDownload}
+                   className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 text-indigo-600 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition-all"
+                 >
+                   <FileText size={14} /> Tải xuống đã chọn
+                 </button>
+                 <button 
+                   onClick={handleBulkDelete}
+                   className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all"
+                 >
+                   <Trash2 size={14} /> Xóa đã chọn
+                 </button>
+                 <button 
+                   onClick={() => setSelectedIds([])}
+                   className="px-4 py-2 text-slate-500 hover:text-slate-700 text-xs font-bold"
+                 >
+                   Hủy
+                 </button>
+               </div>
+             </div>
+           )}
+
            <div className="flex gap-2 mb-4">
              <button onClick={handleExport} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-white/5 rounded-lg text-xs font-bold text-slate-600 dark:text-zinc-300">
                 <FileText size={14}/> Xuất JSON
@@ -577,17 +729,35 @@ export default function AdminDocumentVault() {
              <table className="w-full text-left min-w-[1200px]">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
+                   <th className="px-6 py-4 whitespace-nowrap">
+                     <input 
+                       type="checkbox"
+                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                       checked={selectedIds.length === documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).length && documents.length > 0}
+                       onChange={(e) => {
+                         if (e.target.checked) {
+                           setSelectedIds(documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).map(d => d.id));
+                         } else {
+                           setSelectedIds([]);
+                         }
+                       }}
+                     />
+                   </th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Định dạng</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên file gốc</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên hiển thị</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Giá</th>
+                   {fileTab === 'vip' && (
+                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Vip Code</th>
+                   )}
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày tạo</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ghi chú</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                 {documents.filter(d => !d.isDeleted).map(docItem => (
+                 {documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).map(docItem => (
                    <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                      <td className="px-6 py-4">
                        <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-widest shrink-0">
@@ -600,7 +770,7 @@ export default function AdminDocumentVault() {
                        </div>
                      </td>
                      <td className="px-6 py-4">
-                       <span className="text-sm font-bold text-slate-800 dark:text-zinc-200 whitespace-nowrap">{docItem.name}</span>
+                        <TruncatedName name={docItem.name} maxLength={25} />
                      </td>
                      <td className="px-6 py-4">
                         <select 
@@ -614,6 +784,13 @@ export default function AdminDocumentVault() {
                           {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                      </td>
+                     {fileTab === 'vip' && (
+                       <td className="px-6 py-4">
+                         <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg tracking-[0.1em]">
+                           {docItem.vipCode || "N/A"}
+                         </span>
+                       </td>
+                     )}
                      <td className="px-6 py-4">
                         <span className="text-xs text-slate-500">{docItem.createdAt?.toDate ? docItem.createdAt.toDate().toLocaleDateString('vi-VN') : 'N/A'}</span>
                      </td>
@@ -622,8 +799,11 @@ export default function AdminDocumentVault() {
                           {docItem.note || "---"}
                         </p>
                      </td>
-                     <td className="px-6 py-4 text-right">
+                     <td className="px-6 py-4 text-right sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setEditingDoc(docItem)} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Sửa thông tin">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
                           <button onClick={() => downloadDocument(docItem)} className="p-2 text-slate-400 hover:text-emerald-600" title="Tải xuống"><FileText className="w-4 h-4" /></button>
                            <a href={`https://github.com/${ghConfig?.owner}/${ghConfig?.repo}/tree/main/${docItem.githubPath}`} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-indigo-600" title="Xem file"><FolderOpen className="w-4 h-4" /></a>
                           <button 
@@ -676,14 +856,28 @@ export default function AdminDocumentVault() {
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên gốc</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày xóa</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                   {documents.filter(d => d.isDeleted).map(docItem => (
                     <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                      <td className="px-6 py-4">
+                        <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          checked={selectedIds.includes(docItem.id)}
+                          onChange={(e) => {
+                             if (e.target.checked) {
+                               setSelectedIds(prev => [...prev, docItem.id]);
+                             } else {
+                               setSelectedIds(prev => prev.filter(id => id !== docItem.id));
+                             }
+                          }}
+                        />
+                      </td>
                        <td className="px-6 py-4 whitespace-nowrap">
-                         <span className="font-bold text-sm text-slate-700 dark:text-zinc-300">{docItem.name}</span>
+                        <TruncatedName name={docItem.name} maxLength={25} />
                        </td>
                        <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.originalName}</td>
                        <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.categoryName}</td>
@@ -692,7 +886,7 @@ export default function AdminDocumentVault() {
                            {docItem.deletedAt ? new Date(docItem.deletedAt?.seconds * 1000).toLocaleString() : 'N/A'}
                          </span>
                        </td>
-                       <td className="px-6 py-4 text-right whitespace-nowrap">
+                       <td className="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
                           <div className="flex gap-2 justify-end">
                             <button 
                                onClick={() => handleRestoreFile(docItem)}
@@ -762,8 +956,8 @@ export default function AdminDocumentVault() {
                   
                   <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                     {uploadItems.map(item => (
-                      <div key={item.id} className="relative flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 p-4 lg:p-0 bg-slate-50 dark:bg-zinc-925 lg:bg-transparent lg:dark:bg-transparent border lg:border-0 border-slate-200 dark:border-white/5 rounded-2xl lg:rounded-none">
-                         <div className="lg:col-span-2 flex flex-col justify-center">
+                      <div key={item.id} className="relative flex flex-col lg:grid lg:grid-cols-[1.5fr_2.5fr_2fr_2fr_1fr_1.5fr_1fr] gap-3 p-4 lg:p-0 bg-slate-50 dark:bg-zinc-925 lg:bg-transparent lg:dark:bg-transparent border lg:border-0 border-slate-200 dark:border-white/5 rounded-2xl lg:rounded-none">
+                         <div className="flex flex-col justify-center">
                             <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tên file gốc</label>
                             <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth px-1">
                                <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
@@ -771,7 +965,7 @@ export default function AdminDocumentVault() {
                             </div>
                          </div>
                          
-                         <div className="lg:col-span-3 flex flex-col justify-center">
+                         <div className="flex flex-col justify-center">
                             <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tên hiển thị</label>
                             <input 
                               type="text" 
@@ -783,7 +977,7 @@ export default function AdminDocumentVault() {
                             />
                          </div>
 
-                         <div className="lg:col-span-3 flex flex-col justify-center relative">
+                         <div className="flex flex-col justify-center relative">
                             <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Danh mục</label>
                             <select 
                               className="w-full pl-4 pr-8 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs appearance-none text-slate-900 dark:text-white font-medium transition-all"
@@ -797,7 +991,7 @@ export default function AdminDocumentVault() {
                             <ChevronRight className="absolute right-3 top-[34px] lg:top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none" />
                          </div>
 
-                         <div className="lg:col-span-2 flex flex-col justify-center">
+                         <div className="flex flex-col justify-center">
                             <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Ghi chú</label>
                             <input 
                               type="text"
@@ -808,7 +1002,28 @@ export default function AdminDocumentVault() {
                             />
                          </div>
 
-                         <div className="absolute top-3 right-12 lg:static lg:col-span-1 flex items-center justify-center">
+                         <div className="flex flex-col justify-center">
+                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Vip Code</label>
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="checkbox"
+                                checked={item.isVip}
+                                onChange={(e) => updateUploadItem(item.id, 'isVip', e.target.checked)}
+                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                              />
+                              {item.isVip && (
+                                <input 
+                                  type="text"
+                                  placeholder="Code"
+                                  className="w-full px-2 py-1 rounded border border-slate-200 dark:border-white/10 text-[10px] bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-indigo-500/20"
+                                  value={item.vipCode}
+                                  onChange={(e) => updateUploadItem(item.id, 'vipCode', e.target.value)}
+                                />
+                              )}
+                            </div>
+                         </div>
+
+                         <div className="absolute top-3 right-12 lg:static flex items-center justify-center gap-2">
                             <button 
                                type="button"
                                onClick={() => updateUploadItem(item.id, 'hidden', !item.hidden)}
@@ -907,7 +1122,7 @@ export default function AdminDocumentVault() {
                      </div>
                      <div className="flex gap-2 mt-2 sm:mt-0">
                        <button onClick={() => openEditCategory(cat)} className="text-blue-500 p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all">
-                             <Settings className="w-4 h-4" />
+                             <Edit2 className="w-4 h-4" />
                        </button>
                        <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-rose-500 p-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all">
                           <Trash2 className="w-4 h-4" />
@@ -923,3 +1138,179 @@ export default function AdminDocumentVault() {
     </div>
   );
 }
+
+const TruncatedName = ({ name, maxLength = 30 }: { name: string; maxLength?: number }) => {
+  const [showFull, setShowFull] = useState(false);
+  const isTruncated = name.length > maxLength;
+  const displayName = isTruncated && !showFull ? name.substring(0, maxLength) + '...' : name;
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">
+        {displayName}
+      </span>
+      {isTruncated && (
+        <button 
+          onClick={() => setShowFull(!showFull)}
+          className="text-[10px] text-indigo-500 hover:underline font-bold uppercase tracking-widest shrink-0"
+        >
+          {showFull ? 'Thu gọn' : 'Xem thêm'}
+        </button>
+      )}
+    </div>
+  );
+};
+
+const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any) => {
+  const [formData, setFormData] = useState({
+    name: doc.name,
+    categoryId: doc.categoryId,
+    note: doc.note || '',
+    isVip: doc.isVip || false,
+    vipCode: doc.vipCode || '',
+    hidden: doc.hidden || false,
+    price: doc.price || 0,
+    salePrice: doc.salePrice || 0
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onConfirm(doc.id, {
+      ...formData,
+      categoryName: categories.find((c: any) => c.id === formData.categoryId)?.name || 'Khác'
+    });
+  };
+
+  return (
+    <div className={cn("fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all", isOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
+      <div className={cn("bg-white dark:bg-zinc-925 w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5 overflow-hidden transform transition-all duration-300", isOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4")}>
+        <div className="p-8 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+           <div>
+              <h3 className="text-xl font-black text-slate-800 dark:text-zinc-200 uppercase tracking-tighter">Sửa thông tin tài liệu</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cập nhật chi tiết cho tệp tin của bạn</p>
+           </div>
+           <button onClick={onClose} className="p-3 rounded-2xl bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-rose-500 transition-all">
+              <X size={20} />
+           </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Tên hiển thị</label>
+                 <input 
+                   type="text"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.name}
+                   onChange={e => setFormData({ ...formData, name: e.target.value })}
+                   required
+                 />
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Danh mục</label>
+                 <select 
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all appearance-none"
+                   value={formData.categoryId}
+                   onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
+                   required
+                 >
+                    {categories.map((cat: any) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                 </select>
+              </div>
+           </div>
+
+           <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Ghi chú</label>
+              <textarea 
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all min-h-[100px]"
+                value={formData.note}
+                onChange={e => setFormData({ ...formData, note: e.target.value })}
+              />
+           </div>
+
+           <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Giá niên yết (VNĐ)</label>
+                 <input 
+                   type="number"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.price}
+                   onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
+                 />
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Giá khuyến mãi (VNĐ)</label>
+                 <input 
+                   type="number"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.salePrice}
+                   onChange={e => setFormData({ ...formData, salePrice: Number(e.target.value) })}
+                 />
+              </div>
+           </div>
+
+           <div className="flex flex-wrap gap-6 p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3">
+                 <div className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={formData.isVip}
+                      onChange={e => setFormData({ ...formData, isVip: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                 </div>
+                 <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-zinc-400">Tài liệu VIP</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                 <div className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={formData.hidden}
+                      onChange={e => setFormData({ ...formData, hidden: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                 </div>
+                 <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-zinc-400">Ẩn tài liệu</span>
+              </div>
+           </div>
+
+           {formData.isVip && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                 <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Mã Code VIP</label>
+                 <input 
+                   type="text"
+                   placeholder="Nhập mã code bảo mật..."
+                   className="w-full px-5 py-4 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-xs font-black tracking-widest text-indigo-600 outline-none transition-all"
+                   value={formData.vipCode}
+                   onChange={e => setFormData({ ...formData, vipCode: e.target.value })}
+                   required={formData.isVip}
+                 />
+              </div>
+           )}
+
+           <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="submit"
+                className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                Lưu thay đổi
+              </button>
+           </div>
+        </form>
+      </div>
+    </div>
+  );
+};

@@ -2083,7 +2083,7 @@ export default function AdminDashboard() {
                 { id: 'pdf-merger', title: 'Ghép PDF', icon: FilePlus },
                 { id: 'pdf-splitter', title: 'Tách PDF', icon: Scissors }
               ].map((util) => (
-                <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                <div key={`native-util-${util.id}`} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                       <util.icon className="w-4 h-4" />
@@ -2128,7 +2128,12 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                   {allUtilities.map((util) => (
+                   {allUtilities
+                     .filter(u => ![
+                       'avatar-frame', 'file-manager', 'kho-van-ban', 'ai-scanner', 
+                       'image-to-pdf', 'pdf-to-word', 'pdf-merger', 'pdf-splitter'
+                     ].includes(u.id))
+                     .map((util) => (
                       <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">

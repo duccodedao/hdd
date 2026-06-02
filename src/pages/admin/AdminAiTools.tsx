@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Sparkles, Plus, Edit2, Trash2, X, Download, Upload } from 'lucide-react';
+import { Sparkles, Plus, Edit2, Trash2, X, Download, Upload, Square, CheckSquare, Trash } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useConfirmStore } from '../../store/confirmStore';
 import * as XLSX from 'xlsx';
@@ -11,6 +11,7 @@ export default function AdminAiTools() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { openConfirm } = useConfirmStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [conflicts, setConflicts] = useState<any[]>([]);
@@ -20,7 +21,9 @@ export default function AdminAiTools() {
     logoUrl: '',
     name: '',
     description: '',
-    url: ''
+    url: '',
+    price: 0,
+    salePrice: 0
   });
 
   useEffect(() => {
@@ -42,6 +45,42 @@ export default function AdminAiTools() {
     return () => unsub();
   }, []);
 
+  const toggleSelectAll = () => {
+    if (selectedIds.length === tools.length && tools.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(tools.map(t => t.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    openConfirm({
+      title: 'Xóa hàng loạt AI Tools?',
+      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} công cụ AI đã chọn không?`,
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          selectedIds.forEach(id => {
+            batch.delete(doc(db, 'ai_tools', id));
+          });
+          await batch.commit();
+          toast.success(`Đã xóa ${selectedIds.length} công cụ AI`);
+          setSelectedIds([]);
+        } catch (error: any) {
+          toast.error('Lỗi khi xóa hàng loạt: ' + (error.message || 'Unknown'));
+        }
+      }
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.url.trim()) {
@@ -53,11 +92,15 @@ export default function AdminAiTools() {
       if (editingId) {
         await updateDoc(doc(db, 'ai_tools', editingId), {
           ...formData,
+          price: Number(formData.price),
+          salePrice: Number(formData.salePrice)
         });
         toast.success("Cập nhật thành công");
       } else {
         await addDoc(collection(db, 'ai_tools'), {
           ...formData,
+          price: Number(formData.price),
+          salePrice: Number(formData.salePrice),
           createdAt: serverTimestamp()
         });
         toast.success("Thêm thành công");
@@ -71,7 +114,7 @@ export default function AdminAiTools() {
   };
 
   const resetForm = () => {
-    setFormData({ logoUrl: '', name: '', description: '', url: '' });
+    setFormData({ logoUrl: '', name: '', description: '', url: '', price: 0, salePrice: 0 });
     setEditingId(null);
   };
 
@@ -80,7 +123,9 @@ export default function AdminAiTools() {
       logoUrl: tool.logoUrl || '',
       name: tool.name || '',
       description: tool.description || '',
-      url: tool.url || ''
+      url: tool.url || '',
+      price: tool.price || 0,
+      salePrice: tool.salePrice || 0
     });
     setEditingId(tool.id);
     setIsModalOpen(true);
@@ -110,7 +155,9 @@ export default function AdminAiTools() {
         logoUrl: "https://example.com/logo.png",
         name: "ChatGPT",
         description: "Mô tả ngắn gọn ...",
-        url: "https://chatgpt.com/"
+        url: "https://chatgpt.com/",
+        price: 0,
+        salePrice: 0
       }
     ];
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -130,7 +177,9 @@ export default function AdminAiTools() {
         "Logo URL": tool.logoUrl || '',
         "Tên AI": tool.name || '',
         "Mô tả": tool.description || '',
-        "Đường dẫn": tool.url || ''
+        "Đường dẫn": tool.url || '',
+        "Giá gốc": tool.price || 0,
+        "Giá bán": tool.salePrice || 0
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -167,8 +216,8 @@ export default function AdminAiTools() {
             const nonConflicts: any[] = [];
 
             for (const row of data) {
-              const name = String(row.name || '').trim();
-              const url = String(row.url || '').trim();
+              const name = String(row.name || row["Tên AI"] || '').trim();
+              const url = String(row.url || row["Đường dẫn"] || '').trim();
               if (name && url) {
                 // Find duplicate by name or URL (case insensitive)
                 const existing = tools.find(t => 
@@ -176,10 +225,12 @@ export default function AdminAiTools() {
                   t.url.toLowerCase() === url.toLowerCase()
                 );
                 const itemData = {
-                  logoUrl: String(row.logoUrl || '').trim(),
+                  logoUrl: String(row.logoUrl || row["Logo URL"] || '').trim(),
                   name,
-                  description: String(row.description || '').trim(),
-                  url
+                  description: String(row.description || row["Mô tả"] || '').trim(),
+                  url,
+                  price: Number(row.price || row["Giá gốc"] || 0),
+                  salePrice: Number(row.salePrice || row["Giá bán"] || 0)
                 };
                 if (existing) {
                   detectedConflicts.push({
@@ -222,18 +273,21 @@ export default function AdminAiTools() {
 
   return (
     <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-indigo-500" />
-          Quản Lý Hệ Sinh Thái AI
-        </h3>
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={handleExportExcel} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-indigo-500" />
+            Quản Lý Hệ Sinh Thái AI
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Cung cấp danh mục công cụ AI đa dạng cho người dùng</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition shadow-md shadow-emerald-600/20">
             <Download className="w-4 h-4" /> Xuất Excel
           </button>
 
-          <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition">
-            <Download className="w-4 h-4" /> Import Template
+          <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-2xl text-xs font-bold uppercase tracking-widest transition">
+            <Download className="w-4 h-4" /> Template
           </button>
           
           <input 
@@ -243,48 +297,93 @@ export default function AdminAiTools() {
              ref={fileInputRef}
              onChange={handleImport}
           />
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition">
-            <Upload className="w-4 h-4" /> Thêm nhanh (Excel)
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-2xl text-xs font-bold uppercase tracking-widest transition">
+            <Upload className="w-4 h-4" /> Import Excel
           </button>
           
-          <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition shadow-sm">
+          <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition shadow-md shadow-blue-600/20">
             <Plus className="w-4 h-4" /> Thêm thủ công
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
-              <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Logo AI</th>
-              <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tên AI</th>
-              <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Mô tả</th>
-              <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Liên kết</th>
-              <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+      {selectedIds.length > 0 && (
+        <div className="mb-6 flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold">
+              {selectedIds.length}
+            </div>
+            <span className="text-sm font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider">AI Tool đã chọn</span>
+          </div>
+          <button 
+            onClick={handleBulkDelete}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-rose-700 transition-all shadow-md shadow-rose-600/20"
+          >
+            <Trash size={14} /> Xóa vĩnh viễn
+          </button>
+        </div>
+      )}
+
+      <div className="overflow-x-auto no-scrollbar scroll-smooth border border-slate-200 dark:border-white/10 rounded-2xl">
+        <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1200px]">
+          <colgroup>
+            <col className="w-12 text-center" />
+            <col className="w-24" />
+            <col className="w-56" />
+            <col className="w-80" />
+            <col className="w-32" />
+            <col className="w-32" />
+            <col className="w-48" />
+            <col className="w-32 text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20" />
+          </colgroup>
+          <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
+            <tr className="text-slate-500">
+              <th className="p-4 border-b border-slate-100 dark:border-white/5">
+                <button 
+                  onClick={toggleSelectAll} 
+                  className="text-slate-400 hover:text-indigo-600 transition-colors"
+                  disabled={tools.length === 0}
+                >
+                  {selectedIds.length === tools.length && tools.length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
+                </button>
+              </th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Logo AI</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Tên AI</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Mô tả giới thiệu</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá gốc</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá bán</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Liên kết nguồn</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+          <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
             {tools.map((tool) => (
-              <tr key={tool.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02]">
-                <td className="p-4">
+              <tr key={tool.id} className="hover:bg-slate-50/5 dark:hover:bg-white/[0.01] transition-colors group">
+                <td className="p-4 align-middle text-center">
+                  <button onClick={() => toggleSelect(tool.id)} className={selectedIds.includes(tool.id) ? "text-indigo-600" : "text-slate-300"}>
+                    {selectedIds.includes(tool.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                  </button>
+                </td>
+                <td className="p-4 align-middle">
                   {tool.logoUrl ? (
-                    <img src={tool.logoUrl} alt={tool.name} className="w-8 h-8 rounded-lg object-cover" />
+                    <img src={tool.logoUrl} alt={tool.name} className="w-10 h-10 rounded-xl object-cover shadow-sm bg-slate-100 border border-slate-200 dark:border-white/10" />
                   ) : (
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/5 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-slate-400" />
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-white/10">
+                      <Sparkles className="w-5 h-5 text-slate-300" />
                     </div>
                   )}
                 </td>
-                <td className="p-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">{tool.name}</td>
-                <td className="p-4 text-sm text-slate-600 dark:text-slate-400 max-w-xs">{tool.description}</td>
-                <td className="p-4 text-sm whitespace-nowrap"><a href={tool.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{tool.url}</a></td>
-                <td className="p-4 text-right whitespace-nowrap">
-                  <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => handleEdit(tool)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg">
+                <td className="p-4 align-middle text-slate-900 dark:text-stone-100 whitespace-nowrap font-bold">{tool.name}</td>
+                <td className="p-4 align-middle text-xs text-slate-500 dark:text-slate-455 line-clamp-2 mt-4">{tool.description}</td>
+                <td className="p-4 align-middle font-mono text-xs text-slate-600 dark:text-slate-500">{tool.price?.toLocaleString() || 0}</td>
+                <td className="p-4 align-middle font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold">{tool.salePrice?.toLocaleString() || 0}</td>
+                <td className="p-4 align-middle text-xs whitespace-nowrap text-blue-500 truncate max-w-xs "><a href={tool.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{tool.url}</a></td>
+                <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 backdrop-blur-sm shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button onClick={() => handleEdit(tool)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(tool.id!)} className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg">
+                    <button onClick={() => handleDelete(tool.id!)} className="p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -293,7 +392,7 @@ export default function AdminAiTools() {
             ))}
             {tools.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-slate-500 font-medium">Bạn chưa thêm công cụ AI nào.</td>
+                <td colSpan={8} className="p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Bạn chưa thêm công cụ AI nào.</td>
               </tr>
             )}
           </tbody>
@@ -301,34 +400,50 @@ export default function AdminAiTools() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-lg overflow-hidden shadow-xl border border-slate-200 dark:border-zinc-800">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-white/5">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">{editingId ? 'Cập nhật AI Tool' : 'Thêm AI Tool'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 p-6 md:p-8 text-left">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100 dark:border-white/5">
+              <div className="space-y-1">
+                 <h3 className="font-bold text-xl text-slate-900 dark:text-white uppercase tracking-tight">{editingId ? 'Cập nhật AI Tool' : 'Thêm AI Tool Mới'}</h3>
+                 <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Thông tin cấu hình công cụ</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/5 rounded-full transition-all">
                <X className="w-5 h-5"/>
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Logo URL</label>
-                <input value={formData.logoUrl} onChange={e => setFormData({...formData, logoUrl: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/50 text-sm" placeholder="https://..." />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Tên công cụ AI (*)</label>
+                  <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" placeholder="Ví dụ: ChatGPT Plus" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Đường dẫn truy cập (*)</label>
+                  <input required value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" placeholder="https://chatgpt.com" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Logo URL (Icon)</label>
+                  <input value={formData.logoUrl} onChange={e => setFormData({...formData, logoUrl: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" placeholder="https://..." />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Giá gốc (VNĐ)</label>
+                  <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Giá bán (VNĐ)</label>
+                  <input type="number" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Mô tả ngắn gọn</label>
+                  <textarea rows={3} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm resize-none transition-all" placeholder="Mô tả công dụng và tính năng chính..." />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tên AI (*)</label>
-                <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/50 text-sm" placeholder="Ví dụ: ChatGPT" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Mô tả</label>
-                <textarea rows={2} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/50 text-sm resize-none" placeholder="Mô tả công dụng..." />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Đường dẫn (*)</label>
-                <input required value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/50 text-sm" placeholder="https://..." />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl font-medium text-sm">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Lưu lại</button>
+              <div className="flex justify-end gap-3 pt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all">Hủy bỏ</button>
+                <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2">
+                   {editingId ? <Edit2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                   {editingId ? 'Cập nhật' : 'Thêm công cụ'}
+                </button>
               </div>
             </form>
           </div>
@@ -337,7 +452,7 @@ export default function AdminAiTools() {
 
       {conflicts.length > 0 && currentConflictIdx < conflicts.length && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl border border-rose-100 dark:border-rose-500/10 p-6 space-y-6">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl border border-rose-100 dark:border-rose-500/10 p-6 space-y-6">
             <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
               <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-500">
                 <Sparkles className="w-5 h-5 animate-pulse" />
@@ -424,6 +539,8 @@ export default function AdminAiTools() {
                         name: conflict.imported.name,
                         description: conflict.imported.description,
                         url: conflict.imported.url,
+                        price: conflict.imported.price,
+                        salePrice: conflict.imported.salePrice
                       });
                       toast.success(`Đã ghi đè công cụ "${conflict.imported.name}" thành công!`);
                       if (currentConflictIdx + 1 >= conflicts.length) {
@@ -475,7 +592,9 @@ export default function AdminAiTools() {
                           logoUrl: conflict.imported.logoUrl,
                           name: conflict.imported.name,
                           description: conflict.imported.description,
-                          url: conflict.imported.url
+                          url: conflict.imported.url,
+                          price: conflict.imported.price,
+                          salePrice: conflict.imported.salePrice
                         });
                       }
                       toast.success(`Đã ghi đè thành công tất cả ${remaining.length} công cụ!`);

@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Sparkles, ExternalLink, Search, X } from 'lucide-react';
+import { Sparkles, ExternalLink, Search, X, Lock } from 'lucide-react';
+import { PaymentDialog } from '../components/payment/PaymentDialog';
+import { useAuthStore } from '../store/authStore';
+import toast from 'react-hot-toast';
 
 export default function AiTools() {
   const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTool, setSelectedTool] = useState<any | null>(null);
+  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; item: any | null }>({
+    isOpen: false,
+    item: null
+  });
+  const { user, isAdmin, isSuperAdmin } = useAuthStore();
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'ai_tools'), (snapshot) => {
@@ -31,6 +39,37 @@ export default function AiTools() {
     tool.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tool.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleAccess = (tool: any) => {
+    if (tool.price > 0 && !isAdmin && !isSuperAdmin) {
+      const checkPaid = async () => {
+        try {
+          const q = query(
+            collection(db, 'invoices'), 
+            where('userId', '==', user?.uid),
+            where('status', '==', 'paid')
+          );
+          const snap = await getDocs(q);
+          const hasPaid = snap.docs.some(doc => {
+            const data = doc.data();
+            return data.items?.some((i: any) => i.itemId === tool.id);
+          });
+
+          if (!hasPaid) {
+            setPaymentDialog({ isOpen: true, item: tool });
+            return;
+          }
+
+          window.open(tool.url, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+          window.open(tool.url, '_blank', 'noopener,noreferrer');
+        }
+      };
+      checkPaid();
+      return;
+    }
+    window.open(tool.url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="max-w-[1800px] mx-auto py-8 lg:py-12 space-y-8 animate-fade-in no-scrollbar px-4 bg-transparent min-h-screen">
@@ -65,15 +104,13 @@ export default function AiTools() {
                 <col className="w-28 sm:w-36 shrink-0" />
               </colgroup>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                {filteredTools.map((tool) => (
+                 {filteredTools.map((tool) => (
                    <tr key={tool.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02]">
                     {/* Fixed Logo Column */}
                     <td className="p-4 w-16 sticky left-0 bg-white dark:bg-zinc-950 z-10 border-r border-slate-100 dark:border-white/5 overflow-hidden shrink-0">
-                      <a 
-                        href={tool.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="block hover:scale-105 active:scale-95 transition-transform"
+                      <div 
+                        onClick={() => handleAccess(tool)}
+                        className="block hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                       >
                         {tool.logoUrl ? (
                           <div className="w-10 h-10 rounded-xl border border-slate-200 dark:border-white/10 p-1 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden shrink-0">
@@ -84,22 +121,28 @@ export default function AiTools() {
                             <Sparkles className="w-5 h-5 text-slate-400" />
                           </div>
                         )}
-                      </a>
+                      </div>
                     </td>
                     
                     {/* AI Title Column */}
                     <td className="p-4 overflow-hidden min-w-0">
                        <div className="flex flex-col justify-center min-w-0 overflow-hidden">
-                         <div className="flex items-center min-w-0">
-                           <a 
-                             href={tool.url} 
-                             target="_blank" 
-                             rel="noopener noreferrer" 
+                         <div className="flex items-center min-w-0 gap-2">
+                           <div 
+                             onClick={() => handleAccess(tool)}
                              className="inline-flex items-center gap-1.5 font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group cursor-pointer text-sm sm:text-base max-w-full min-w-0"
                            >
                              <span className="truncate block font-bold leading-tight">{tool.name}</span>
                              <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 animate-fade-in" />
-                           </a>
+                           </div>
+                           {tool.price > 0 && (
+                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                               <Lock size={10} className="text-indigo-500" />
+                               <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                                 {tool.salePrice ? tool.salePrice.toLocaleString() : tool.price.toLocaleString()}đ
+                               </span>
+                             </div>
+                           )}
                          </div>
                          {tool.description && (
                            <p className="hidden md:block text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed max-w-4xl text-left">
@@ -178,18 +221,31 @@ export default function AiTools() {
               >
                 Đóng
               </button>
-              <a 
-                href={selectedTool.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button 
+                onClick={() => {
+                  const tool = selectedTool;
+                  setSelectedTool(null);
+                  handleAccess(tool);
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs uppercase tracking-widest transition shadow-lg shadow-indigo-600/20 text-center"
               >
                 Mở AI <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <PaymentDialog 
+        isOpen={paymentDialog.isOpen}
+        onClose={() => setPaymentDialog({ isOpen: false, item: null })}
+        item={paymentDialog.item}
+        onPaid={() => {
+          if (paymentDialog.item) {
+            window.open(paymentDialog.item.url, '_blank', 'noopener,noreferrer');
+          }
+        }}
+      />
     </div>
   );
 }

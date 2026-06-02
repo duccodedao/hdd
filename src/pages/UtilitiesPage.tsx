@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
@@ -18,6 +18,7 @@ import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
+import { PaymentDialog } from '../components/payment/PaymentDialog';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -309,6 +310,10 @@ export default function UtilitiesPage() {
   const [systemTools, setSystemTools] = useState<any>({});
   const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
   const [realUsers, setRealUsers] = useState<any[]>([]);
+  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; item: any | null }>({
+    isOpen: false,
+    item: null
+  });
   const { setAiActive } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
 
@@ -356,6 +361,36 @@ export default function UtilitiesPage() {
       toast.error('Tiện ích này chỉ dành cho người dùng nội bộ/có ủy quyền.', { icon: '🔐' });
       return;
     }
+
+    // Check payment if priced
+    if ((item as any).price > 0 && !isAdmin && !isSuperAdmin) {
+      // Check if already paid
+      const checkPaid = async () => {
+        try {
+          const q = query(
+            collection(db, 'invoices'), 
+            where('userId', '==', user?.uid),
+            where('status', '==', 'paid')
+          );
+          const snap = await getDocs(q);
+          const hasPaid = snap.docs.some(doc => {
+            const data = doc.data();
+            return data.items?.some((i: any) => i.itemId === item.id);
+          });
+
+          if (!hasPaid) {
+            setPaymentDialog({ isOpen: true, item });
+            return;
+          }
+
+          navigate(`/utilities/${item.id}`);
+        } catch (e) {
+          navigate(`/utilities/${item.id}`);
+        }
+      };
+      checkPaid();
+      return;
+    }
     
     navigate(`/utilities/${item.id}`);
   };
@@ -394,7 +429,27 @@ export default function UtilitiesPage() {
   useEffect(() => {
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
+      const dbUtils = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem));
+      
+      // Override native tools with DB tool overrides
+      const overriddenNative = nativeUtilities.map(nu => {
+        const override = dbUtils.find(dbu => dbu.id === nu.id);
+        if (override) {
+          return { 
+            ...nu, 
+            ...override, 
+            description: override.description || nu.description,
+            title: override.title || nu.title
+          };
+        }
+        return nu;
+      });
+
+      // Filter out ONLY embedded tools from DB (ones that ARE NOT native tool overrides)
+      const embeddedTools = dbUtils.filter(dbu => !nativeUtilities.some(nu => nu.id === dbu.id));
+      
+      // Combined list: Overridden natives first, then embedded tools
+      setUtilities([...overriddenNative, ...embeddedTools]);
       setLoading(false);
     }, (err) => {
       console.error("UtilitiesPage utilities listener error:", err?.message || String(err));
@@ -408,7 +463,9 @@ export default function UtilitiesPage() {
     const unsubUsers = onSnapshot(userQ, (snapshot) => {
       const users = snapshot.docs.map(doc => doc.data());
       // Lấy các users có ảnh đại diện, lọc trùng lặp và lấy ngẫu nhiên/hoặc 20 user
-      const withAvatars = users.filter((u: any) => u.photoURL);
+      const withAvatars = users
+        .filter((u: any) => u.photoURL)
+        .map((u: any) => ({ photoURL: u.photoURL, displayName: u.displayName || 'User' }));
       setRealUsers(withAvatars);
     }, () => {});
 
@@ -420,9 +477,7 @@ export default function UtilitiesPage() {
 
   const { maintenanceTabs } = useAppStore();
 
-  const filteredItems = [...nativeUtilities, ...utilities];
-
-  const allItems = filteredItems.filter(item => {
+  const allItems = utilities.filter(item => {
     const config = systemTools[item.id];
     const isInternal = config?.internal || (item as any).internalOnly;
     if (isInternal) {
@@ -607,6 +662,17 @@ export default function UtilitiesPage() {
           </div>
         </section>
       </div>
+
+      <PaymentDialog 
+        isOpen={paymentDialog.isOpen}
+        onClose={() => setPaymentDialog({ isOpen: false, item: null })}
+        item={paymentDialog.item}
+        onPaid={() => {
+          if (paymentDialog.item) {
+            navigate(`/utilities/${paymentDialog.item.id}`);
+          }
+        }}
+      />
     </div>
   );
 }
