@@ -7,7 +7,20 @@ import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, s
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
-import firebaseConfig from "./firebase-applet-config.json";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let firebaseConfig: any;
+try {
+  const configPath = path.resolve(__dirname, "./firebase-applet-config.json");
+  firebaseConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+} catch (error) {
+  console.error("Critical error reading firebase-applet-config.json:", error);
+  firebaseConfig = {};
+}
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = (firebaseConfig as any).firestoreDatabaseId 
