@@ -51,16 +51,14 @@ async function getAiClient() {
   }
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
 
-  app.use(cors());
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  app.use(cookieParser());
+app.use(cors());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(cookieParser());
 
-  // Gemini Proxy Endpoint
+// Gemini Proxy Endpoint
   app.post("/api/gemini/generate", async (req, res) => {
     try {
       const { model, contents, config } = req.body;
@@ -265,25 +263,33 @@ async function startServer() {
 
   // Proxy for Cloud Storage or other APIs would go here
 
-  // Chèn Middleware Vite hoặc serve file tĩnh
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    // Serve index.html for all undefined GET requests (SPA catch-all)
-    app.get(/.*/, (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  export default app;
+
+  async function startServer() {
+    const PORT = 3000;
+  
+    // Chèn Middleware Vite hoặc serve file tĩnh
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      // Serve index.html for all undefined GET requests (SPA catch-all)
+      app.get(/.*/, (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server đang chạy tại http://localhost:${PORT}`);
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server đang chạy tại http://localhost:${PORT}`);
-  });
-}
-
-startServer();
+  // Khởi động nội bộ khi không chạy trên Vercel Serverless
+  if (!process.env.VERCEL) {
+    startServer();
+  }
