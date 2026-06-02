@@ -89,9 +89,9 @@ app.use(cookieParser());
       const { userId, userEmail, items, totalAmount } = req.body;
       
       const referenceCode = `BMASS${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = doc(collection(db, "invoices"));
+      const invoiceRef = doc(db, "invoices", referenceCode);
       const invoiceData = {
-        id: invoiceRef.id,
+        id: referenceCode,
         userId: userId || "guest",
         userEmail: userEmail || "guest",
         items: items || [],
@@ -163,26 +163,27 @@ app.use(cookieParser());
       if (referenceCodeSearch) {
         const referenceCode = referenceCodeSearch.toUpperCase();
         
-        // Find pending invoice with this reference code
-        const invoicesSnap = await getDocs(collection(db, "invoices"));
-        const invoiceDoc = invoicesSnap.docs.find(d => {
-          const data = d.data();
-          return data.status === "pending" && data.paymentDetails?.referenceCode === referenceCode;
-        });
+        // Find pending invoice directly using its unique ID (reference code)
+        const invoiceRef = doc(db, "invoices", referenceCode);
+        const invoiceSnap = await getDoc(invoiceRef);
 
-        if (invoiceDoc) {
-          const invoiceData = invoiceDoc.data();
-          // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
-          if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
-             await updateDoc(doc(db, "invoices", invoiceDoc.id), {
-               status: "paid",
-               paidAt: Timestamp.now(),
-               "paymentDetails.sepayTransactionId": transactionId,
-               "paymentDetails.actualAmount": amount
-             });
-             console.log(`Invoice ${invoiceDoc.id} marked as PAID via SePay (Ref: ${referenceCode})`);
+        if (invoiceSnap.exists()) {
+          const invoiceData = invoiceSnap.data();
+          if (invoiceData.status === "pending") {
+            // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
+            if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
+               await updateDoc(invoiceRef, {
+                 status: "paid",
+                 paidAt: Timestamp.now(),
+                 "paymentDetails.sepayTransactionId": transactionId,
+                 "paymentDetails.actualAmount": amount
+               });
+               console.log(`Invoice ${referenceCode} marked as PAID via SePay`);
+            } else {
+               console.log(`Amount mismatch for invoice ${referenceCode}: expected ${invoiceData.totalAmount}, got ${amount}`);
+            }
           } else {
-             console.log(`Amount mismatch for invoice ${invoiceDoc.id}: expected ${invoiceData.totalAmount}, got ${amount}`);
+            console.log(`Invoice ${referenceCode} is already in state: ${invoiceData.status}`);
           }
         } else {
           console.log(`No pending invoice found for reference code: ${referenceCode}`);
