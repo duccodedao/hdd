@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -270,6 +269,7 @@ app.use(cookieParser());
   
     // Chèn Middleware Vite hoặc serve file tĩnh
     if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
