@@ -7,23 +7,7 @@ import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, s
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
-import fs from "fs";
-
-// Load firebase-applet-config.json safely at runtime without ESM import assertion issues
-let firebaseConfig: any;
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-} catch (err) {
-  console.error("Failed to load firebase-applet-config.json from cwd:", err);
-  try {
-    const configPathBackup = new URL("./firebase-applet-config.json", import.meta.url);
-    firebaseConfig = JSON.parse(fs.readFileSync(configPathBackup, "utf8"));
-  } catch (errBackup) {
-    console.error("Failed to load firebase-applet-config.json from backup url:", errBackup);
-    firebaseConfig = {};
-  }
-}
+import firebaseConfig from "./firebase-applet-config.json";
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = (firebaseConfig as any).firestoreDatabaseId 
