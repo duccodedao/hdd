@@ -588,6 +588,7 @@ export default function App() {
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
               <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
               <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
+              <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />

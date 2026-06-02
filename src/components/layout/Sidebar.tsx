@@ -319,6 +319,25 @@ export default function Sidebar({ className }: { className?: string }) {
                   </NavLink>
                 )}
 
+                {/* Trang cá nhân NavLink */}
+                {user && (
+                  <NavLink
+                    to="/profile"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm font-semibold" 
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <UserCircle className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/profile' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/profile' && "font-semibold")}>Trang cá nhân</span>
+                    </div>
+                  </NavLink>
+                )}
+
               </motion.div>
             )}
           </AnimatePresence>

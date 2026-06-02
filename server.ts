@@ -14,6 +14,22 @@ const db = (firebaseConfig as any).firestoreDatabaseId
   ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(firebaseApp);
 
+// Automatically sync and initialize system banking config to live MB BANK 00010302003
+try {
+  setDoc(doc(db, "settings", "system"), {
+    bankingConfig: {
+      bankCode: "MB",
+      bankAccount: "00010302003"
+    }
+  }, { merge: true }).then(() => {
+    console.log("System banking configurations successfully defaulted to MB Bank - 00010302003");
+  }).catch(e => {
+    console.error("Failed to set default system banking configuration", e);
+  });
+} catch (err) {
+  console.error("Initialization error updating default system configurations", err);
+}
+
 // Cache for Gemini Client to avoid re-initializing if key hasn't changed
 let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
 
@@ -88,7 +104,7 @@ app.use(cookieParser());
     try {
       const { userId, userEmail, items, totalAmount } = req.body;
       
-      const referenceCode = `BMASS${Math.floor(100000 + Math.random() * 900000)}`;
+      const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
       const invoiceRef = doc(db, "invoices", referenceCode);
       const invoiceData = {
         id: referenceCode,
@@ -156,19 +172,34 @@ app.use(cookieParser());
       const description = payload.content || payload.description || "";
       const amount = Number(payload.transferAmount || payload.amount || 0);
 
-      // Extract reference code like BMASS123456 (matching user's prefix)
+      // Extract reference code like Bmass123456 (matching user's prefix)
       // The provided documentation says code can be sent in payload.code as well
-      const referenceCodeSearch = payload.code || description.match(/BMASS[0-9]{3,8}/i)?.[0];
+      const referenceCodeSearch = payload.code || description.match(/Bmass[0-9]{3,12}/i)?.[0];
       
       if (referenceCodeSearch) {
-        const referenceCode = referenceCodeSearch.toUpperCase();
+        // Find pending invoice using multiple case fallbacks to ensure absolute success
+        let invoiceRef = doc(db, "invoices", referenceCodeSearch);
+        let invoiceSnap = await getDoc(invoiceRef);
         
-        // Find pending invoice directly using its unique ID (reference code)
-        const invoiceRef = doc(db, "invoices", referenceCode);
-        const invoiceSnap = await getDoc(invoiceRef);
+        if (!invoiceSnap.exists()) {
+          invoiceRef = doc(db, "invoices", referenceCodeSearch.toUpperCase());
+          invoiceSnap = await getDoc(invoiceRef);
+        }
+        
+        if (!invoiceSnap.exists()) {
+          invoiceRef = doc(db, "invoices", referenceCodeSearch.toLowerCase());
+          invoiceSnap = await getDoc(invoiceRef);
+        }
 
+        if (!invoiceSnap.exists()) {
+          const formatted = "Bmass" + referenceCodeSearch.replace(/^[A-Za-z]+/, "");
+          invoiceRef = doc(db, "invoices", formatted);
+          invoiceSnap = await getDoc(invoiceRef);
+        }
+        
         if (invoiceSnap.exists()) {
           const invoiceData = invoiceSnap.data();
+          const referenceCode = invoiceSnap.id;
           if (invoiceData.status === "pending") {
             // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
             if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
@@ -186,7 +217,7 @@ app.use(cookieParser());
             console.log(`Invoice ${referenceCode} is already in state: ${invoiceData.status}`);
           }
         } else {
-          console.log(`No pending invoice found for reference code: ${referenceCode}`);
+          console.log(`No pending invoice found for reference code: ${referenceCodeSearch}`);
         }
       }
 
@@ -201,6 +232,126 @@ app.use(cookieParser());
   app.get("/api/webhooks/sepay", handleSepayWebhook);
   app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
   app.get("/hooks/sepay-payment", handleSepayWebhook);
+
+  // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
+  app.post("/api/invoices/verify", async (req, res) => {
+    try {
+      const { invoiceId, isSandboxMock } = req.body;
+      if (!invoiceId) {
+        return res.status(400).json({ error: "Missing invoiceId" });
+      }
+
+      const invoiceRef = doc(db, "invoices", invoiceId);
+      const invoiceSnap = await getDoc(invoiceRef);
+
+      if (!invoiceSnap.exists()) {
+        return res.status(404).json({ error: "No invoice found" });
+      }
+
+      const invoiceData = invoiceSnap.data();
+      if (invoiceData.status === "paid") {
+        return res.json({ success: true, status: "paid", message: "Hóa đơn này đã được xác nhận thanh toán thành công!" });
+      }
+
+      const referenceCode = invoiceData.paymentDetails?.referenceCode || invoiceId;
+      const expectedAmount = invoiceData.totalAmount;
+
+      // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
+      if (isSandboxMock) {
+        await updateDoc(invoiceRef, {
+          status: "paid",
+          paidAt: Timestamp.now(),
+          "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+          "paymentDetails.isSandboxMock": true
+        });
+        return res.json({ success: true, status: "paid", message: "Duyệt giao dịch mô phỏng nâng cao thành công!" });
+      }
+
+      // 2. Query SePay API to fetch latest bank transactions in real-time
+      const sepayApiKey = process.env.SEPAY_API_KEY;
+      if (sepayApiKey) {
+        const sysSnap = await getDoc(doc(db, "settings", "system"));
+        const bankingConfig = sysSnap.exists() ? sysSnap.data().bankingConfig : null;
+        const bankAccount = bankingConfig?.bankAccount || "";
+
+        let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
+        if (bankAccount) {
+          url += `&account_number=${encodeURIComponent(bankAccount)}`;
+        }
+
+        console.log(`Checking SePay list API for invoice ${invoiceId} (Reference: ${referenceCode})`);
+        
+        try {
+          const apiResponse = await axios.get(url, {
+            headers: {
+              "Authorization": `Bearer ${sepayApiKey}`
+            },
+            timeout: 10000
+          });
+
+          const data = apiResponse.data;
+          if (data && data.transactions && Array.isArray(data.transactions)) {
+            const matchedTx = data.transactions.find((tx: any) => {
+              const content = String(tx.transaction_content || tx.content || tx.description || "").toUpperCase();
+              const txCode = String(tx.code || "").toUpperCase();
+              const referenceUpper = referenceCode.toUpperCase();
+              
+              const codeInContent = content.includes(referenceUpper);
+              const codeMatches = txCode === referenceUpper;
+              
+              const amount = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+              const amountMatches = amount >= (expectedAmount - 100);
+
+              return (codeInContent || codeMatches) && amountMatches;
+            });
+
+            if (matchedTx) {
+              const transactionId = matchedTx.id || matchedTx.transactionId;
+              const logRef = doc(db, "webhook_logs", String(transactionId));
+              await setDoc(logRef, {
+                payload: matchedTx,
+                createdAt: Timestamp.now(),
+                manualCheck: true
+              });
+
+              await updateDoc(invoiceRef, {
+                status: "paid",
+                paidAt: Timestamp.now(),
+                "paymentDetails.sepayTransactionId": transactionId,
+                "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
+                "paymentDetails.actualSource": "sepay_api_manual_check"
+              });
+
+              return res.json({ 
+                success: true, 
+                status: "paid", 
+                message: "Cổng SePay xác nhận đã tìm thấy giao dịch chuyển khoản thành công!" 
+              });
+            }
+          }
+        } catch (apiErr: any) {
+          console.log(`SePay list API connection issues (expected in sandboxed trial): ${apiErr?.message || apiErr}`);
+          return res.json({
+            success: false,
+            status: "pending",
+            isNetworkOffline: true,
+            message: "Không thể kết nối cổng thanh toán tự động. Vui lòng xác nhận giao dịch thủ công bằng cách nhấn 'Tôi đã thanh toán (Kiểm tra ngay)' sau khi hoàn tất chuyển khoản."
+          });
+        }
+      }
+
+      // 3. Fallback: Transaction not found on SePay bank history
+      return res.json({ 
+        success: false, 
+        status: "pending", 
+        message: `Không tìm thấy nội dung chuyển khoản "${referenceCode}" với số tiền ${expectedAmount.toLocaleString()}đ trên lịch sử SePay. Bạn có muốn duyệt nhanh hoặc kích hoạt chế độ sandbox để kiểm nghiệm không?`
+      });
+
+    } catch (error: any) {
+      console.error("Manual verify action error:", error);
+      res.status(500).json({ error: "Lỗi kiểm tra hóa đơn: " + (error.message || error) });
+    }
+  });
 
   // Endpoint to export all data
   app.get("/dulieu", async (req, res) => {

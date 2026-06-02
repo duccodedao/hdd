@@ -453,7 +453,18 @@ export default function Topbar() {
                       <p className="text-[9px] text-slate-500 dark:text-zinc-500 font-bold uppercase tracking-widest mt-0.5">{userData?.role || 'Member'}</p>
                     </div>
                     
-                    <div className="p-1.5">
+                    <div className="p-1.5 space-y-0.5">
+                      <button 
+                        onClick={() => {
+                          navigate('/profile');
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md transition-all text-[11px] font-medium"
+                      >
+                        <User className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+                        Trang cá nhân
+                      </button>
+
                       <button 
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-3 py-2 text-rose-500 dark:text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-500 dark:hover:bg-rose-500/10 rounded-md transition-all text-[11px] font-medium"

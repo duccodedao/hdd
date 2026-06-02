@@ -78,7 +78,8 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'normal' | 'vip'>('normal');
+  const [activeTab, setActiveTab] = useState<'normal' | 'vip' | 'paid'>('normal');
+  const [purchasedDocIds, setPurchasedDocIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'explorer'>('list');
   const [explorerCategory, setExplorerCategory] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -161,6 +162,29 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       unsubCats();
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (user) {
+      const q = query(
+        collection(db, 'invoices'),
+        where('userId', '==', user.uid),
+        where('status', '==', 'paid')
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        const ids = new Set<string>();
+        snapshot.docs.forEach(d => {
+          const data = d.data();
+          data.items?.forEach((item: any) => {
+            if (item.docId) ids.add(item.docId);
+          });
+        });
+        setPurchasedDocIds(Array.from(ids));
+      });
+      return () => unsub();
+    } else {
+      setPurchasedDocIds([]);
+    }
+  }, [user]);
 
   const loadMore = async () => {
     if (!lastDoc || loadingMore || !hasMore) return;
@@ -263,7 +287,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
     const price = docObj.salePrice || docObj.price || 0;
     if (price > 0) {
-      const hasPaid = await checkHasPaid(docObj.id);
+      const hasPaid = purchasedDocIds.includes(docObj.id);
       if (!hasPaid) {
         setPaymentDialog({ isOpen: true, doc: docObj });
         return;
@@ -308,7 +332,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
     const price = docObj.salePrice || docObj.price || 0;
     if ((price > 0 || docObj.isVip) && !isAdmin) {
-      const hasPaid = await checkHasPaid(docObj.id);
+      const hasPaid = purchasedDocIds.includes(docObj.id);
       if (!hasPaid) {
         setPaymentDialog({ isOpen: true, doc: docObj });
         return;
@@ -444,7 +468,18 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     // Non-admin can't see hidden files
     if (!isAdmin && doc.hidden) return false;
     
+    if (activeTab === 'paid') {
+      return matchesSearch && matchesCategory && matchesHighlight && purchasedDocIds.includes(doc.id);
+    }
+    
     const matchesTab = activeTab === 'vip' ? doc.isVip : !doc.isVip;
+    
+    // In normal/vip tabs, we might want to hide already purchased if requested, 
+    // but usually users want to see them and just see a "Downloaded" badge.
+    // However, the request says "file đã thanh toán sẽ được phân loại ở tab riêng", 
+    // implying they should be moved or at least exclusively shown there.
+    // Let's hide them from normal/vip if they are in the paid list to strictly follow "phân loại ở tab riêng".
+    if (purchasedDocIds.includes(doc.id)) return false;
     
     return matchesSearch && matchesCategory && matchesHighlight && matchesTab;
   });
@@ -618,22 +653,22 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         </div>
 
         {/* Tab Switcher */}
-        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-full md:w-fit border border-slate-200 dark:border-white/5">
+        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-full md:w-fit border border-slate-200 dark:border-white/5 overflow-x-auto no-scrollbar">
            <button 
              onClick={() => { setActiveTab('normal'); setSelectedIds([]); }}
              className={cn(
-               "flex-1 md:flex-initial px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
                activeTab === 'normal' 
                  ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
                  : "text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-white"
              )}
            >
-             Kho thường
+             Tất cả
            </button>
            <button 
              onClick={() => { setActiveTab('vip'); setSelectedIds([]); }}
              className={cn(
-               "flex-1 md:flex-initial px-8 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                activeTab === 'vip' 
                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
                  : "text-slate-500 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400"
@@ -641,6 +676,18 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
            >
              {activeTab === 'vip' && <Zap size={14} className="fill-white" />}
              Kho VIP
+           </button>
+           <button 
+             onClick={() => { setActiveTab('paid'); setSelectedIds([]); }}
+             className={cn(
+               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 whitespace-nowrap",
+               activeTab === 'paid' 
+                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" 
+                 : "text-slate-500 dark:text-zinc-500 hover:text-emerald-500 dark:hover:text-emerald-400"
+             )}
+           >
+             <Check size={14} />
+             Đã mua
            </button>
            <button
              onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
@@ -850,47 +897,63 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       ) : (
         <div className="space-y-10">
           <div className="overflow-x-auto">
-             <table className="min-w-[850px] lg:min-w-0 w-full text-left table-auto">
+             <table className="min-w-[850px] w-full text-left table-auto">
                <thead>
                  <tr className="border-b border-slate-100 dark:border-white/5">
-                   {isSelectionMode && <th className="px-4 py-4 whitespace-nowrap">
-                     <input 
-                        type="checkbox"
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        checked={selectedIds.length === filteredDocs.length && filteredDocs.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds(filteredDocs.map(d => d.id));
-                          } else {
-                            setSelectedIds([]);
-                          }
-                        }}
-                      />
-                   </th>}
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-20 md:w-24 text-left">Định dạng</th>
+                    {isSelectionMode && <th className="w-12 px-4 py-4 whitespace-nowrap">
+                      <label className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-300 dark:border-white/20 bg-slate-50 dark:bg-zinc-800 cursor-pointer transition-all hover:border-indigo-500 group relative">
+                        <input 
+                           type="checkbox"
+                           className="peer sr-only"
+                           checked={selectedIds.length === filteredDocs.length && filteredDocs.length > 0}
+                           onChange={(e) => {
+                             if (e.target.checked) {
+                               setSelectedIds(filteredDocs.map(d => d.id));
+                             } else {
+                               setSelectedIds([]);
+                             }
+                           }}
+                         />
+                         <div className={cn(
+                           "w-full h-full rounded-[3px] flex items-center justify-center transition-all scale-0 peer-checked:scale-100 bg-indigo-500 text-white shadow-sm",
+                           selectedIds.length === filteredDocs.length && filteredDocs.length > 0 && "scale-100"
+                         )}>
+                           <Check size={12} strokeWidth={4} />
+                         </div>
+                       </label>
+                    </th>}
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Định dạng</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-40 md:w-44">Danh mục</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-24">Giá</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Danh mục</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Giá</th>
                    {activeTab === 'vip' && isAdmin && (
-                     <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left w-32">Vip Code</th>
+                     <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Vip Code</th>
                    )}
-                   <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-48">Ngày tạo</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-20 sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
+                   <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ngày tạo</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right sticky right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm z-20 border-l border-slate-200 dark:border-white/10">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                  {filteredDocs.map((docItem) => (
                    <tr key={docItem.id} className={cn("hover:bg-slate-50 dark:hover:bg-white/5 transition-colors", selectedIds.includes(docItem.id) && "bg-indigo-50/50 dark:bg-indigo-500/5")}>
                      {isSelectionMode && <td className="px-4 py-4">
-                       <input 
-                          type="checkbox"
-                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                          checked={selectedIds.includes(docItem.id)}
-                          onChange={() => {
-                            setSelectedIds(prev => prev.includes(docItem.id) ? prev.filter(id => id !== docItem.id) : [...prev, docItem.id]);
-                          }}
-                        />
-                     </td>}
+                       <label className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-900 cursor-pointer transition-all hover:border-indigo-500 group relative">
+                         <input 
+                            type="checkbox"
+                            className="peer sr-only"
+                            checked={selectedIds.includes(docItem.id)}
+                            onChange={() => {
+                              setSelectedIds(prev => prev.includes(docItem.id) ? prev.filter(id => id !== docItem.id) : [...prev, docItem.id]);
+                            }}
+                          />
+                          <div className={cn(
+                            "w-full h-full rounded-[3px] flex items-center justify-center transition-all scale-0 peer-checked:scale-100 bg-indigo-500 text-white shadow-sm",
+                            selectedIds.includes(docItem.id) && "scale-100"
+                          )}>
+                            <Check size={12} strokeWidth={4} />
+                          </div>
+                        </label>
+                      </td>}
                      <td className="px-2 md:px-4 py-4 text-left w-20 md:w-24">
                        <span className={cn("font-mono text-[9px] md:text-[10px] px-1.5 md:px-2 py-1 rounded uppercase tracking-wider border", getFormatBadgeColor(docItem.githubPath))}>
                          {docItem.githubPath.split('.').pop()?.toUpperCase()}
@@ -922,7 +985,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                      <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
+                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap sticky right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm z-10 border-l border-slate-200 dark:border-white/10 transition-colors">
                        <div className="flex justify-center">
                          {expandedRow === docItem.id ? (
                            <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">
@@ -1032,7 +1095,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
       <PaymentDialog 
         isOpen={paymentDialog.isOpen}
         onClose={() => setPaymentDialog({ isOpen: false, doc: null })}
-        item={paymentDialog.doc ? { ...paymentDialog.doc, title: paymentDialog.doc.name, price: paymentDialog.doc.price || 0 } : null}
+        item={paymentDialog.doc ? { ...paymentDialog.doc, title: paymentDialog.doc.name, price: paymentDialog.doc.price || 0, githubUrl: paymentDialog.doc.githubUrl } : null}
         onPaid={() => {
           if (paymentDialog.doc) {
              handleDownload(paymentDialog.doc);

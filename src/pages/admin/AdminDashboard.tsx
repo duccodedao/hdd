@@ -74,8 +74,8 @@ export default function AdminDashboard() {
   const [appVersion, setAppVersion] = useState('');
   const [adminPin, setAdminPin] = useState('1234');
   const [bankingConfig, setBankingConfig] = useState({
-    bankCode: 'SACOMBANK',
-    bankAccount: 'STB_060269666879'
+    bankCode: 'MB',
+    bankAccount: '00010302003'
   });
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
