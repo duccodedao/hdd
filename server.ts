@@ -7,7 +7,7 @@ import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, s
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
-import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
+import firebaseConfig from "./firebase-applet-config.json";
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = (firebaseConfig as any).firestoreDatabaseId 
