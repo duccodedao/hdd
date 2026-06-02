@@ -117,6 +117,11 @@ async function startServer() {
 
   // SePay Webhook Endpoint (Main)
   const handleSepayWebhook = async (req: express.Request, res: express.Response) => {
+    // If it's a GET request (for testing/pinging), just return success
+    if (req.method === 'GET') {
+      return res.status(200).json({ success: true, message: "Webhook is reachable" });
+    }
+
     try {
       // 1. Validate API Key if configured
       if (process.env.SEPAY_API_KEY) {
@@ -195,7 +200,9 @@ async function startServer() {
   };
 
   app.post("/api/webhooks/sepay", handleSepayWebhook);
+  app.get("/api/webhooks/sepay", handleSepayWebhook);
   app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
+  app.get("/hooks/sepay-payment", handleSepayWebhook);
 
   // Endpoint to export all data
   app.get("/dulieu", async (req, res) => {
