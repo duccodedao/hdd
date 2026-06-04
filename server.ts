@@ -3,32 +3,31 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase/app";
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  Timestamp,
+  increment,
+  limit
+} from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json";
 
-// Initialize Firebase Admin
-try {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId
-    });
-    console.log(`Firebase Admin initialized for project: ${firebaseConfig.projectId}`);
-  }
-} catch (e) {
-  console.error("Firebase Admin initialization error:", e);
-}
-
-// Targeting the project database
+// Initialize Firebase Client SDK
+const firebaseApp = initializeApp(firebaseConfig);
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
-const db = getFirestore(databaseId);
-console.log(`Firestore Database ID: ${databaseId}`);
-
-// Helper for Firestore Timestamps
-const Timestamp = admin.firestore.Timestamp;
+const db = getFirestore(firebaseApp, databaseId);
+console.log(`Firebase Client initialized targeting project: ${firebaseConfig.projectId}, database: ${databaseId}`);
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
 // try {
@@ -52,8 +51,8 @@ let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
   async function getAiClient() {
   // 1. Try to get key from Firestore (Admin UI setup)
   try {
-    const apiKeysSnap = await db.doc("settings/apiKeys").get();
-    const firestoreKey = apiKeysSnap.exists ? apiKeysSnap.data()?.geminiApiKey : null;
+    const apiKeysSnap = await getDoc(doc(db, "settings/apiKeys"));
+    const firestoreKey = apiKeysSnap.exists() ? apiKeysSnap.data()?.geminiApiKey : null;
     
     const keyToUse = firestoreKey || process.env.GEMINI_API_KEY;
 
@@ -123,18 +122,18 @@ app.use(cookieParser());
   // Diagnostic endpoint to check Firestore connectivity
   app.get("/api/diag/firestore", async (req, res) => {
     try {
-      const testRef = db.doc("system/health_check");
-      await testRef.set({
+      const testRef = doc(db, "system/health_check");
+      await setDoc(testRef, {
         lastCheck: Timestamp.now(),
         serverNode: process.env.K_SERVICE || "local",
-        sdk: "admin"
+        sdk: "client"
       }, { merge: true });
       
-      const snap = await testRef.get();
+      const snap = await getDoc(testRef);
       res.json({ 
         status: "ok", 
         databaseId: firebaseConfig.firestoreDatabaseId || "(default)",
-        projectId: admin.app().options.projectId || "default",
+        projectId: firebaseConfig.projectId,
         data: snap.data() 
       });
     } catch (error: any) {
@@ -144,7 +143,7 @@ app.use(cookieParser());
         code: error.code,
         details: error.details,
         stack: error.stack,
-        hint: `Nếu gặp lỗi PERMISSION_DENIED (API not used/disabled), hãy truy cập link sau để kích hoạt API cho project ${admin.app().options.projectId}: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${admin.app().options.projectId}`
+        hint: `Nếu gặp lỗi PERMISSION_DENIED (API not used/disabled), hãy truy cập link sau để kích hoạt API cho project ${firebaseConfig.projectId}: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${firebaseConfig.projectId}`
       });
     }
   });
@@ -154,7 +153,7 @@ app.use(cookieParser());
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = db.doc(`invoices/${referenceCode}`);
+      const invoiceRef = doc(db, `invoices/${referenceCode}`);
       const invoiceData = {
         id: referenceCode,
         userId: userId || "guest",
@@ -170,7 +169,7 @@ app.use(cookieParser());
         createdAt: Timestamp.now(),
       };
 
-      await invoiceRef.set(invoiceData);
+      await setDoc(invoiceRef, invoiceData);
       res.json(invoiceData);
     } catch (error: any) {
       console.error("Create Invoice Error details:", {
@@ -206,23 +205,23 @@ app.use(cookieParser());
       const { userId, userEmail, userName, productId, productName, amount } = req.body;
       if (!userId || !amount) return res.status(400).json({ error: "Missing required fields" });
 
-      const userRef = db.doc(`users/${userId}`);
-      const userSnap = await userRef.get();
+      const userRef = doc(db, `users/${userId}`);
+      const userSnap = await getDoc(userRef);
       
-      const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+      const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
       
       if (currentBalance < amount) {
         return res.status(400).json({ error: "Số dư không đủ. Vui lòng nạp thêm tiền vào ví!" });
       }
 
       // Deduct balance
-      await userRef.set({
+      await setDoc(userRef, {
         balance: currentBalance - amount,
       }, { merge: true });
 
       // Record transaction
       const txId = `TX_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await db.doc(`transactions/${txId}`).set({
+      await setDoc(doc(db, `transactions/${txId}`), {
         id: txId,
         userId,
         userEmail,
