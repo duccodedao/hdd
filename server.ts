@@ -143,7 +143,7 @@ app.use(cookieParser());
         code: error.code,
         details: error.details,
         stack: error.stack,
-        hint: `Nếu gặp lỗi PERMISSION_DENIED (API not used/disabled), hãy truy cập link sau để kích hoạt API cho project ${firebaseConfig.projectId}: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${firebaseConfig.projectId}`
+        hint: `Nếu gặp lỗi PERMISSION_DENIED (API not used/disabled), hãy truy cập link sau để kích hoạt API cho project ${firebaseConfig.projectId}: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${firebaseConfig.projectId}. Ngoài ra hãy kiểm tra xem database '${databaseId}' đã được tạo chưa.`
       });
     }
   });
@@ -182,13 +182,18 @@ app.use(cookieParser());
       let errorMessage = "Failed to create invoice: " + (error.message || error);
       let hint = "";
 
-      if (error.message?.includes("PERMISSION_DENIED") || error.code === 7) {
+      if (error.message?.includes("PERMISSION_DENIED") || error.code === 7 || error.code === "permission-denied") {
         const projId = firebaseConfig.projectId;
         errorMessage = "Lỗi: Quyền truy cập Firestore bị từ chối (PERMISSION_DENIED).";
-        hint = `Vui lòng kiểm tra xem Cloud Firestore API đã được kích hoạt chưa: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projId}`;
-      } else if (error.message?.includes("NOT_FOUND") || error.message?.includes("database") || error.code === 5) {
+        
+        if (error.message?.includes("API not used") || error.message?.includes("disabled")) {
+          hint = `Cloud Firestore API chưa được kích hoạt. Hãy truy cập link này để kích hoạt: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projId}`;
+        } else {
+          hint = `Có thể do Security Rules chặn truy xuất hoặc do API chưa được kích hoạt cho Project ID: ${projId}.`;
+        }
+      } else if (error.message?.includes("NOT_FOUND") || error.message?.includes("database") || error.code === 5 || error.code === "not-found") {
         errorMessage = `Lỗi: Không tìm thấy database '${databaseId}'.`;
-        hint = "Vui lòng kiểm tra lại cấu hình firestoreDatabaseId trong cài đặt.";
+        hint = `Vui lòng kiểm tra xem bạn đã tạo database tên là '${databaseId}' trong Firestore console chưa. Nếu chỉ dùng database mặc định, hãy xóa 'firestoreDatabaseId' trong cài đặt hoặc đổi thành '(default)'.`;
       }
 
       res.status(500).json({ 
@@ -250,11 +255,13 @@ app.use(cookieParser());
       const searchLower = searchKey.trim().toLowerCase();
 
       // Query by email
-      let snap = await db.collection("users").where("email", "==", searchLower).get();
+      const qEmail = query(collection(db, "users"), where("email", "==", searchLower), limit(1));
+      let snap = await getDocs(qEmail);
 
       // Try phone number if empty
       if (snap.empty) {
-        snap = await db.collection("users").where("phoneNumber", "==", searchKey.trim()).get();
+        const qPhone = query(collection(db, "users"), where("phoneNumber", "==", searchKey.trim()), limit(1));
+        snap = await getDocs(qPhone);
       }
 
       if (snap.empty) {
@@ -290,16 +297,16 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Bạn không thể tự chuyển tiền cho chính mình!" });
       }
 
-      const senderRef = db.doc(`users/${senderId}`);
-      const recipientRef = db.doc(`users/${recipientId}`);
+      const senderRef = doc(db, `users/${senderId}`);
+      const recipientRef = doc(db, `users/${recipientId}`);
 
-      const senderSnap = await senderRef.get();
-      const recipientSnap = await recipientRef.get();
+      const senderSnap = await getDoc(senderRef);
+      const recipientSnap = await getDoc(recipientRef);
 
-      if (!senderSnap.exists) {
+      if (!senderSnap.exists()) {
          return res.status(400).json({ error: "Không tìm thấy tài khoản người gửi." });
       }
-      if (!recipientSnap.exists) {
+      if (!recipientSnap.exists()) {
          return res.status(400).json({ error: "Không tìm thấy tài khoản người nhận." });
       }
 
@@ -314,11 +321,11 @@ app.use(cookieParser());
       }
 
       // Deduct from sender, add to recipient
-      await senderRef.set({
+      await setDoc(senderRef, {
         balance: senderBalance - parseAmount
       }, { merge: true });
 
-      await recipientRef.set({
+      await setDoc(recipientRef, {
         balance: recipientBalance + parseAmount
       }, { merge: true });
 
@@ -327,7 +334,7 @@ app.use(cookieParser());
       const txIdRecipient = `TX_TRA_IN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       // Save transactions
-      await db.doc(`transactions/${txIdSender}`).set({
+      await setDoc(doc(db, `transactions/${txIdSender}`), {
         id: txIdSender,
         userId: senderId,
         userEmail: senderData?.email || "",
@@ -341,7 +348,7 @@ app.use(cookieParser());
         createdAt: transferTime
       });
 
-      await db.doc(`transactions/${txIdRecipient}`).set({
+      await setDoc(doc(db, `transactions/${txIdRecipient}`), {
         id: txIdRecipient,
         userId: recipientId,
         userEmail: recipientData?.email || "",
@@ -364,17 +371,17 @@ app.use(cookieParser());
 
   async function updateWalletOnPayment(invoiceData: any) {
     if (invoiceData.type === "deposit") {
-      const userRef = db.doc(`users/${invoiceData.userId}`);
-      const userSnap = await userRef.get();
-      const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+      const userRef = doc(db, `users/${invoiceData.userId}`);
+      const userSnap = await getDoc(userRef);
+      const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
       
-      await userRef.set({
+      await setDoc(userRef, {
         balance: currentBalance + invoiceData.totalAmount,
       }, { merge: true });
 
       // Also record in deposits collection for admin audit
       const depositId = `DEP_${invoiceData.id}`;
-      await db.doc(`deposits/${depositId}`).set({
+      await setDoc(doc(db, `deposits/${depositId}`), {
         id: depositId,
         invoiceId: invoiceData.id,
         userId: invoiceData.userId,
@@ -412,16 +419,16 @@ app.use(cookieParser());
       }
 
       // 2. Prevent duplicate processing using a webhook_logs collection (Idempotency)
-      const logRef = db.doc(`webhook_logs/${String(transactionId)}`);
-      const logSnap = await logRef.get();
+      const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+      const logSnap = await getDoc(logRef);
       
-      if (logSnap.exists) {
+      if (logSnap.exists()) {
         console.log(`Webhook for transaction ${transactionId} already processed.`);
         return res.json({ success: true });
       }
 
       // 3. Mark as processed immediately (to avoid race conditions)
-      await logRef.set({
+      await setDoc(logRef, {
         payload,
         createdAt: Timestamp.now()
       });
@@ -435,26 +442,26 @@ app.use(cookieParser());
       
       if (referenceCodeSearch) {
         // Find pending invoice using multiple case fallbacks to ensure absolute success
-        let invoiceRef = db.doc(`invoices/${referenceCodeSearch}`);
-        let invoiceSnap = await invoiceRef.get();
+        let invoiceRef = doc(db, `invoices/${referenceCodeSearch}`);
+        let invoiceSnap = await getDoc(invoiceRef);
         
-        if (!invoiceSnap.exists) {
-          invoiceRef = db.doc(`invoices/${referenceCodeSearch.toUpperCase()}`);
-          invoiceSnap = await invoiceRef.get();
+        if (!invoiceSnap.exists()) {
+          invoiceRef = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
+          invoiceSnap = await getDoc(invoiceRef);
         }
         
-        if (!invoiceSnap.exists) {
-          invoiceRef = db.doc(`invoices/${referenceCodeSearch.toLowerCase()}`);
-          invoiceSnap = await invoiceRef.get();
+        if (!invoiceSnap.exists()) {
+          invoiceRef = doc(db, `invoices/${referenceCodeSearch.toLowerCase()}`);
+          invoiceSnap = await getDoc(invoiceRef);
         }
 
-        if (invoiceSnap.exists) {
+        if (invoiceSnap.exists()) {
           const invoiceData = invoiceSnap.data();
           const referenceCode = invoiceSnap.id;
           if (invoiceData?.status === "pending") {
             // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
             if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
-               await invoiceRef.update({
+               await updateDoc(invoiceRef, {
                  status: "paid",
                  paidAt: Timestamp.now(),
                  "paymentDetails.sepayTransactionId": transactionId,
@@ -468,9 +475,19 @@ app.use(cookieParser());
       }
 
       res.json({ success: true });
-    } catch (error) {
-      console.error("SePay Webhook Error:", error);
-      res.status(500).json({ error: "Webhook processing failed" });
+    } catch (error: any) {
+      console.error("SePay Webhook Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack,
+        payload: req.body
+      });
+      res.status(500).json({ 
+        error: "Webhook processing failed", 
+        details: error.message || String(error),
+        code: error.code 
+      });
     }
   };
 
@@ -487,10 +504,10 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Missing invoiceId" });
       }
 
-      const invoiceRef = db.doc(`invoices/${invoiceId}`);
-      const invoiceSnap = await invoiceRef.get();
+      const invoiceRef = doc(db, `invoices/${invoiceId}`);
+      const invoiceSnap = await getDoc(invoiceRef);
 
-      if (!invoiceSnap.exists) {
+      if (!invoiceSnap.exists()) {
         return res.status(404).json({ error: "No invoice found" });
       }
 
@@ -504,7 +521,7 @@ app.use(cookieParser());
 
       // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
       if (isSandboxMock) {
-        await invoiceRef.update({
+        await updateDoc(invoiceRef, {
           status: "paid",
           paidAt: Timestamp.now(),
           "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
@@ -517,8 +534,8 @@ app.use(cookieParser());
       // 2. Query SePay API to fetch latest bank transactions in real-time
       const sepayApiKey = process.env.SEPAY_API_KEY;
       if (sepayApiKey) {
-        const sysSnap = await db.doc("settings/system").get();
-        const bankingConfig = sysSnap.exists ? sysSnap.data()?.bankingConfig : null;
+        const sysSnap = await getDoc(doc(db, "settings/system"));
+        const bankingConfig = sysSnap.exists() ? sysSnap.data()?.bankingConfig : null;
         const bankAccount = bankingConfig?.bankAccount || "";
 
         let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
@@ -554,14 +571,14 @@ app.use(cookieParser());
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
-              const logRef = db.doc(`webhook_logs/${String(transactionId)}`);
-              await logRef.set({
+              const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+              await setDoc(logRef, {
                 payload: matchedTx,
                 createdAt: Timestamp.now(),
                 manualCheck: true
               });
 
-              await invoiceRef.update({
+              await updateDoc(invoiceRef, {
                 status: "paid",
                 paidAt: Timestamp.now(),
                 "paymentDetails.sepayTransactionId": transactionId,
@@ -613,7 +630,7 @@ app.use(cookieParser());
       
       const data: Record<string, any[]> = {};
       for (const col of collectionsToExport) {
-        const snap = await db.collection(col).get();
+        const snap = await getDocs(collection(db, col));
         data[col] = snap.docs.map(doc => {
           const docData = doc.data();
           const sanitized: any = { id: doc.id };
@@ -652,7 +669,7 @@ app.use(cookieParser());
     if (!uid) return res.status(400).json({ error: "Missing uid" });
 
     try {
-        await db.doc(`users/${uid}`).update({
+        await updateDoc(doc(db, `users/${uid}`), {
           "socialLinks.telegram": telegramData
         });
         res.json({ success: true });
