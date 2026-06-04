@@ -274,15 +274,22 @@ export default function WalletPage() {
         })
       });
 
-      if (!resp.ok) throw new Error('Create invoice server failure');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        const msg = errorData.error || 'Create invoice server failure';
+        if (errorData.hint) {
+          toast.error(`${msg}\n${errorData.hint}`, { duration: 8000 });
+        }
+        throw new Error(msg);
+      }
       const invoiceData = await resp.json();
 
       setActiveInvoice(invoiceData);
       setTimeLeft(15 * 60_000); // 15 mins checkout counter
       setDepositStep(2); // Set step after successful creation
       toast.success('Tạo đơn nạp thành công!');
-    } catch (e) {
-      toast.error('Lỗi khởi tạo nạp tiền SePay');
+    } catch (e: any) {
+      toast.error(e.message || 'Lỗi khởi tạo nạp tiền SePay');
     } finally {
       setIsGeneratingQR(false);
     }
