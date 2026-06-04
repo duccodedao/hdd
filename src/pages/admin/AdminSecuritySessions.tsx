@@ -268,7 +268,7 @@ export default function AdminSecuritySessions() {
               <col className="w-48" />
               <col className="w-56" />
               <col className="w-48" />
-              <col className="w-48 text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 shrink-0" />
+              <col className="w-48 text-right shrink-0" />
             </colgroup>
             <thead>
               <tr className="bg-slate-50/70 dark:bg-white/[0.02]">
@@ -288,7 +288,7 @@ export default function AdminSecuritySessions() {
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">IP (Bảo mật)</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Vị trí</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Ngày giờ đăng nhập</th>
-                <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">Thao tác</th>
+                <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -383,7 +383,7 @@ export default function AdminSecuritySessions() {
                     </td>
 
                     {/* Thao tác Column */}
-                    <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] backdrop-blur-sm">
+                    <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
                       {session.active ? (
                         <div className="flex items-center justify-end gap-2">
                           {isCurrentSession ? (
@@ -439,7 +439,7 @@ export default function AdminSecuritySessions() {
 
               {filteredSessions.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
+                  <td colSpan={9} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
                     Không tìm thấy phiên đăng nhập nào khớp với điều kiện tìm kiếm.
                   </td>
                 </tr>
@@ -447,7 +447,7 @@ export default function AdminSecuritySessions() {
 
               {loading && (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-400 text-sm">
                     <AppLogo className="w-12 h-12 mx-auto mb-3" isLoading={true} />
                     Đang tải danh sách phiên bảo mật...
                   </td>

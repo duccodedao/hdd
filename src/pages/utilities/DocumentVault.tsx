@@ -26,7 +26,6 @@ import { saveAs } from 'file-saver';
 import { useAuthStore } from '../../store/authStore';
 import { useConfirmStore } from '../../store/confirmStore';
 import ConfirmModal from '../../components/ConfirmModal';
-import { PaymentDialog } from '../../components/payment/PaymentDialog';
 
 const DOCS_PER_PAGE = 50;
 
@@ -89,10 +88,6 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; doc: AdminDocument | null }>({
-    isOpen: false,
-    doc: null
-  });
   const [editForm, setEditForm] = useState({ name: '', categoryId: '', note: '', hidden: false });
   const [vipDialog, setVipDialog] = useState<{ isOpen: boolean; doc: AdminDocument | null; code: string; onConfirm: () => void; error?: string }>({
     isOpen: false,
@@ -268,32 +263,6 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   };
 
   const handlePreview = async (docObj: AdminDocument) => {
-    if (isAdmin) {
-      const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
-      const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
-      const url = isOffice 
-        ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(docObj.githubUrl)}`
-        : docObj.githubUrl;
-      window.open(url, '_blank');
-      await updateDoc(doc(db, 'documents', docObj.id), { views: increment(1) });
-      return;
-    }
-
-    if (docObj.isVip) {
-      // No preview for VIP files per user request
-      toast.error('Tài liệu VIP không hỗ trợ xem trước. Vui lòng thanh toán để tải xuống.');
-      return;
-    }
-
-    const price = docObj.salePrice || docObj.price || 0;
-    if (price > 0) {
-      const hasPaid = purchasedDocIds.includes(docObj.id);
-      if (!hasPaid) {
-        setPaymentDialog({ isOpen: true, doc: docObj });
-        return;
-      }
-    }
-
     const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
     const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
     const url = isOffice 
@@ -305,40 +274,10 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   };
 
   const checkHasPaid = async (docId: string) => {
-    if (!user) return false;
-    try {
-      const q = query(
-        collection(db, 'invoices'), 
-        where('userId', '==', user.uid),
-        where('status', '==', 'paid')
-      );
-      const snap = await getDocs(q);
-      return snap.docs.some(d => {
-        const data = d.data();
-        return data.items?.some((i: any) => i.docId === docId);
-      });
-    } catch (e) {
-      console.error("Check paid error:", e);
-      return false;
-    }
+    return true;
   };
 
   const handleDownload = async (docObj: AdminDocument) => {
-    if (isAdmin) {
-      window.open(docObj.githubUrl, '_blank');
-      await updateDoc(doc(db, 'documents', docObj.id), { downloads: increment(1) });
-      return;
-    }
-
-    const price = docObj.salePrice || docObj.price || 0;
-    if ((price > 0 || docObj.isVip) && !isAdmin) {
-      const hasPaid = purchasedDocIds.includes(docObj.id);
-      if (!hasPaid) {
-        setPaymentDialog({ isOpen: true, doc: docObj });
-        return;
-      }
-    }
-
     window.open(docObj.githubUrl, '_blank');
     await updateDoc(doc(db, 'documents', docObj.id), {
       downloads: increment(1)
@@ -392,13 +331,6 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const handleBulkDownload = async () => {
     const selectedDocuments = documents.filter(d => selectedIds.includes(d.id));
     if (selectedDocuments.length === 0) return;
-
-    // Check if any selected doc has a price (bulk pay not supported yet in UI, so just filter them or warn)
-    const paidDocs = selectedDocuments.filter(d => (d.salePrice || d.price || 0) > 0);
-    if (paidDocs.length > 0 && !isAdmin) {
-      toast.error('Không thể tải xuống hàng loạt các tài liệu có tính phí. Vui lòng tải từng file.');
-      return;
-    }
     
     if (selectedDocuments.length === 1) {
       handleDownload(selectedDocuments[0]);
@@ -468,20 +400,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     // Non-admin can't see hidden files
     if (!isAdmin && doc.hidden) return false;
     
-    if (activeTab === 'paid') {
-      return matchesSearch && matchesCategory && matchesHighlight && purchasedDocIds.includes(doc.id);
-    }
-    
-    const matchesTab = activeTab === 'vip' ? doc.isVip : !doc.isVip;
-    
-    // In normal/vip tabs, we might want to hide already purchased if requested, 
-    // but usually users want to see them and just see a "Downloaded" badge.
-    // However, the request says "file đã thanh toán sẽ được phân loại ở tab riêng", 
-    // implying they should be moved or at least exclusively shown there.
-    // Let's hide them from normal/vip if they are in the paid list to strictly follow "phân loại ở tab riêng".
-    if (purchasedDocIds.includes(doc.id)) return false;
-    
-    return matchesSearch && matchesCategory && matchesHighlight && matchesTab;
+    return matchesSearch && matchesCategory && matchesHighlight;
   });
 
   const getFileIcon = (fileName: string) => {
@@ -652,53 +571,19 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-full md:w-fit border border-slate-200 dark:border-white/5 overflow-x-auto no-scrollbar">
-           <button 
-             onClick={() => { setActiveTab('normal'); setSelectedIds([]); }}
-             className={cn(
-               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-               activeTab === 'normal' 
-                 ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                 : "text-slate-500 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-white"
-             )}
-           >
-             Tất cả
-           </button>
-           <button 
-             onClick={() => { setActiveTab('vip'); setSelectedIds([]); }}
-             className={cn(
-               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 whitespace-nowrap",
-               activeTab === 'vip' 
-                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" 
-                 : "text-slate-500 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400"
-             )}
-           >
-             {activeTab === 'vip' && <Zap size={14} className="fill-white" />}
-             Kho VIP
-           </button>
-           <button 
-             onClick={() => { setActiveTab('paid'); setSelectedIds([]); }}
-             className={cn(
-               "flex-1 md:flex-initial px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 whitespace-nowrap",
-               activeTab === 'paid' 
-                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" 
-                 : "text-slate-500 dark:text-zinc-500 hover:text-emerald-500 dark:hover:text-emerald-400"
-             )}
-           >
-             <Check size={14} />
-             Đã mua
-           </button>
+        {/* Selection mode toggle button */}
+        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1">
            <button
              onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
              className={cn(
-               "p-2.5 rounded-xl transition-all",
+               "flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-bold transition-all border",
                isSelectionMode 
-                 ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400" 
-                 : "text-slate-500 dark:text-zinc-500 hover:bg-slate-50 dark:hover:bg-white/5"
+                 ? "bg-indigo-50 border-indigo-250 text-indigo-600 dark:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-400" 
+                 : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-zinc-900 dark:border-white/10 dark:text-zinc-500 dark:hover:bg-white/5"
              )}
            >
-             <CheckSquare size={16} />
+             <CheckSquare size={14} />
+             {isSelectionMode ? "Tắt chọn nhiều" : "Bật chọn nhiều"}
            </button>
         </div>
 
@@ -925,12 +810,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Định dạng</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Danh mục</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Giá</th>
-                   {activeTab === 'vip' && isAdmin && (
-                     <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Vip Code</th>
-                   )}
+
                    <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ngày tạo</th>
-                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right sticky right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm z-20 border-l border-slate-200 dark:border-white/10">Thao tác</th>
+                   <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-slate-50 dark:bg-zinc-950/20">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -965,27 +847,11 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                      <td className="px-2 md:px-4 py-4 text-[11px] md:text-sm text-slate-500 text-left w-40 md:w-44 truncate" title={docItem.categoryName || 'Chưa phân loại'}>
                        {docItem.categoryName || 'Chưa phân loại'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-24">
-                       <div className="flex flex-col items-end">
-                         <span className={cn("text-xs font-bold", (docItem.salePrice || docItem.price) ? "text-indigo-600 dark:text-indigo-400" : "text-emerald-600 dark:text-emerald-400")}>
-                           {docItem.salePrice ? docItem.salePrice.toLocaleString() : (docItem.price ? docItem.price.toLocaleString() : 'Free')}
-                         </span>
-                         {docItem.salePrice && docItem.price && (
-                           <span className="text-[9px] text-slate-400 line-through">{docItem.price.toLocaleString()}</span>
-                         )}
-                       </div>
-                     </td>
-                     {activeTab === 'vip' && isAdmin && (
-                        <td className="px-2 md:px-4 py-4 text-left w-32">
-                          <span className="font-mono text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded tracking-widest border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20">
-                            {docItem.vipCode || '---'}
-                          </span>
-                        </td>
-                      )}
+
                      <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap sticky right-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm z-10 border-l border-slate-200 dark:border-white/10 transition-colors">
+                     <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap bg-white dark:bg-zinc-950/30 transition-colors">
                        <div className="flex justify-center">
                          {expandedRow === docItem.id ? (
                            <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">
@@ -1090,17 +956,6 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         onClose={() => setVipDialog(prev => ({ ...prev, isOpen: false }))}
         doc={vipDialog.doc}
         onConfirm={vipDialog.onConfirm}
-      />
-
-      <PaymentDialog 
-        isOpen={paymentDialog.isOpen}
-        onClose={() => setPaymentDialog({ isOpen: false, doc: null })}
-        item={paymentDialog.doc ? { ...paymentDialog.doc, title: paymentDialog.doc.name, price: paymentDialog.doc.price || 0, githubUrl: paymentDialog.doc.githubUrl } : null}
-        onPaid={() => {
-          if (paymentDialog.doc) {
-             handleDownload(paymentDialog.doc);
-          }
-        }}
       />
     </div>
   );

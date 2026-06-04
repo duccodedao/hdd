@@ -998,7 +998,7 @@ export default function AdminForms() {
                          {selectedForm?.questions.map(q => (
                            <th key={q.id} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{q.label}</th>
                          ))}
-                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Thao tác</th>
+                         <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Thao tác</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-200 dark:divide-white/10">
@@ -1071,7 +1071,7 @@ export default function AdminForms() {
                                </div>
                              </td>
                            ))}
-                           <td className="px-6 py-4 whitespace-nowrap text-right">
+                           <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 whitespace-nowrap text-right">
                              <button
                                onClick={() => handleDeleteResponse(resp.id)}
                                className="p-1 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ml-auto cursor-pointer border border-rose-200 dark:border-rose-500/20 active:scale-95 inline-flex whitespace-nowrap"

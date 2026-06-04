@@ -362,36 +362,6 @@ export default function UtilitiesPage() {
       return;
     }
 
-    // Check payment if priced
-    if ((item as any).price > 0 && !isAdmin && !isSuperAdmin) {
-      // Check if already paid
-      const checkPaid = async () => {
-        try {
-          const q = query(
-            collection(db, 'invoices'), 
-            where('userId', '==', user?.uid),
-            where('status', '==', 'paid')
-          );
-          const snap = await getDocs(q);
-          const hasPaid = snap.docs.some(doc => {
-            const data = doc.data();
-            return data.items?.some((i: any) => i.itemId === item.id);
-          });
-
-          if (!hasPaid) {
-            setPaymentDialog({ isOpen: true, item });
-            return;
-          }
-
-          navigate(`/utilities/${item.id}`);
-        } catch (e) {
-          navigate(`/utilities/${item.id}`);
-        }
-      };
-      checkPaid();
-      return;
-    }
-    
     navigate(`/utilities/${item.id}`);
   };
 

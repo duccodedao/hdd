@@ -225,12 +225,64 @@
         "active": { "type": "boolean" }
       },
       "required": ["id", "uid", "email", "device", "ip", "createdAt", "active"]
+    },
+    "UserWallet": {
+      "title": "User Wallet",
+      "description": "User balance information",
+      "type": "object",
+      "properties": {
+        "balance": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["balance"]
+    },
+    "Deposit": {
+      "title": "Deposit",
+      "description": "Top-up history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "amount": { "type": "number" },
+        "bank": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "referenceCode": { "type": "string" },
+        "status": { "enum": ["pending", "completed", "expired"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "amount", "status", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Purchase history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "productName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "enum": ["purchase", "refund", "adjustment"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "productName", "amount", "type", "createdAt"]
     }
   },
   "firestore": {
     "admin_sessions": {
       "schema": "AdminSession",
       "description": "Admin login sessions tracked for real-time security alerts on multi-device or location conflicts"
+    },
+    "wallets": {
+      "schema": "UserWallet",
+      "description": "User balances"
+    },
+    "deposits": {
+      "schema": "Deposit",
+      "description": "Deposit requests"
+    },
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Transaction logs"
     },
     "ai_tools": {
       "schema": "AiTool",

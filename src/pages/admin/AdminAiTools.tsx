@@ -331,10 +331,8 @@ export default function AdminAiTools() {
             <col className="w-24" />
             <col className="w-56" />
             <col className="w-80" />
-            <col className="w-32" />
-            <col className="w-32" />
             <col className="w-48" />
-            <col className="w-32 text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20" />
+            <col className="w-32 text-right" />
           </colgroup>
           <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10">
             <tr className="text-slate-500">
@@ -350,10 +348,8 @@ export default function AdminAiTools() {
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Logo AI</th>
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Tên AI</th>
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Mô tả giới thiệu</th>
-              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá gốc</th>
-              <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá bán</th>
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Liên kết nguồn</th>
-              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] whitespace-nowrap">Thao tác</th>
+              <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
@@ -361,7 +357,7 @@ export default function AdminAiTools() {
               <tr key={tool.id} className="hover:bg-slate-50/5 dark:hover:bg-white/[0.01] transition-colors group">
                 <td className="p-4 align-middle text-center">
                   <button onClick={() => toggleSelect(tool.id)} className={selectedIds.includes(tool.id) ? "text-indigo-600" : "text-slate-300"}>
-                    {selectedIds.includes(tool.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                     {selectedIds.includes(tool.id) ? <CheckSquare size={18} /> : <Square size={18} />}
                   </button>
                 </td>
                 <td className="p-4 align-middle">
@@ -375,10 +371,8 @@ export default function AdminAiTools() {
                 </td>
                 <td className="p-4 align-middle text-slate-900 dark:text-stone-100 whitespace-nowrap font-bold">{tool.name}</td>
                 <td className="p-4 align-middle text-xs text-slate-500 dark:text-slate-455 line-clamp-2 mt-4">{tool.description}</td>
-                <td className="p-4 align-middle font-mono text-xs text-slate-600 dark:text-slate-500">{tool.price?.toLocaleString() || 0}</td>
-                <td className="p-4 align-middle font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold">{tool.salePrice?.toLocaleString() || 0}</td>
                 <td className="p-4 align-middle text-xs whitespace-nowrap text-blue-500 truncate max-w-xs "><a href={tool.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{tool.url}</a></td>
-                <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 backdrop-blur-sm shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
+                <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <button onClick={() => handleEdit(tool)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all">
                       <Edit2 className="w-4 h-4" />
@@ -392,7 +386,7 @@ export default function AdminAiTools() {
             ))}
             {tools.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Bạn chưa thêm công cụ AI nào.</td>
+                <td colSpan={8} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Bạn chưa thêm công cụ AI nào.</td>
               </tr>
             )}
           </tbody>
@@ -424,14 +418,6 @@ export default function AdminAiTools() {
                 <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Logo URL (Icon)</label>
                   <input value={formData.logoUrl} onChange={e => setFormData({...formData, logoUrl: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" placeholder="https://..." />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Giá gốc (VNĐ)</label>
-                  <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Giá bán (VNĐ)</label>
-                  <input type="number" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: Number(e.target.value)})} className="w-full px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm transition-all" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Mô tả ngắn gọn</label>

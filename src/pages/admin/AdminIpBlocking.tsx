@@ -151,13 +151,13 @@ export default function AdminIpBlocking() {
                 <th className="px-6 py-4 whitespace-nowrap">Lý do</th>
                 <th className="px-6 py-4 whitespace-nowrap">Ngày chặn</th>
                 <th className="px-6 py-4 whitespace-nowrap">Bởi</th>
-                <th className="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-slate-50 dark:bg-zinc-950 z-10 border-l border-slate-200 dark:border-white/5">Thao tác</th>
+                <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {bannedIps.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-zinc-500 font-medium whitespace-nowrap">Chưa có IP nào bị chặn.</td>
+                  <td colSpan={6} className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-12 text-center text-slate-500 dark:text-zinc-500 font-medium whitespace-nowrap">Chưa có IP nào bị chặn.</td>
                 </tr>
               ) : (
                 bannedIps.map(b => (
@@ -171,7 +171,7 @@ export default function AdminIpBlocking() {
                     <td className="px-6 py-4 text-slate-600 dark:text-zinc-400 whitespace-nowrap">{b.reason || '-'}</td>
                     <td className="px-6 py-4 text-slate-600 dark:text-zinc-400 whitespace-nowrap">{format(toSafeDate(b.blockedAt), 'dd/MM/yyyy HH:mm')}</td>
                     <td className="px-6 py-4 font-medium whitespace-nowrap">{b.blockedBy}</td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm z-10 border-l border-slate-100 dark:border-white/5">
+                    <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                       <button onClick={() => handleUnblockIp(b.id, b.ip)} className="inline-flex items-center justify-center p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all" title="Bỏ chặn">
                         <Trash2 className="w-4 h-4" />
                       </button>

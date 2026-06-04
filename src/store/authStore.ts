@@ -24,6 +24,7 @@ export interface UserData {
   onboardingCompleted?: boolean;
   createdAt: number;
   lastLoginAt: number;
+  balance?: number;
   location?: { lat: number, lng: number, address?: string };
   ip?: string;
   assignedUtilities?: string[];

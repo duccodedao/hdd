@@ -283,7 +283,7 @@ export default function AdminUtilities() {
                 <col className="w-32" />
                 <col className="w-32" />
                 <col className="w-64" />
-                <col className="w-32 text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20" />
+                <col className="w-32 text-right" />
               </colgroup>
               <thead className="bg-slate-50/50 dark:bg-white/[0.02]">
                 <tr className="text-slate-500">
@@ -301,7 +301,7 @@ export default function AdminUtilities() {
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá gốc</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá bán</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Đường dẫn nguồn</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5 sticky right-0 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] whitespace-nowrap">Thao tác</th>
+                  <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -326,7 +326,7 @@ export default function AdminUtilities() {
                     <td className="p-4 align-middle text-blue-500 text-xs truncate max-w-xs">
                       <a href={u.embedUrl} target="_blank" rel="noreferrer" className="hover:underline">{u.embedUrl}</a>
                     </td>
-                    <td className="p-4 align-middle text-right bg-slate-50/50 dark:bg-black/10 sticky right-0 z-20 backdrop-blur-sm shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
+                    <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => startEdit(u)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all" title="Cập nhật"><Edit className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(u.id)} className="p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>

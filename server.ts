@@ -3,7 +3,7 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, setDoc, query, where } from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
@@ -15,20 +15,20 @@ const db = (firebaseConfig as any).firestoreDatabaseId
   : getFirestore(firebaseApp);
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
-try {
-  setDoc(doc(db, "settings", "system"), {
-    bankingConfig: {
-      bankCode: "MB",
-      bankAccount: "00010302003"
-    }
-  }, { merge: true }).then(() => {
-    console.log("System banking configurations successfully defaulted to MB Bank - 00010302003");
-  }).catch(e => {
-    console.error("Failed to set default system banking configuration", e);
-  });
-} catch (err) {
-  console.error("Initialization error updating default system configurations", err);
-}
+// try {
+//   setDoc(doc(db, "settings", "system"), {
+//     bankingConfig: {
+//       bankCode: "MB",
+//       bankAccount: "00010302003"
+//     }
+//   }, { merge: true }).then(() => {
+//     console.log("System banking configurations successfully defaulted to MB Bank - 00010302003");
+//   }).catch(e => {
+//     console.error("Failed to set default system banking configuration", e);
+//   });
+// } catch (err) {
+//   console.error("Initialization error updating default system configurations", err);
+// }
 
 // Cache for Gemini Client to avoid re-initializing if key hasn't changed
 let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
@@ -99,10 +99,10 @@ app.use(cookieParser());
     }
   });
 
-  // Endpoint to create an invoice
+  // Endpoint to create an invoice (for deposits too)
   app.post("/api/invoices/create", async (req, res) => {
     try {
-      const { userId, userEmail, items, totalAmount } = req.body;
+      const { userId, userEmail, items, totalAmount, type } = req.body;
       
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
       const invoiceRef = doc(db, "invoices", referenceCode);
@@ -113,6 +113,7 @@ app.use(cookieParser());
         items: items || [],
         totalAmount: totalAmount || 0,
         status: "pending",
+        type: type || "purchase", // 'purchase' or 'deposit'
         paymentMethod: "bank_transfer",
         paymentDetails: {
           referenceCode
@@ -127,6 +128,195 @@ app.use(cookieParser());
       res.status(500).json({ error: "Failed to create invoice: " + (error.message || error) });
     }
   });
+
+  // Wallet Purchase API
+  app.post("/api/wallet/purchase", async (req, res) => {
+    try {
+      const { userId, userEmail, userName, productId, productName, amount } = req.body;
+      if (!userId || !amount) return res.status(400).json({ error: "Missing required fields" });
+
+      const userRef = doc(db, "users", userId);
+      const userSnap = await getDoc(userRef);
+      
+      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
+      
+      if (currentBalance < amount) {
+        return res.status(400).json({ error: "Số dư không đủ. Vui lòng nạp thêm tiền vào ví!" });
+      }
+
+      // Deduct balance
+      await setDoc(userRef, {
+        balance: currentBalance - amount,
+      }, { merge: true });
+
+      // Record transaction
+      const txId = `TX_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      await setDoc(doc(db, "transactions", txId), {
+        id: txId,
+        userId,
+        userEmail,
+        userName,
+        productId,
+        productName,
+        amount,
+        type: "purchase",
+        status: "completed",
+        createdAt: Timestamp.now()
+      });
+
+      res.json({ success: true, newBalance: currentBalance - amount });
+    } catch (error: any) {
+      console.error("Purchase Error:", error);
+      res.status(500).json({ error: "Giao dịch thất bại: " + error.message });
+    }
+  });
+
+  // Find Transfer Recipient
+  app.post("/api/wallet/find-recipient", async (req, res) => {
+    try {
+      const { searchKey } = req.body;
+      if (!searchKey) return res.status(400).json({ error: "Vui lòng nhập email hoặc số điện thoại" });
+
+      const searchLower = searchKey.trim().toLowerCase();
+
+      // Query by email
+      let q = query(collection(db, "users"), where("email", "==", searchLower));
+      let snap = await getDocs(q);
+
+      // Try phone number if empty
+      if (snap.empty) {
+        q = query(collection(db, "users"), where("phoneNumber", "==", searchKey.trim()));
+        snap = await getDocs(q);
+      }
+
+      if (snap.empty) {
+        return res.status(404).json({ error: "Không tìm thấy người nhận với email hoặc số điện thoại này." });
+      }
+
+      const recipientDoc = snap.docs[0];
+      const recipientData = recipientDoc.data();
+      res.json({
+        uid: recipientDoc.id,
+        displayName: recipientData.displayName || "Người dùng",
+        email: recipientData.email || "",
+        phoneNumber: recipientData.phoneNumber || "",
+        photoURL: recipientData.photoURL || ""
+      });
+    } catch (error: any) {
+      console.error("Find Recipient Error:", error);
+      res.status(500).json({ error: "Failed to query recipient: " + error.message });
+    }
+  });
+
+  // Inter-user Wallet Balance Transfer
+  app.post("/api/wallet/transfer", async (req, res) => {
+    try {
+      const { senderId, recipientId, amount, message } = req.body;
+      const parseAmount = parseInt(amount);
+
+      if (!senderId || !recipientId || isNaN(parseAmount) || parseAmount <= 0) {
+        return res.status(400).json({ error: "Thông tin chuyển khoản không hợp lệ." });
+      }
+
+      if (senderId === recipientId) {
+        return res.status(400).json({ error: "Bạn không thể tự chuyển tiền cho chính mình!" });
+      }
+
+      const senderRef = doc(db, "users", senderId);
+      const recipientRef = doc(db, "users", recipientId);
+
+      const senderSnap = await getDoc(senderRef);
+      const recipientSnap = await getDoc(recipientRef);
+
+      if (!senderSnap.exists()) {
+         return res.status(400).json({ error: "Không tìm thấy tài khoản người gửi." });
+      }
+      if (!recipientSnap.exists()) {
+         return res.status(400).json({ error: "Không tìm thấy tài khoản người nhận." });
+      }
+
+      const senderData = senderSnap.data();
+      const recipientData = recipientSnap.data();
+
+      const senderBalance = senderData.balance || 0;
+      const recipientBalance = recipientData.balance || 0;
+
+      if (senderBalance < parseAmount) {
+         return res.status(400).json({ error: "Số dư khả dụng không đủ để thực hiện giao dịch." });
+      }
+
+      // Deduct from sender, add to recipient
+      await setDoc(senderRef, {
+        balance: senderBalance - parseAmount
+      }, { merge: true });
+
+      await setDoc(recipientRef, {
+        balance: recipientBalance + parseAmount
+      }, { merge: true });
+
+      const transferTime = Timestamp.now();
+      const txIdSender = `TX_TRA_OUT_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const txIdRecipient = `TX_TRA_IN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      // Save transactions
+      await setDoc(doc(db, "transactions", txIdSender), {
+        id: txIdSender,
+        userId: senderId,
+        userEmail: senderData.email || "",
+        userName: senderData.displayName || "User",
+        productId: recipientId,
+        productName: `Chuyển tiền đến ${recipientData.displayName || recipientData.email}`,
+        amount: parseAmount,
+        type: "transfer_out",
+        status: "completed",
+        message: message || "Chuyển tiền qua ví",
+        createdAt: transferTime
+      });
+
+      await setDoc(doc(db, "transactions", txIdRecipient), {
+        id: txIdRecipient,
+        userId: recipientId,
+        userEmail: recipientData.email || "",
+        userName: recipientData.displayName || "User",
+        productId: senderId,
+        productName: `Nhận tiền từ ${senderData.displayName || senderData.email}`,
+        amount: parseAmount,
+        type: "transfer_in",
+        status: "completed",
+        message: message || "Chuyển tiền qua ví",
+        createdAt: transferTime
+      });
+
+      res.json({ success: true, newBalance: senderBalance - parseAmount });
+    } catch (error: any) {
+      console.error("Transfer Error:", error);
+      res.status(500).json({ error: "Chuyển tiền thất bại: " + error.message });
+    }
+  });
+
+  async function updateWalletOnPayment(invoiceData: any) {
+    if (invoiceData.type === "deposit") {
+      const userRef = doc(db, "users", invoiceData.userId);
+      const userSnap = await getDoc(userRef);
+      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
+      
+      await setDoc(userRef, {
+        balance: currentBalance + invoiceData.totalAmount,
+      }, { merge: true });
+
+      // Also record in deposits collection for admin audit
+      const depositId = `DEP_${invoiceData.id}`;
+      await setDoc(doc(db, "deposits", depositId), {
+        id: depositId,
+        invoiceId: invoiceData.id,
+        userId: invoiceData.userId,
+        userEmail: invoiceData.userEmail,
+        amount: invoiceData.totalAmount,
+        status: "completed",
+        createdAt: Timestamp.now()
+      });
+    }
+  }
 
   // SePay Webhook Endpoint (Main)
   const handleSepayWebhook = async (req: express.Request, res: express.Response) => {
@@ -209,6 +399,7 @@ app.use(cookieParser());
                  "paymentDetails.sepayTransactionId": transactionId,
                  "paymentDetails.actualAmount": amount
                });
+               await updateWalletOnPayment(invoiceData);
                console.log(`Invoice ${referenceCode} marked as PAID via SePay`);
             } else {
                console.log(`Amount mismatch for invoice ${referenceCode}: expected ${invoiceData.totalAmount}, got ${amount}`);
@@ -264,6 +455,7 @@ app.use(cookieParser());
           "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
           "paymentDetails.isSandboxMock": true
         });
+        await updateWalletOnPayment(invoiceData);
         return res.json({ success: true, status: "paid", message: "Duyệt giao dịch mô phỏng nâng cao thành công!" });
       }
 
@@ -321,6 +513,8 @@ app.use(cookieParser());
                 "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
                 "paymentDetails.actualSource": "sepay_api_manual_check"
               });
+
+              await updateWalletOnPayment(invoiceData);
 
               return res.json({ 
                 success: true, 

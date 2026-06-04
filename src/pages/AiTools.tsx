@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Sparkles, ExternalLink, Search, X, Lock } from 'lucide-react';
-import { PaymentDialog } from '../components/payment/PaymentDialog';
-import { useAuthStore } from '../store/authStore';
-import toast from 'react-hot-toast';
+import { Sparkles, ExternalLink, Search, X } from 'lucide-react';
 
 export default function AiTools() {
   const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTool, setSelectedTool] = useState<any | null>(null);
-  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; item: any | null }>({
-    isOpen: false,
-    item: null
-  });
-  const { user, isAdmin, isSuperAdmin } = useAuthStore();
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'ai_tools'), (snapshot) => {
@@ -41,33 +33,6 @@ export default function AiTools() {
   );
 
   const handleAccess = (tool: any) => {
-    if (tool.price > 0 && !isAdmin && !isSuperAdmin) {
-      const checkPaid = async () => {
-        try {
-          const q = query(
-            collection(db, 'invoices'), 
-            where('userId', '==', user?.uid),
-            where('status', '==', 'paid')
-          );
-          const snap = await getDocs(q);
-          const hasPaid = snap.docs.some(doc => {
-            const data = doc.data();
-            return data.items?.some((i: any) => i.itemId === tool.id);
-          });
-
-          if (!hasPaid) {
-            setPaymentDialog({ isOpen: true, item: tool });
-            return;
-          }
-
-          window.open(tool.url, '_blank', 'noopener,noreferrer');
-        } catch (e) {
-          window.open(tool.url, '_blank', 'noopener,noreferrer');
-        }
-      };
-      checkPaid();
-      return;
-    }
     window.open(tool.url, '_blank', 'noopener,noreferrer');
   };
 
@@ -135,14 +100,6 @@ export default function AiTools() {
                              <span className="truncate block font-bold leading-tight">{tool.name}</span>
                              <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 animate-fade-in" />
                            </div>
-                           {tool.price > 0 && (
-                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-                               <Lock size={10} className="text-indigo-500" />
-                               <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
-                                 {tool.salePrice ? tool.salePrice.toLocaleString() : tool.price.toLocaleString()}đ
-                               </span>
-                             </div>
-                           )}
                          </div>
                          {tool.description && (
                            <p className="hidden md:block text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed max-w-4xl text-left">
@@ -235,17 +192,6 @@ export default function AiTools() {
           </div>
         </div>
       )}
-
-      <PaymentDialog 
-        isOpen={paymentDialog.isOpen}
-        onClose={() => setPaymentDialog({ isOpen: false, item: null })}
-        item={paymentDialog.item}
-        onPaid={() => {
-          if (paymentDialog.item) {
-            window.open(paymentDialog.item.url, '_blank', 'noopener,noreferrer');
-          }
-        }}
-      />
     </div>
   );
 }

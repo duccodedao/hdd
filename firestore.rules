@@ -1,257 +1,211 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isSuperAdmin() {
+      return isSignedIn() && (request.auth.token.email == 'sonlyhongduc@gmail.com' || request.auth.token.email == 'sonlyhongduc1@ghn.vn');
+    }
+    function isAdmin() {
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin']);
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
     
-    // GUESTS & STATS
     match /guests/{id} {
       allow read, write: if true;
-      match /{allSubcollections=**} {
-        allow read, write: if true;
-      }
+    }
+    match /guests/{id}/{allPaths=**} {
+      allow read, write: if true;
     }
     match /site_visitation_stats/{id} {
       allow read, write: if true;
-      match /{allSubcollections=**} {
-        allow read, write: if true;
-      }
+    }
+    match /site_visitation_stats/{id}/{allPaths=**} {
+      allow read, write: if true;
     }
     match /utility_stats/{id} {
       allow read, write: if true;
-      match /{allSubcollections=**} {
-        allow read, write: if true;
-      }
     }
-
-    // --- Helpers ---
-    function isSignedIn() { return request.auth != null; }
-    function isAdmin() { 
-      return isSignedIn() && (
-        (request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin']
-        ))
-      );
+    match /utility_stats/{id}/{allPaths=**} {
+      allow read, write: if true;
     }
-    function isSuperAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.get('email', '') in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'superadmin'
-        )
-      );
-    }
-    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-
-    // --- Entity Validations ---
-    function isValidUser(data) {
-      return data.keys().hasAll(['displayName', 'email']) &&
-             data.displayName is string && data.displayName.size() <= 100 &&
-             data.email is string && data.email.size() <= 150;
-    }
-
-    function isValidUserAIKey(data) {
-      return data.keys().hasAll(['userId', 'apiKey', 'status']) &&
-             data.userId is string && data.userId.size() <= 128 &&
-             data.apiKey is string && data.apiKey.size() <= 200 &&
-             data.status in ['active', 'revoked', 'invalid'];
-    }
-
-    // --- Collections ---
-
-    // PUBLIC ACCESS COLLECTIONS
-
-    // TEST CONNECTION
-    match /test/connection { allow read: if true; }
-
-    // USERS
-    match /users/{userId} {
+    match /test/connection {
       allow read: if true;
-      allow create: if isOwner(userId) || isSuperAdmin();
-      allow update: if isSuperAdmin() || 
-                    (isOwner(userId) && 
-                      (request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'isBanned']) == false)
-                    ) || 
-                    (isAdmin() && 
-                      (request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) == false)
-                    );
-      allow delete: if isSuperAdmin();
-
-      match /private/security {
-        allow read, write: if isOwner(userId) || isSuperAdmin();
-      }
     }
-
-    // DOCUMENT VAULT & CATEGORIES
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isOwner(userId) || isSuperAdmin();
+      allow update: if isSuperAdmin() || (isOwner(userId) && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'isBanned']))) || (isAdmin() && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])));
+      allow delete: if isSuperAdmin();
+    }
+    match /users/{userId}/private/security {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+    match /wallets/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow write: if isSuperAdmin();
+    }
     match /documents/{docId} {
       allow read: if true;
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'downloads']));
     }
-    
     match /document_categories/{catId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-    
     match /settings/{docId} {
       allow read: if (docId == 'tool_permissions' && isSignedIn()) || isAdmin() || (docId != 'github' && docId != 'github_integration');
       allow write: if isAdmin();
-
-      // Support nested settings
-      match /{allSubcollections=**} {
-        allow read: if isAdmin();
-        allow write: if isSuperAdmin();
-      }
     }
-    
+    match /settings/{docId}/{allPaths=**} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+    match /transactions/{txId} {
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isSuperAdmin();
+    }
     match /invoices/{invoiceId} {
-      allow read, write: if true;
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment');
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
-
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
     match /webhook_logs/{logId} {
       allow read, write: if true;
     }
-    
-    // ADMIN REQUESTS
     match /adminRequests/{reqId} {
       allow read: if isAdmin();
       allow create: if isSignedIn() && request.auth.uid == reqId;
       allow delete: if isSuperAdmin();
     }
-    
-    // USER AI KEYS
     match /user_ai_keys/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create, update: if (isOwner(userId) && isValidUserAIKey(incoming())) || isAdmin();
+      allow create, update: if (isOwner(userId) && request.resource.data.userId == userId) || isAdmin();
       allow delete: if isAdmin();
     }
-
-    // PRODUCTS / UTILITIES / PARTNERS
-    match /products/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /utilities/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /partners/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /airdrops/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /banks/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /exchanges/{id} { allow read: if true; allow write: if isAdmin(); }
-
-    // DATA LOGS
+    match /products/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /utilities/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /partners/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /airdrops/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /banks/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /exchanges/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     match /device_logins/{id} {
       allow read: if isAdmin();
-      allow create, update: if true; // Allow logging even if not signed in for tracking
-      allow delete: if isAdmin();
+      allow create, update, delete: if true;
     }
-
     match /utility_usage/{id} {
       allow read: if isAdmin();
-      allow create, update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow create, update, delete: if isSignedIn();
     }
-
     match /contact_requests/{id} {
       allow read: if isAdmin();
-      allow create, update: if true; 
-      allow delete: if isAdmin();
+      allow create, update, delete: if true;
     }
-
     match /activities/{id} {
       allow read: if true;
       allow create, update: if true;
-      allow update, delete: if isAdmin();
+      allow delete: if isAdmin();
     }
-
     match /blockedIps/{ip} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
-    // APPS & CATEGORIES
     match /ai_tools/{toolId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /apps/{appId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /app_categories/{catId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /tasks/{taskId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-    
     match /calendar_events/{eventId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /recurring_events/{eventId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /word_covers/{coverId} {
       allow read: if true;
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
     }
-
     match /hrm_employees/{empId} {
       allow read, write: if isAdmin();
     }
-
     match /hrm_collaborators/{collabId} {
       allow read, write: if isAdmin();
     }
-    
-    // ACTIVITY LOGS
     match /activityLogs/{logId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isSuperAdmin();
     }
-    
-    // FILES
     match /files/{fileId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn();
-      allow delete: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
-
-    // FORMS & FOLDERS
     match /forms/{formId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
     match /form_responses/{responseId} {
       allow create, update: if true;
       allow read, update, delete: if isAdmin();
     }
-
-    // AVATAR FRAMES
     match /avatar_frames/{frameId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
-
-    // ADMIN SESSIONS
     match /admin_sessions/{sessionId} {
-      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.uid == request.auth.uid || resource.data.email == request.auth.token.email));
-      allow create: if isSignedIn() && (incoming().uid == request.auth.uid || isAdmin());
-      allow update: if isSignedIn() && (incoming().uid == request.auth.uid || isAdmin());
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.email == request.auth.token.email));
+      allow create: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
-
-    // --- Safety Net ---
     match /{document=**} {
       allow read, write: if false;
     }

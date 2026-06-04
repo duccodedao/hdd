@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -21,6 +21,10 @@ import AdminPartners from './AdminPartners';
 import AdminOverview from './AdminOverview';
 import AdminAiTools from './AdminAiTools';
 import AdminSecuritySessions from './AdminSecuritySessions';
+import AdminRevenueStats from './AdminRevenueStats';
+import AdminDepositHistory from './AdminDepositHistory';
+import AdminUserPurchases from './AdminUserPurchases';
+import AdminShopSetup from './AdminShopSetup';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -33,7 +37,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'revenue_stats' | 'all_transactions' | 'purchase_history' | 'shop_setup'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -75,7 +79,8 @@ export default function AdminDashboard() {
   const [adminPin, setAdminPin] = useState('1234');
   const [bankingConfig, setBankingConfig] = useState({
     bankCode: 'MB',
-    bankAccount: '00010302003'
+    bankAccount: '00010302003',
+    ownerName: 'Vũ Minh Đức'
   });
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
@@ -1258,6 +1263,25 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleAdjustBalance = async (user: UserData) => {
+    if (!isSuperAdmin) return toast.error('Quyền truy cập bị từ chối.');
+    const amountStr = window.prompt(`Cộng/Trừ tiền cho ${user.displayName} (vd: 50000 để cộng, -20000 để trừ):`, '0');
+    if (amountStr === null || amountStr === '') return;
+    
+    const amount = parseInt(amountStr);
+    if (isNaN(amount)) return toast.error('Số tiền không hợp lệ');
+
+    try {
+      const currentBalance = user.balance || 0;
+      await updateDoc(doc(db, 'users', user.uid), {
+        balance: currentBalance + amount
+      });
+      toast.success(`Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount).toLocaleString()}đ thành công!`);
+    } catch (e) {
+      toast.error('Lỗi khi cập nhật số dư');
+    }
+  };
+
   const toggleBlockedDevice = async (type: 'ios' | 'android') => {
     const newBlocked = {
       ...blockedDevices,
@@ -1393,6 +1417,10 @@ export default function AdminDashboard() {
         <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
           {[
             { id: 'dashboard', label: 'Tổng quan', icon: Activity },
+            { id: 'revenue_stats', label: 'Thống kê Doanh thu', icon: LineChart },
+            { id: 'all_transactions', label: 'Lịch sử Nạp - Rút', icon: Landmark },
+            { id: 'purchase_history', label: 'Lịch sử Mua hàng', icon: ShoppingBag },
+            { id: 'shop_setup', label: 'Shop Setup', icon: Settings },
             { id: 'system', label: 'Hệ thống', icon: Settings },
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
@@ -1441,7 +1469,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools'}[activeTab as any] }` }
+            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools', revenue_stats: 'Thống kê Doanh thu & Tài chính', all_transactions: 'Lịch sử Nạp & Rút', purchase_history: 'Lịch sử Mua hàng', shop_setup: 'Shop Setup'}[activeTab as any] }` }
         </h1>
 
         {activeTab === 'dashboard' && (
@@ -1454,6 +1482,22 @@ export default function AdminDashboard() {
              contacts={contacts} 
              adminAppsCount={adminApps.length}
            />
+        )}
+
+        {activeTab === 'revenue_stats' && (
+          <AdminRevenueStats />
+        )}
+
+        {activeTab === 'all_transactions' && (
+          <AdminDepositHistory />
+        )}
+
+        {activeTab === 'purchase_history' && (
+          <AdminUserPurchases />
+        )}
+
+        {activeTab === 'shop_setup' && (
+          <AdminShopSetup />
         )}
 
 
@@ -1803,13 +1847,14 @@ export default function AdminDashboard() {
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số dư Ví</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Đăng nhập lần cuối</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Địa chỉ IP</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vị trí (Location)</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Quản trị</th>
+                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Quản trị</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
@@ -1828,6 +1873,18 @@ export default function AdminDashboard() {
                             <div className="font-semibold text-slate-900 dark:text-white">{u.displayName}</div>
                             <div className="text-xs text-slate-500 max-w-[150px] truncate">{u.email}</div>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
+                        <div className="flex items-center gap-2">
+                           <span className="font-black text-indigo-600 dark:text-indigo-400">{(u.balance || 0).toLocaleString()}đ</span>
+                           <button 
+                             onClick={() => handleAdjustBalance(u)}
+                             className="p-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md text-indigo-500 transition-colors"
+                             title="Điều chỉnh số dư"
+                           >
+                             <Plus size={14} />
+                           </button>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1902,7 +1959,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2 opacity-100 transition-opacity">
                           <button
                             onClick={() => handleBanUser(u.uid, !!u.isBanned)}
@@ -3261,6 +3318,21 @@ export default function AdminDashboard() {
                   />
                   <p className="text-[10px] text-slate-400 mt-1 ml-1">Nhập chính xác số tài khoản ngân hàng của bạn.</p>
                 </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Tên người thụ hưởng (Chủ tài khoản)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    value={(bankingConfig as any).ownerName || ''}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, ownerName: e.target.value }))}
+                    placeholder="ví dụ: VU MINH DUC"
+                    disabled={!isSuperAdmin}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Tên viết hoa không dấu của chủ tài khoản thụ hưởng.</p>
+                </div>
               </div>
 
               {/* Preview simulated QR */}
@@ -3580,7 +3652,7 @@ export default function AdminDashboard() {
                             <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
                               <th className="py-3 px-2 whitespace-nowrap">Ứng dụng / Logo</th>
                               <th className="py-3 px-2 whitespace-nowrap">Đường dẫn mở</th>
-                              <th className="py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
+                              <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -3617,7 +3689,7 @@ export default function AdminDashboard() {
                                     {app.appUrl} <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
                                   </a>
                                 </td>
-                                <td className="py-4 px-2 text-right whitespace-nowrap">
+                                <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-4 px-2 text-right whitespace-nowrap">
                                   <div className="flex justify-end gap-1.5">
                                     <button 
                                       onClick={() => toggleTabMaintenance(`app_${app.id}`)}

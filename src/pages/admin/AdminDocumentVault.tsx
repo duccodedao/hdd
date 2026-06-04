@@ -662,30 +662,7 @@ export default function AdminDocumentVault() {
         <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm overflow-hidden">
            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <h3 className="text-lg font-bold">Danh sách tài liệu ({documents.filter(d => !d.isDeleted).length})</h3>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-900 rounded-xl w-fit">
-                <button 
-                  onClick={() => { setFileTab('normal'); setSelectedIds([]); }}
-                  className={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                    fileTab === 'normal' 
-                      ? "bg-white dark:bg-zinc-800 text-indigo-600 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-700 dark:hover:text-zinc-400"
-                  )}
-                >
-                  Kho thường
-                </button>
-                <button 
-                  onClick={() => { setFileTab('vip'); setSelectedIds([]); }}
-                  className={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                    fileTab === 'vip' 
-                      ? "bg-indigo-600 text-white shadow-lg" 
-                      : "text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400"
-                  )}
-                >
-                  Kho VIP
-                </button>
-              </div>
+
            </div>
 
            {selectedIds.length > 0 && activeTab === 'files' && (
@@ -699,18 +676,6 @@ export default function AdminDocumentVault() {
                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 text-indigo-600 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition-all"
                  >
                    <FileText size={14} /> Tải xuống đã chọn
-                 </button>
-                 <button 
-                   onClick={handleBulkDelete}
-                   className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-500/20 hover:bg-rose-600 transition-all"
-                 >
-                   <Trash2 size={14} /> Xóa đã chọn
-                 </button>
-                 <button 
-                   onClick={() => setSelectedIds([])}
-                   className="px-4 py-2 text-slate-500 hover:text-slate-700 text-xs font-bold"
-                 >
-                   Hủy
                  </button>
                </div>
              </div>
@@ -733,10 +698,10 @@ export default function AdminDocumentVault() {
                      <input 
                        type="checkbox"
                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                       checked={selectedIds.length === documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).length && documents.length > 0}
+                       checked={selectedIds.length === documents.filter(d => !d.isDeleted).length && documents.length > 0}
                        onChange={(e) => {
                          if (e.target.checked) {
-                           setSelectedIds(documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).map(d => d.id));
+                           setSelectedIds(documents.filter(d => !d.isDeleted).map(d => d.id));
                          } else {
                            setSelectedIds([]);
                          }
@@ -747,18 +712,30 @@ export default function AdminDocumentVault() {
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên file gốc</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên hiển thị</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Giá</th>
-                   {fileTab === 'vip' && (
-                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Vip Code</th>
-                   )}
+                   
+
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày tạo</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ghi chú</th>
-                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
+                   <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                 {documents.filter(d => !d.isDeleted && (fileTab === 'vip' ? d.isVip : !d.isVip)).map(docItem => (
+                 {documents.filter(d => !d.isDeleted).map(docItem => (
                    <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                     <td className="px-6 py-4">
+                       <input 
+                         type="checkbox"
+                         className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                         checked={selectedIds.includes(docItem.id)}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedIds(prev => [...prev, docItem.id]);
+                           } else {
+                             setSelectedIds(prev => prev.filter(id => id !== docItem.id));
+                           }
+                         }}
+                       />
+                     </td>
                      <td className="px-6 py-4">
                        <span className="font-mono text-[10px] bg-slate-200 dark:bg-zinc-800 px-2 py-1 rounded uppercase tracking-widest shrink-0">
                          {docItem.githubPath.split('.').pop()}
@@ -784,7 +761,7 @@ export default function AdminDocumentVault() {
                           {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                         </select>
                      </td>
-                     {fileTab === 'vip' && (
+                     {false && (
                        <td className="px-6 py-4">
                          <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg tracking-[0.1em]">
                            {docItem.vipCode || "N/A"}
@@ -799,7 +776,7 @@ export default function AdminDocumentVault() {
                           {docItem.note || "---"}
                         </p>
                      </td>
-                     <td className="px-6 py-4 text-right sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
+                     <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                        <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setEditingDoc(docItem)} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Sửa thông tin">
                             <Edit2 className="w-4 h-4" />
@@ -852,11 +829,25 @@ export default function AdminDocumentVault() {
              <table className="w-full text-left min-w-[1000px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-white/5">
+                    <th className="px-6 py-4 whitespace-nowrap">
+                      <input 
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        checked={selectedIds.length === documents.filter(d => d.isDeleted).length && documents.filter(d => d.isDeleted).length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(documents.filter(d => d.isDeleted).map(d => d.id));
+                          } else {
+                            setSelectedIds([]);
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên tài liệu</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên gốc</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày xóa</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-20 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">Thao tác</th>
+                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -886,7 +877,7 @@ export default function AdminDocumentVault() {
                            {docItem.deletedAt ? new Date(docItem.deletedAt?.seconds * 1000).toLocaleString() : 'N/A'}
                          </span>
                        </td>
-                       <td className="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-[#0A0A0B]/95 backdrop-blur-sm z-10 shadow-[-12px_0_15px_-4px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5">
+                       <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex gap-2 justify-end">
                             <button 
                                onClick={() => handleRestoreFile(docItem)}
@@ -956,7 +947,7 @@ export default function AdminDocumentVault() {
                   
                   <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                     {uploadItems.map(item => (
-                      <div key={item.id} className="relative flex flex-col lg:grid lg:grid-cols-[1.5fr_2.5fr_2fr_2fr_1fr_1.5fr_1fr] gap-3 p-4 lg:p-0 bg-slate-50 dark:bg-zinc-925 lg:bg-transparent lg:dark:bg-transparent border lg:border-0 border-slate-200 dark:border-white/5 rounded-2xl lg:rounded-none">
+                      <div key={item.id} className="relative flex flex-col lg:grid lg:grid-cols-[1.5fr_2.5fr_2fr_2fr_1fr_1fr] gap-3 p-4 lg:p-0 bg-slate-50 dark:bg-zinc-925 lg:bg-transparent lg:dark:bg-transparent border lg:border-0 border-slate-200 dark:border-white/5 rounded-2xl lg:rounded-none">
                          <div className="flex flex-col justify-center">
                             <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tên file gốc</label>
                             <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth px-1">
@@ -1002,26 +993,7 @@ export default function AdminDocumentVault() {
                             />
                          </div>
 
-                         <div className="flex flex-col justify-center">
-                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Vip Code</label>
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox"
-                                checked={item.isVip}
-                                onChange={(e) => updateUploadItem(item.id, 'isVip', e.target.checked)}
-                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
-                              />
-                              {item.isVip && (
-                                <input 
-                                  type="text"
-                                  placeholder="Code"
-                                  className="w-full px-2 py-1 rounded border border-slate-200 dark:border-white/10 text-[10px] bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-indigo-500/20"
-                                  value={item.vipCode}
-                                  onChange={(e) => updateUploadItem(item.id, 'vipCode', e.target.value)}
-                                />
-                              )}
-                            </div>
-                         </div>
+
 
                          <div className="absolute top-3 right-12 lg:static flex items-center justify-center gap-2">
                             <button 
@@ -1231,7 +1203,7 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
               />
            </div>
 
-           <div className="grid grid-cols-2 gap-6">
+           <div className="hidden grid grid-cols-2 gap-6">
               <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Giá niên yết (VNĐ)</label>
                  <input 
@@ -1258,12 +1230,12 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
                     <input 
                       type="checkbox" 
                       className="sr-only peer"
-                      checked={formData.isVip}
+                      checked={false}
                       onChange={e => setFormData({ ...formData, isVip: e.target.checked })}
                     />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    <div className="hidden w-11 h-6 bg-slate-200 peer-focus:outline-none dark:bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                  </div>
-                 <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-zinc-400">Tài liệu VIP</span>
+                 
               </div>
 
               <div className="flex items-center gap-3">
@@ -1280,7 +1252,7 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
               </div>
            </div>
 
-           {formData.isVip && (
+           {false && (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                  <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Mã Code VIP</label>
                  <input 
