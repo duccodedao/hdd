@@ -2,17 +2,25 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, setDoc, query, where } from "firebase/firestore";
+import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json";
 
-const firebaseApp = initializeApp(firebaseConfig);
-const db = (firebaseConfig as any).firestoreDatabaseId 
-  ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(firebaseApp);
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+}
+
+// Database ID is 'main' as specified in metadata
+const db = getFirestore("main");
+
+// Helper for Firestore Timestamps in Admin SDK
+const Timestamp = admin.firestore.Timestamp;
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
 // try {
@@ -33,11 +41,11 @@ const db = (firebaseConfig as any).firestoreDatabaseId
 // Cache for Gemini Client to avoid re-initializing if key hasn't changed
 let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
 
-async function getAiClient() {
+  async function getAiClient() {
   // 1. Try to get key from Firestore (Admin UI setup)
   try {
-    const apiKeysSnap = await getDoc(doc(db, "settings", "apiKeys"));
-    const firestoreKey = apiKeysSnap.exists() ? apiKeysSnap.data().geminiApiKey : null;
+    const apiKeysSnap = await db.doc("settings/apiKeys").get();
+    const firestoreKey = apiKeysSnap.exists ? apiKeysSnap.data()?.geminiApiKey : null;
     
     const keyToUse = firestoreKey || process.env.GEMINI_API_KEY;
 
@@ -105,7 +113,7 @@ app.use(cookieParser());
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = doc(db, "invoices", referenceCode);
+      const invoiceRef = db.doc(`invoices/${referenceCode}`);
       const invoiceData = {
         id: referenceCode,
         userId: userId || "guest",
@@ -121,7 +129,7 @@ app.use(cookieParser());
         createdAt: Timestamp.now(),
       };
 
-      await setDoc(invoiceRef, invoiceData);
+      await invoiceRef.set(invoiceData);
       res.json(invoiceData);
     } catch (error: any) {
       console.error("Create Invoice Error:", error);
@@ -135,23 +143,23 @@ app.use(cookieParser());
       const { userId, userEmail, userName, productId, productName, amount } = req.body;
       if (!userId || !amount) return res.status(400).json({ error: "Missing required fields" });
 
-      const userRef = doc(db, "users", userId);
-      const userSnap = await getDoc(userRef);
+      const userRef = db.doc(`users/${userId}`);
+      const userSnap = await userRef.get();
       
-      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
+      const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
       
       if (currentBalance < amount) {
         return res.status(400).json({ error: "Số dư không đủ. Vui lòng nạp thêm tiền vào ví!" });
       }
 
       // Deduct balance
-      await setDoc(userRef, {
+      await userRef.set({
         balance: currentBalance - amount,
       }, { merge: true });
 
       // Record transaction
       const txId = `TX_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await setDoc(doc(db, "transactions", txId), {
+      await db.doc(`transactions/${txId}`).set({
         id: txId,
         userId,
         userEmail,
@@ -180,13 +188,11 @@ app.use(cookieParser());
       const searchLower = searchKey.trim().toLowerCase();
 
       // Query by email
-      let q = query(collection(db, "users"), where("email", "==", searchLower));
-      let snap = await getDocs(q);
+      let snap = await db.collection("users").where("email", "==", searchLower).get();
 
       // Try phone number if empty
       if (snap.empty) {
-        q = query(collection(db, "users"), where("phoneNumber", "==", searchKey.trim()));
-        snap = await getDocs(q);
+        snap = await db.collection("users").where("phoneNumber", "==", searchKey.trim()).get();
       }
 
       if (snap.empty) {
@@ -222,35 +228,35 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Bạn không thể tự chuyển tiền cho chính mình!" });
       }
 
-      const senderRef = doc(db, "users", senderId);
-      const recipientRef = doc(db, "users", recipientId);
+      const senderRef = db.doc(`users/${senderId}`);
+      const recipientRef = db.doc(`users/${recipientId}`);
 
-      const senderSnap = await getDoc(senderRef);
-      const recipientSnap = await getDoc(recipientRef);
+      const senderSnap = await senderRef.get();
+      const recipientSnap = await recipientRef.get();
 
-      if (!senderSnap.exists()) {
+      if (!senderSnap.exists) {
          return res.status(400).json({ error: "Không tìm thấy tài khoản người gửi." });
       }
-      if (!recipientSnap.exists()) {
+      if (!recipientSnap.exists) {
          return res.status(400).json({ error: "Không tìm thấy tài khoản người nhận." });
       }
 
       const senderData = senderSnap.data();
       const recipientData = recipientSnap.data();
 
-      const senderBalance = senderData.balance || 0;
-      const recipientBalance = recipientData.balance || 0;
+      const senderBalance = senderData?.balance || 0;
+      const recipientBalance = recipientData?.balance || 0;
 
       if (senderBalance < parseAmount) {
          return res.status(400).json({ error: "Số dư khả dụng không đủ để thực hiện giao dịch." });
       }
 
       // Deduct from sender, add to recipient
-      await setDoc(senderRef, {
+      await senderRef.set({
         balance: senderBalance - parseAmount
       }, { merge: true });
 
-      await setDoc(recipientRef, {
+      await recipientRef.set({
         balance: recipientBalance + parseAmount
       }, { merge: true });
 
@@ -259,13 +265,13 @@ app.use(cookieParser());
       const txIdRecipient = `TX_TRA_IN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       // Save transactions
-      await setDoc(doc(db, "transactions", txIdSender), {
+      await db.doc(`transactions/${txIdSender}`).set({
         id: txIdSender,
         userId: senderId,
-        userEmail: senderData.email || "",
-        userName: senderData.displayName || "User",
+        userEmail: senderData?.email || "",
+        userName: senderData?.displayName || "User",
         productId: recipientId,
-        productName: `Chuyển tiền đến ${recipientData.displayName || recipientData.email}`,
+        productName: `Chuyển tiền đến ${recipientData?.displayName || recipientData?.email}`,
         amount: parseAmount,
         type: "transfer_out",
         status: "completed",
@@ -273,13 +279,13 @@ app.use(cookieParser());
         createdAt: transferTime
       });
 
-      await setDoc(doc(db, "transactions", txIdRecipient), {
+      await db.doc(`transactions/${txIdRecipient}`).set({
         id: txIdRecipient,
         userId: recipientId,
-        userEmail: recipientData.email || "",
-        userName: recipientData.displayName || "User",
+        userEmail: recipientData?.email || "",
+        userName: recipientData?.displayName || "User",
         productId: senderId,
-        productName: `Nhận tiền từ ${senderData.displayName || senderData.email}`,
+        productName: `Nhận tiền từ ${senderData?.displayName || senderData?.email}`,
         amount: parseAmount,
         type: "transfer_in",
         status: "completed",
@@ -296,17 +302,17 @@ app.use(cookieParser());
 
   async function updateWalletOnPayment(invoiceData: any) {
     if (invoiceData.type === "deposit") {
-      const userRef = doc(db, "users", invoiceData.userId);
-      const userSnap = await getDoc(userRef);
-      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
+      const userRef = db.doc(`users/${invoiceData.userId}`);
+      const userSnap = await userRef.get();
+      const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
       
-      await setDoc(userRef, {
+      await userRef.set({
         balance: currentBalance + invoiceData.totalAmount,
       }, { merge: true });
 
       // Also record in deposits collection for admin audit
       const depositId = `DEP_${invoiceData.id}`;
-      await setDoc(doc(db, "deposits", depositId), {
+      await db.doc(`deposits/${depositId}`).set({
         id: depositId,
         invoiceId: invoiceData.id,
         userId: invoiceData.userId,
@@ -344,16 +350,16 @@ app.use(cookieParser());
       }
 
       // 2. Prevent duplicate processing using a webhook_logs collection (Idempotency)
-      const logRef = doc(db, "webhook_logs", String(transactionId));
-      const logSnap = await getDoc(logRef);
+      const logRef = db.doc(`webhook_logs/${String(transactionId)}`);
+      const logSnap = await logRef.get();
       
-      if (logSnap.exists()) {
+      if (logSnap.exists) {
         console.log(`Webhook for transaction ${transactionId} already processed.`);
         return res.json({ success: true });
       }
 
       // 3. Mark as processed immediately (to avoid race conditions)
-      await setDoc(logRef, {
+      await logRef.set({
         payload,
         createdAt: Timestamp.now()
       });
@@ -368,32 +374,32 @@ app.use(cookieParser());
       
       if (referenceCodeSearch) {
         // Find pending invoice using multiple case fallbacks to ensure absolute success
-        let invoiceRef = doc(db, "invoices", referenceCodeSearch);
-        let invoiceSnap = await getDoc(invoiceRef);
+        let invoiceRef = db.doc(`invoices/${referenceCodeSearch}`);
+        let invoiceSnap = await invoiceRef.get();
         
-        if (!invoiceSnap.exists()) {
-          invoiceRef = doc(db, "invoices", referenceCodeSearch.toUpperCase());
-          invoiceSnap = await getDoc(invoiceRef);
+        if (!invoiceSnap.exists) {
+          invoiceRef = db.doc(`invoices/${referenceCodeSearch.toUpperCase()}`);
+          invoiceSnap = await invoiceRef.get();
         }
         
-        if (!invoiceSnap.exists()) {
-          invoiceRef = doc(db, "invoices", referenceCodeSearch.toLowerCase());
-          invoiceSnap = await getDoc(invoiceRef);
+        if (!invoiceSnap.exists) {
+          invoiceRef = db.doc(`invoices/${referenceCodeSearch.toLowerCase()}`);
+          invoiceSnap = await invoiceRef.get();
         }
 
-        if (!invoiceSnap.exists()) {
+        if (!invoiceSnap.exists) {
           const formatted = "Bmass" + referenceCodeSearch.replace(/^[A-Za-z]+/, "");
-          invoiceRef = doc(db, "invoices", formatted);
-          invoiceSnap = await getDoc(invoiceRef);
+          invoiceRef = db.doc(`invoices/${formatted}`);
+          invoiceSnap = await invoiceRef.get();
         }
         
-        if (invoiceSnap.exists()) {
+        if (invoiceSnap.exists) {
           const invoiceData = invoiceSnap.data();
           const referenceCode = invoiceSnap.id;
-          if (invoiceData.status === "pending") {
+          if (invoiceData?.status === "pending") {
             // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
             if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
-               await updateDoc(invoiceRef, {
+               await invoiceRef.update({
                  status: "paid",
                  paidAt: Timestamp.now(),
                  "paymentDetails.sepayTransactionId": transactionId,
@@ -432,24 +438,24 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Missing invoiceId" });
       }
 
-      const invoiceRef = doc(db, "invoices", invoiceId);
-      const invoiceSnap = await getDoc(invoiceRef);
+      const invoiceRef = db.doc(`invoices/${invoiceId}`);
+      const invoiceSnap = await invoiceRef.get();
 
-      if (!invoiceSnap.exists()) {
+      if (!invoiceSnap.exists) {
         return res.status(404).json({ error: "No invoice found" });
       }
 
       const invoiceData = invoiceSnap.data();
-      if (invoiceData.status === "paid") {
+      if (invoiceData?.status === "paid") {
         return res.json({ success: true, status: "paid", message: "Hóa đơn này đã được xác nhận thanh toán thành công!" });
       }
 
-      const referenceCode = invoiceData.paymentDetails?.referenceCode || invoiceId;
-      const expectedAmount = invoiceData.totalAmount;
+      const referenceCode = invoiceData?.paymentDetails?.referenceCode || invoiceId;
+      const expectedAmount = invoiceData?.totalAmount || 0;
 
       // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
       if (isSandboxMock) {
-        await updateDoc(invoiceRef, {
+        await invoiceRef.update({
           status: "paid",
           paidAt: Timestamp.now(),
           "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
@@ -462,8 +468,8 @@ app.use(cookieParser());
       // 2. Query SePay API to fetch latest bank transactions in real-time
       const sepayApiKey = process.env.SEPAY_API_KEY;
       if (sepayApiKey) {
-        const sysSnap = await getDoc(doc(db, "settings", "system"));
-        const bankingConfig = sysSnap.exists() ? sysSnap.data().bankingConfig : null;
+        const sysSnap = await db.doc("settings/system").get();
+        const bankingConfig = sysSnap.exists ? sysSnap.data()?.bankingConfig : null;
         const bankAccount = bankingConfig?.bankAccount || "";
 
         let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
@@ -499,14 +505,14 @@ app.use(cookieParser());
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
-              const logRef = doc(db, "webhook_logs", String(transactionId));
-              await setDoc(logRef, {
+              const logRef = db.doc(`webhook_logs/${String(transactionId)}`);
+              await logRef.set({
                 payload: matchedTx,
                 createdAt: Timestamp.now(),
                 manualCheck: true
               });
 
-              await updateDoc(invoiceRef, {
+              await invoiceRef.update({
                 status: "paid",
                 paidAt: Timestamp.now(),
                 "paymentDetails.sepayTransactionId": transactionId,
@@ -558,7 +564,7 @@ app.use(cookieParser());
       
       const data: Record<string, any[]> = {};
       for (const col of collectionsToExport) {
-        const snap = await getDocs(collection(db, col));
+        const snap = await db.collection(col).get();
         data[col] = snap.docs.map(doc => {
           const docData = doc.data();
           const sanitized: any = { id: doc.id };
@@ -597,7 +603,7 @@ app.use(cookieParser());
     if (!uid) return res.status(400).json({ error: "Missing uid" });
 
     try {
-        await updateDoc(doc(db, "users", uid), {
+        await db.doc(`users/${uid}`).update({
           "socialLinks.telegram": telegramData
         });
         res.json({ success: true });
