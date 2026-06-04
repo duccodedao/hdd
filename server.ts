@@ -10,14 +10,26 @@ import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json";
 
 // Initialize Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
+try {
+  if (!admin.apps.length) {
+    // If running in production (Cloud Run), initializeApp() without args is often best to pick up environment defaults.
+    // However, if we have a specific projectId, we can try using it.
+    const projectId = firebaseConfig.projectId;
+    console.log(`Initializing Firebase Admin for project: ${projectId}`);
+    
+    admin.initializeApp({
+      projectId: projectId
+    });
+  }
+} catch (e) {
+  console.error("Firebase Admin initialization error:", e);
 }
 
-// Database ID is 'main' as specified in metadata
-const db = getFirestore("main");
+// Database ID is 'main' as specified in metadata.
+// In AI Studio, sometimes the database is named 'main' but sometimes it's '(default)'.
+const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
+console.log(`Using Firestore Database ID: ${databaseId}`);
+const db = getFirestore(databaseId);
 
 // Helper for Firestore Timestamps in Admin SDK
 const Timestamp = admin.firestore.Timestamp;
@@ -97,6 +109,10 @@ app.use(cookieParser());
         config: config || {}
       });
 
+      if (!response || !response.text) {
+        throw new Error("Empty response from Gemini");
+      }
+
       res.json({ text: response.text });
     } catch (error: any) {
       console.error("Gemini API Error:", error);
@@ -132,7 +148,12 @@ app.use(cookieParser());
       await invoiceRef.set(invoiceData);
       res.json(invoiceData);
     } catch (error: any) {
-      console.error("Create Invoice Error:", error);
+      console.error("Create Invoice Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack
+      });
       res.status(500).json({ error: "Failed to create invoice: " + (error.message || error) });
     }
   });
