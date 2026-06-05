@@ -65,14 +65,22 @@ let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
   
-  // Safe helper to check for apps
-  const getApps = () => {
+  // Safe helper to check for apps and firestore handle
+  const getAdminDb = (dbId?: string) => {
     try {
-      if (admin && admin.apps) return admin.apps;
+      const targetDb = dbId && dbId !== "(default)" ? dbId : undefined;
+      // @ts-ignore - Handle different SDK versions/bundling
+      if (typeof admin.firestore === 'function') {
+        return targetDb ? admin.firestore(targetDb) : admin.firestore();
+      }
       const a = admin as any;
-      if (a && a.default && a.default.apps) return a.default.apps;
-    } catch (e) {}
-    return [];
+      if (a.default && typeof a.default.firestore === 'function') {
+        return targetDb ? a.default.firestore(targetDb) : a.default.firestore();
+      }
+    } catch (e) {
+      console.warn("Error getting admin firestore handle:", e);
+    }
+    return null;
   };
 
   if (getApps().length === 0) {
@@ -96,13 +104,10 @@ try {
     }
   }
 
-  try {
-    const dbId = databaseId === "(default)" ? undefined : databaseId;
-    // @ts-ignore
-    adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
-  } catch (dbErr: any) {
-    console.warn("Admin Firestore handle failed, falling back to default.");
-    adminDb = admin.firestore();
+  adminDb = getAdminDb(databaseId);
+  if (!adminDb && databaseId !== "(default)") {
+    console.warn(`Falling back to default database for adminDb`);
+    adminDb = getAdminDb();
   }
 } catch (e: any) {
   console.error("Critical: Firebase Admin SDK setup failed:", e.message);
@@ -650,13 +655,20 @@ app.use(cookieParser());
       }
       
       // Determine transfer amount and reference code
-      const description = payload.content || payload.description || "";
+      const description = String(payload.content || payload.description || "");
       const amount = Number(payload.transferAmount || payload.amount || 0);
-      const referenceCodeSearch = payload.code || description.match(/Bmass[0-9]{3,12}/i)?.[0];
+      
+      // Improved reference code extraction
+      let referenceCodeSearch = payload.code;
+      if (!referenceCodeSearch) {
+        const match = description.match(/Bmass[0-9]+/i);
+        if (match) referenceCodeSearch = match[0];
+      }
 
       let invoiceData: any = null;
       
       if (referenceCodeSearch) {
+        console.log(`[SePay Webhook] Searching for invoice: ${referenceCodeSearch}`);
         // Find pending invoice
         if (adminDb) {
           try {
@@ -664,6 +676,7 @@ app.use(cookieParser());
             if (snap.exists) {
               invoiceData = snap.data();
             } else {
+              // Try case-insensitive fallback if ID format varies
               const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
               if (snapUpper.exists) {
                 invoiceData = snapUpper.data();
@@ -674,7 +687,7 @@ app.use(cookieParser());
           }
         }
         
-        if (!invoiceData) {
+        if (!invoiceData && db) {
           try {
             let ref = doc(db, `invoices/${referenceCodeSearch}`);
             let snap = await getDoc(ref);
@@ -693,35 +706,43 @@ app.use(cookieParser());
         }
       }
 
+      if (!invoiceData) {
+        console.log(`[SePay Webhook] No matching invoice found for reference: ${referenceCodeSearch || 'None'}`);
+        // We still return 200 to SePay to acknowledgereceipt, but log the miss
+        return res.json({ success: true, message: "No matching invoice" });
+      }
+
       let processed = false;
       if (adminDb) {
         try {
-          await adminDb.runTransaction(async (t) => {
+          await adminDb.runTransaction(async (t: any) => {
             const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
             const logSnap = await t.get(logRefAdmin);
             
             if (logSnap.exists) {
-              throw new Error("Already processed");
+              processed = true; // Already done
+              return;
             }
 
             // Mark as processed
             t.set(logRefAdmin, {
-              payload,
+              payload: { ...payload, processedAt: new Date().toISOString() },
               createdAt: admin.firestore.Timestamp.now()
             });
 
-            if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+            if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 500)) {
                // Update invoice
                const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
                t.update(invoiceRefAdmin, {
                  status: "paid",
                  paidAt: admin.firestore.Timestamp.now(),
                  "paymentDetails.sepayTransactionId": transactionId,
-                 "paymentDetails.actualAmount": amount
+                 "paymentDetails.actualAmount": amount,
+                 "paymentDetails.processedVia": "webhook_admin"
                });
 
-               // Wallet update logic (if needed)
-               if (invoiceData.type === "deposit") {
+               // Wallet update logic
+               if (invoiceData.type === "deposit" && invoiceData.userId) {
                  const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
                  const userSnap = await t.get(userRef);
                  const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
@@ -742,48 +763,43 @@ app.use(cookieParser());
                    createdAt: admin.firestore.Timestamp.now()
                  });
                }
-               console.log(`Invoice ${invoiceData.id} marked as PAID via SePay transaction ${transactionId} (Admin SDK)`);
+               console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID (Admin SDK)`);
             }
           });
           processed = true;
         } catch (err: any) {
-          console.error("SePay Webhook Admin SDK Transaction Error:", err.message);
-          if (err.message === "Already processed") return res.json({ success: true });
-          // Fallback to client SDK if Admin failed due to config
+          console.error("[SePay Webhook] Admin SDK Transaction Error:", err.message);
         }
       } 
       
-      if (!processed) {
-        let invoiceRef: any = null;
-        if (invoiceData) {
-          invoiceRef = doc(db, `invoices/${invoiceData.id}`);
-        }
-
+      if (!processed && db) {
+        const invoiceRef = doc(db, `invoices/${invoiceData.id}`);
         await runTransaction(db, async (t) => {
           const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
           const logSnap = await t.get(logRef);
           
           if (logSnap.exists) {
-            throw new Error("Already processed");
+            return;
           }
 
           // Mark as processed
           t.set(logRef, {
-            payload,
+            payload: { ...payload, processedAt: new Date().toISOString() },
             createdAt: Timestamp.now()
           });
 
-          if (invoiceData && invoiceRef && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+          if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 500)) {
              // Update invoice
              t.update(invoiceRef, {
                status: "paid",
                paidAt: Timestamp.now(),
                "paymentDetails.sepayTransactionId": transactionId,
-               "paymentDetails.actualAmount": amount
+               "paymentDetails.actualAmount": amount,
+               "paymentDetails.processedVia": "webhook_client"
              });
 
-             // Wallet update logic (if needed)
-             if (invoiceData.type === "deposit") {
+             // Wallet update logic
+             if (invoiceData.type === "deposit" && invoiceData.userId) {
                const userRef = doc(db, `users/${invoiceData.userId}`);
                const userSnap = await t.get(userRef);
                const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
@@ -792,7 +808,6 @@ app.use(cookieParser());
                   balance: currentBalance + invoiceData.totalAmount,
                }, { merge: true });
 
-               // Also record in deposits collection
                const depositId = `DEP_${invoiceData.id}`;
                t.set(doc(db, `deposits/${depositId}`), {
                  id: depositId,
@@ -804,7 +819,7 @@ app.use(cookieParser());
                  createdAt: Timestamp.now()
                });
              }
-             console.log(`Invoice ${invoiceRef.id} marked as PAID via SePay transaction ${transactionId}`);
+             console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID (Client SDK)`);
           }
         });
       }
@@ -965,7 +980,8 @@ app.use(cookieParser());
               const codeMatches = txCode === referenceUpper;
               
               const amount = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
-              const amountMatches = amount >= (expectedAmount - 100);
+              // Allow a small margin for bank fees or rounding
+              const amountMatches = amount >= (expectedAmount - 500);
 
               return (codeInContent || codeMatches) && amountMatches;
             });
