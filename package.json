@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "build": "rm -rf dist && mkdir -p dist && NODE_ENV=production vite build && NODE_ENV=production esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "NODE_ENV=production node dist/server.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "axios": "^1.16.0",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "date-fns": "^4.1.0",

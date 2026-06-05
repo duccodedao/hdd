@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useSearchParams } from 'react-router-dom';
-import { doc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { updateProfile, sendPasswordResetEmail, sendEmailVerification, signOut } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
@@ -34,6 +34,8 @@ export default function Profile() {
   const { user, userData } = useAuthStore();
   const [displayName, setDisplayName] = useState(userData?.displayName || '');
   const [phoneNumber, setPhoneNumber] = useState(userData?.phoneNumber || '');
+  const [socialLinks, setSocialLinks] = useState({ github: '', twitter: '', linkedin: '', facebook: '' });
+  const [badges, setBadges] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +55,16 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
+    
+    // Fetch UserProfile
+    const unsubProfile = onSnapshot(doc(db, 'user_profiles', user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setSocialLinks(data.socialLinks || { github: '', twitter: '', linkedin: '', facebook: '' });
+        setBadges(data.badges || []);
+      }
+    });
+
     const q = query(collection(db, 'activities'), where('userId', '==', user.uid));
     const unsub = onSnapshot(q, (snap) => {
       const all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog));
@@ -124,6 +136,7 @@ export default function Profile() {
     return () => {
       unsub();
       unsubInvoices();
+      unsubProfile();
       clearInterval(timer);
     };
   }, [user]);
@@ -194,9 +207,15 @@ export default function Profile() {
     try {
       await updateProfile(user, { displayName });
       await updateDoc(doc(db, 'users', user.uid), { displayName, phoneNumber });
+      await setDoc(doc(db, 'user_profiles', user.uid), { 
+        uid: user.uid,
+        displayName,
+        email: user.email,
+        socialLinks 
+      }, { merge: true });
       await logActivity(ActivityType.UPDATE_PROFILE, 'Đã cập nhật thông tin tài khoản');
       toast.success('Đã lưu thông tin');
-    } catch (e) { toast.error('Lỗi khi lưu dữ liệu'); } finally { setLoading(false); }
+    } catch (e) { console.error(e); toast.error('Lỗi khi lưu dữ liệu'); } finally { setLoading(false); }
   };
 
   const togglePermission = async (type: 'geolocation') => {
@@ -364,6 +383,25 @@ export default function Profile() {
                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-4 text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-600" 
                                placeholder="Số điện thoại..."
                              />
+                          </div>
+                          
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Social Links</label>
+                             <div className="grid grid-cols-2 gap-4">
+                                <input type="text" placeholder="GitHub" value={socialLinks.github} onChange={e => setSocialLinks({...socialLinks, github: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="Twitter" value={socialLinks.twitter} onChange={e => setSocialLinks({...socialLinks, twitter: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="LinkedIn" value={socialLinks.linkedin} onChange={e => setSocialLinks({...socialLinks, linkedin: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="Facebook" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                             </div>
+                          </div>
+
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Badges</label>
+                             <div className="flex flex-wrap gap-2">
+                                {badges.length > 0 ? badges.map(b => (
+                                  <span key={b} className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold">{b}</span>
+                                )) : <span className="text-xs text-slate-400">Chưa có huy hiệu</span>}
+                             </div>
                           </div>
                           
                           <div className="pt-4">

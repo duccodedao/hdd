@@ -274,15 +274,22 @@ export default function WalletPage() {
         })
       });
 
-      if (!resp.ok) throw new Error('Create invoice server failure');
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        const msg = errorData.error || 'Create invoice server failure';
+        if (errorData.hint) {
+          toast.error(`${msg}\n${errorData.hint}`, { duration: 8000 });
+        }
+        throw new Error(msg);
+      }
       const invoiceData = await resp.json();
 
       setActiveInvoice(invoiceData);
       setTimeLeft(15 * 60_000); // 15 mins checkout counter
       setDepositStep(2); // Set step after successful creation
       toast.success('Tạo đơn nạp thành công!');
-    } catch (e) {
-      toast.error('Lỗi khởi tạo nạp tiền SePay');
+    } catch (e: any) {
+      toast.error(e.message || 'Lỗi khởi tạo nạp tiền SePay');
     } finally {
       setIsGeneratingQR(false);
     }
@@ -814,6 +821,8 @@ export default function WalletPage() {
 
           </AnimatePresence>
         </div>
+      </div>
+    </div>
 
       {/* 5. Combined Histories Table Container */}
       <div className="bg-white dark:bg-zinc-950 p-0 rounded-[2.5rem] flex flex-col border border-slate-100 dark:border-white/5 shadow-sm overflow-hidden flex-1 relative">
@@ -882,12 +891,17 @@ export default function WalletPage() {
                             {d.createdAt?.toMillis ? format(d.createdAt.toMillis(), 'HH:mm dd/MM/yy') : 'Vừa xong'}
                           </td>
                           <td className="py-4 px-2 text-[11px] font-black text-emerald-600 text-right">{d.totalAmount?.toLocaleString()}đ</td>
-                          <td className="py-4 px-6 text-right">
+                          <td className="py-4 px-6 text-right flex items-center justify-end gap-2">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                               d.status === 'completed' || d.status === 'paid' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500'
                             }`}>
                               {d.status === 'completed' || d.status === 'paid' ? 'Thành công' : 'Đang duyệt'}
                             </span>
+                            {!(d.status === 'completed' || d.status === 'paid') && (
+                              <button onClick={() => handleVerifyInvoiceStatus(d.id, false)} className="p-1 text-slate-400 hover:text-indigo-600 transition-colors" title="Rà soát lại">
+                                <RefreshCw size={12} />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -970,7 +984,5 @@ export default function WalletPage() {
         </div>
       </div>
     </div>
-  </div>
-</div>
    );
 }

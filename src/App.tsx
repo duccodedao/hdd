@@ -9,6 +9,7 @@ import { useAppStore } from './store/appStore';
 import { Toaster, toast } from 'react-hot-toast';
 import { ShieldAlert, X } from 'lucide-react';
 import AdminPinLockScreen from './components/auth/AdminPinLockScreen';
+import CommandPalette from './components/ui/CommandPalette';
 import {
   registerAdminSession,
   getOrCreateSessionId,
@@ -69,6 +70,7 @@ import { HelmetProvider, Helmet } from 'react-helmet-async';
 import HomePage from './pages/HomePage';
 
 import { useAudioStore } from './store/audioStore';
+import { useFirebaseSync } from './hooks/useFirebaseSync';
 
 let lastIncrementedPath: string | null = null;
 let lastIncrementTime: number = 0;
@@ -119,6 +121,7 @@ function VisitTracker() {
 
 export default function App() {
   const { user, userData, setUser, setUserData, setLoading, loading, isAdmin, isSuperAdmin } = useAuthStore();
+  useFirebaseSync();
   const { maintenanceMode, setMaintenanceMode, setOnlineStatus, setMaintenanceTabs, setMaintenanceDevices, setBlockedDevices, stampConfig, setStampConfig, maintenanceStampConfig, setMaintenanceStampConfig, setSystemVersion, setWebLogo, setHasUnapprovedSessions } = useAppStore();
   const initAudio = useAudioStore((state) => state.init);
   const [seo, setSeo] = useState({
@@ -557,6 +560,7 @@ export default function App() {
       <OfflineNotification />
       <FloatingAdminButton />
       <CookieConsentComponent />
+      <CommandPalette />
       <AuthActionRedirector />
       <Toaster position="top-right" />
       <ConfirmModal />

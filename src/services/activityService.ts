@@ -9,6 +9,14 @@ export enum ActivityType {
   ADMIN_ACTION = 'ADMIN_ACTION'
 }
 
+const ACTION_TITLES: Record<string, string> = {
+  LOGIN: 'Đăng nhập hệ thống',
+  UPDATE_PROFILE: 'Cập nhật hồ sơ cá nhân',
+  SECURITY_CHANGE: 'Thiết lập bảo mật & Cài đặt',
+  UPLOAD_FILE: 'Đăng tải tệp tin',
+  ADMIN_ACTION: 'Thao tác trình quản trị'
+};
+
 export async function logActivity(type: ActivityType, description: string, metadata?: any) {
   const user = auth.currentUser;
   if (!user) return;
@@ -19,7 +27,10 @@ export async function logActivity(type: ActivityType, description: string, metad
       userId: user.uid,
       type,
       description,
+      action: ACTION_TITLES[type] || type,
+      details: description,
       timestamp: serverTimestamp(),
+      createdAt: serverTimestamp(),
       ipAddress: 'Auto',
       userAgent: navigator.userAgent
     };

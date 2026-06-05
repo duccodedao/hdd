@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { format } from 'date-fns';
 import { motion, useSpring, useTransform, AnimatePresence } from 'motion/react';
+import ActivityFeed from '../components/activity/ActivityFeed';
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
@@ -211,7 +212,7 @@ export default function HomePage() {
       unsubLogins();
       unsubPartners();
     };
-  }, []);
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden font-sans text-slate-900 dark:text-zinc-300">
@@ -340,7 +341,10 @@ export default function HomePage() {
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       Hoạt động trực tuyến
                     </h3>
-                    <RecentLoginsStream logins={recentLogins} />
+                    <ActivityFeed />
+                    <div className="mt-4">
+                      <RecentLoginsStream logins={recentLogins} />
+                    </div>
                   </div>
                 )}
               </div>

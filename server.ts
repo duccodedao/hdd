@@ -1,18 +1,66 @@
+
 import express from "express";
 import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, updateDoc, collection, getDocs, Timestamp, getDoc, setDoc, query, where } from "firebase/firestore";
+import * as admin from 'firebase-admin';
+import { 
+  getFirestore, 
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  Timestamp,
+  increment,
+  limit,
+  writeBatch,
+  runTransaction
+} from "firebase/firestore";
 import crypto from "crypto";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
-import firebaseConfig from "./firebase-applet-config.json";
+import fs from "fs";
 
+// Read config explicitly to ensure resolution
+const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
+
+// Initialize Firebase Admin (for privileged server-side operations)
+let adminDb: admin.firestore.Firestore | null = null;
+try {
+  if (admin.apps.length === 0) {
+    admin.initializeApp({
+      projectId: firebaseConfig.projectId
+    });
+  }
+  
+  try {
+    // Try specifically for the configured database
+    adminDb = databaseId && databaseId !== "(default)" ? admin.firestore(databaseId) : admin.firestore();
+    console.log(`Firebase Admin initialized for database: ${databaseId}`);
+  } catch (dbErr) {
+    console.warn(`Failed to initialize Admin for database '${databaseId}', falling back to default`);
+    adminDb = admin.firestore(); // Fallback to default database
+  }
+} catch (e) {
+  console.error("Failed to initialize Firebase Admin basic apps", e);
+}
+
+// Initialize Firebase Client SDK
 const firebaseApp = initializeApp(firebaseConfig);
-const db = (firebaseConfig as any).firestoreDatabaseId 
-  ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(firebaseApp);
+let db: any;
+try {
+  db = getFirestore(firebaseApp, databaseId);
+} catch (e) {
+  console.warn(`Client SDK fail for database '${databaseId}', using default`);
+  db = getFirestore(firebaseApp);
+}
+console.log(`Firebase Client initialized targeting project: ${firebaseConfig.projectId}`);
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
 // try {
@@ -33,11 +81,11 @@ const db = (firebaseConfig as any).firestoreDatabaseId
 // Cache for Gemini Client to avoid re-initializing if key hasn't changed
 let cachedAiClient: { key: string, client: GoogleGenAI } | null = null;
 
-async function getAiClient() {
+  async function getAiClient() {
   // 1. Try to get key from Firestore (Admin UI setup)
   try {
-    const apiKeysSnap = await getDoc(doc(db, "settings", "apiKeys"));
-    const firestoreKey = apiKeysSnap.exists() ? apiKeysSnap.data().geminiApiKey : null;
+    const apiKeysSnap = await getDoc(doc(db, "settings/apiKeys"));
+    const firestoreKey = apiKeysSnap.exists() ? apiKeysSnap.data()?.geminiApiKey : null;
     
     const keyToUse = firestoreKey || process.env.GEMINI_API_KEY;
 
@@ -66,6 +114,20 @@ async function getAiClient() {
   }
 }
 
+// Helper to safely stringify objects potentially containing circular references
+function safeStringify(obj: any, indent = 2) {
+  const cache = new Set();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (cache.has(value)) {
+        return '[Circular]';
+      }
+      cache.add(value);
+    }
+    return value;
+  }, indent);
+}
+
 const app = express();
 
 app.use(cors());
@@ -89,6 +151,10 @@ app.use(cookieParser());
         config: config || {}
       });
 
+      if (!response || !response.text) {
+        throw new Error("Empty response from Gemini");
+      }
+
       res.json({ text: response.text });
     } catch (error: any) {
       console.error("Gemini API Error:", error);
@@ -100,32 +166,156 @@ app.use(cookieParser());
   });
 
   // Endpoint to create an invoice (for deposits too)
+  // Diagnostic endpoint to check Firestore connectivity
+  app.get("/api/diag/firestore", async (req, res) => {
+    const results: any = {};
+    
+    // 1. Check Admin SDK (Preferred)
+    if (adminDb) {
+      try {
+        const testRefAdmin = adminDb.doc("system/health_check_admin");
+        await testRefAdmin.set({
+          lastCheck: admin.firestore.Timestamp.now(),
+          serverNode: process.env.K_SERVICE || "local",
+          sdk: "admin",
+          databaseId
+        }, { merge: true });
+        results.adminSdk = { status: "ok", message: "Admin SDK connected successfully" };
+      } catch (err: any) {
+        results.adminSdk = { status: "error", message: err.message, code: err.code };
+      }
+    } else {
+      results.adminSdk = { status: "missing", message: "Admin SDK not initialized" };
+    }
+
+    // 2. Check Client SDK (Fallback)
+    try {
+      const testRef = doc(db, "system/health_check_client");
+      await setDoc(testRef, {
+        lastCheck: Timestamp.now(),
+        serverNode: process.env.K_SERVICE || "local",
+        sdk: "client",
+        databaseId
+      }, { merge: true });
+      results.clientSdk = { status: "ok", message: "Client SDK connected (might fail if rules apply)" };
+    } catch (err: any) {
+      results.clientSdk = { status: "error", message: err.message, code: err.code };
+    }
+
+    res.json({ 
+      status: results.adminSdk?.status === "ok" ? "ok" : "warning",
+      databaseId,
+      projectId: firebaseConfig.projectId,
+      results
+    });
+  });
+
   app.post("/api/invoices/create", async (req, res) => {
     try {
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = doc(db, "invoices", referenceCode);
-      const invoiceData = {
+      
+      // Use basic JS date for initial return object to avoid serialization issues
+      const dateNow = new Date();
+      const invoiceData: any = {
         id: referenceCode,
         userId: userId || "guest",
         userEmail: userEmail || "guest",
         items: items || [],
         totalAmount: totalAmount || 0,
         status: "pending",
-        type: type || "purchase", // 'purchase' or 'deposit'
+        type: type || "purchase",
         paymentMethod: "bank_transfer",
         paymentDetails: {
           referenceCode
         },
-        createdAt: Timestamp.now(),
+        createdAt: dateNow,
       };
 
-      await setDoc(invoiceRef, invoiceData);
+      let success = false;
+      let lastErr = null;
+
+      // 1. Try Admin SDK first (specifically database might fail if it doesn't exist)
+      if (adminDb) {
+        try {
+          await adminDb.doc(`invoices/${referenceCode}`).set({
+            ...invoiceData,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          success = true;
+          console.log(`Invoice ${referenceCode} created via Admin SDK`);
+        } catch (err: any) {
+          console.error("Admin SDK Invoice Create Error:", err.message);
+          lastErr = err;
+          
+          // If the error is about not finding the database, we might want to try default database via admin
+          if (err.message?.includes("not found") || err.code === 5) {
+             try {
+                await admin.firestore().doc(`invoices/${referenceCode}`).set({
+                  ...invoiceData,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                success = true;
+                console.log(`Invoice ${referenceCode} created via Admin SDK (Default DB fallback)`);
+             } catch (innerErr) {
+                // Ignore, we will fallback to client SDK
+             }
+          }
+        }
+      }
+
+      // 2. Fallback to Client SDK if Admin failed or wasn't available
+      if (!success) {
+        try {
+          const invoiceRef = doc(db, `invoices/${referenceCode}`);
+          await setDoc(invoiceRef, {
+            ...invoiceData,
+            createdAt: Timestamp.now() // Client SDK doesn't have ServerTimestamp easily accessible without extra import
+          });
+          success = true;
+          console.log(`Invoice ${referenceCode} created via Client SDK`);
+        } catch (err: any) {
+          console.error("Client SDK Invoice Create Error:", err.message);
+          lastErr = lastErr || err;
+        }
+      }
+
+      if (!success) {
+        throw lastErr || new Error("All Firestore SDKs failed to create invoice");
+      }
+
       res.json(invoiceData);
     } catch (error: any) {
-      console.error("Create Invoice Error:", error);
-      res.status(500).json({ error: "Failed to create invoice: " + (error.message || error) });
+      console.error("Create Invoice Error details:", safeStringify({
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack
+      }));
+
+      let errorMessage = "Failed to create invoice: " + (error.message || error);
+      let hint = "";
+
+      if (error.message?.includes("PERMISSION_DENIED") || error.code === 7 || error.code === "permission-denied") {
+        const projId = firebaseConfig.projectId;
+        errorMessage = "Lỗi: Quyền truy cập Firestore bị từ chối (PERMISSION_DENIED).";
+        
+        if (error.message?.includes("API not used") || error.message?.includes("disabled")) {
+          hint = `Cloud Firestore API chưa được kích hoạt. Hãy truy cập link này để kích hoạt: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projId}`;
+        } else {
+          hint = `Có thể do Security Rules chặn truy xuất hoặc do API chưa được kích hoạt cho Project ID: ${projId}.`;
+        }
+      } else if (error.message?.includes("NOT_FOUND") || error.message?.includes("database") || error.code === 5 || error.code === "not-found") {
+        errorMessage = `Lỗi: Không tìm thấy database '${databaseId}'.`;
+        hint = `Vui lòng kiểm tra xem bạn đã tạo database tên là '${databaseId}' trong Firestore console chưa. Nếu chỉ dùng database mặc định, hãy xóa 'firestoreDatabaseId' trong cài đặt hoặc đổi thành '(default)'.`;
+      }
+
+      res.status(500).json({ 
+        error: errorMessage,
+        hint: hint,
+        details: error.message
+      });
     }
   });
 
@@ -135,10 +325,10 @@ app.use(cookieParser());
       const { userId, userEmail, userName, productId, productName, amount } = req.body;
       if (!userId || !amount) return res.status(400).json({ error: "Missing required fields" });
 
-      const userRef = doc(db, "users", userId);
+      const userRef = doc(db, `users/${userId}`);
       const userSnap = await getDoc(userRef);
       
-      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
+      const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
       
       if (currentBalance < amount) {
         return res.status(400).json({ error: "Số dư không đủ. Vui lòng nạp thêm tiền vào ví!" });
@@ -151,7 +341,7 @@ app.use(cookieParser());
 
       // Record transaction
       const txId = `TX_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await setDoc(doc(db, "transactions", txId), {
+      await setDoc(doc(db, `transactions/${txId}`), {
         id: txId,
         userId,
         userEmail,
@@ -180,13 +370,13 @@ app.use(cookieParser());
       const searchLower = searchKey.trim().toLowerCase();
 
       // Query by email
-      let q = query(collection(db, "users"), where("email", "==", searchLower));
-      let snap = await getDocs(q);
+      const qEmail = query(collection(db, "users"), where("email", "==", searchLower), limit(1));
+      let snap = await getDocs(qEmail);
 
       // Try phone number if empty
       if (snap.empty) {
-        q = query(collection(db, "users"), where("phoneNumber", "==", searchKey.trim()));
-        snap = await getDocs(q);
+        const qPhone = query(collection(db, "users"), where("phoneNumber", "==", searchKey.trim()), limit(1));
+        snap = await getDocs(qPhone);
       }
 
       if (snap.empty) {
@@ -222,8 +412,8 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Bạn không thể tự chuyển tiền cho chính mình!" });
       }
 
-      const senderRef = doc(db, "users", senderId);
-      const recipientRef = doc(db, "users", recipientId);
+      const senderRef = doc(db, `users/${senderId}`);
+      const recipientRef = doc(db, `users/${recipientId}`);
 
       const senderSnap = await getDoc(senderRef);
       const recipientSnap = await getDoc(recipientRef);
@@ -238,8 +428,8 @@ app.use(cookieParser());
       const senderData = senderSnap.data();
       const recipientData = recipientSnap.data();
 
-      const senderBalance = senderData.balance || 0;
-      const recipientBalance = recipientData.balance || 0;
+      const senderBalance = senderData?.balance || 0;
+      const recipientBalance = recipientData?.balance || 0;
 
       if (senderBalance < parseAmount) {
          return res.status(400).json({ error: "Số dư khả dụng không đủ để thực hiện giao dịch." });
@@ -259,13 +449,13 @@ app.use(cookieParser());
       const txIdRecipient = `TX_TRA_IN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
       // Save transactions
-      await setDoc(doc(db, "transactions", txIdSender), {
+      await setDoc(doc(db, `transactions/${txIdSender}`), {
         id: txIdSender,
         userId: senderId,
-        userEmail: senderData.email || "",
-        userName: senderData.displayName || "User",
+        userEmail: senderData?.email || "",
+        userName: senderData?.displayName || "User",
         productId: recipientId,
-        productName: `Chuyển tiền đến ${recipientData.displayName || recipientData.email}`,
+        productName: `Chuyển tiền đến ${recipientData?.displayName || recipientData?.email}`,
         amount: parseAmount,
         type: "transfer_out",
         status: "completed",
@@ -273,13 +463,13 @@ app.use(cookieParser());
         createdAt: transferTime
       });
 
-      await setDoc(doc(db, "transactions", txIdRecipient), {
+      await setDoc(doc(db, `transactions/${txIdRecipient}`), {
         id: txIdRecipient,
         userId: recipientId,
-        userEmail: recipientData.email || "",
-        userName: recipientData.displayName || "User",
+        userEmail: recipientData?.email || "",
+        userName: recipientData?.displayName || "User",
         productId: senderId,
-        productName: `Nhận tiền từ ${senderData.displayName || senderData.email}`,
+        productName: `Nhận tiền từ ${senderData?.displayName || senderData?.email}`,
         amount: parseAmount,
         type: "transfer_in",
         status: "completed",
@@ -296,25 +486,46 @@ app.use(cookieParser());
 
   async function updateWalletOnPayment(invoiceData: any) {
     if (invoiceData.type === "deposit") {
-      const userRef = doc(db, "users", invoiceData.userId);
-      const userSnap = await getDoc(userRef);
-      const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
-      
-      await setDoc(userRef, {
-        balance: currentBalance + invoiceData.totalAmount,
-      }, { merge: true });
+      if (adminDb) {
+        const userRef = adminDb.doc(`users/${invoiceData.userId}`);
+        const userSnap = await userRef.get();
+        const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+        
+        await userRef.set({
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
 
-      // Also record in deposits collection for admin audit
-      const depositId = `DEP_${invoiceData.id}`;
-      await setDoc(doc(db, "deposits", depositId), {
-        id: depositId,
-        invoiceId: invoiceData.id,
-        userId: invoiceData.userId,
-        userEmail: invoiceData.userEmail,
-        amount: invoiceData.totalAmount,
-        status: "completed",
-        createdAt: Timestamp.now()
-      });
+        const depositId = `DEP_${invoiceData.id}`;
+        await adminDb.doc(`deposits/${depositId}`).set({
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: admin.firestore.Timestamp.now()
+        });
+      } else {
+        const userRef = doc(db, `users/${invoiceData.userId}`);
+        const userSnap = await getDoc(userRef);
+        const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+        
+        await setDoc(userRef, {
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
+
+        // Also record in deposits collection for admin audit
+        const depositId = `DEP_${invoiceData.id}`;
+        await setDoc(doc(db, `deposits/${depositId}`), {
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: Timestamp.now()
+        });
+      }
     }
   }
 
@@ -336,86 +547,167 @@ app.use(cookieParser());
       }
 
       const payload = req.body;
-      console.log("SePay Webhook Received:", JSON.stringify(payload, null, 2));
+      console.log("SePay Webhook Received:", safeStringify(payload));
 
       const transactionId = payload.id || payload.transactionId;
       if (!transactionId) {
         return res.json({ success: true }); // Ignore if no transaction ID
       }
-
-      // 2. Prevent duplicate processing using a webhook_logs collection (Idempotency)
-      const logRef = doc(db, "webhook_logs", String(transactionId));
-      const logSnap = await getDoc(logRef);
       
-      if (logSnap.exists()) {
-        console.log(`Webhook for transaction ${transactionId} already processed.`);
-        return res.json({ success: true });
-      }
-
-      // 3. Mark as processed immediately (to avoid race conditions)
-      await setDoc(logRef, {
-        payload,
-        createdAt: Timestamp.now()
-      });
-
-      // SePay sends description which contains reference code
+      // Determine transfer amount and reference code
       const description = payload.content || payload.description || "";
       const amount = Number(payload.transferAmount || payload.amount || 0);
-
-      // Extract reference code like Bmass123456 (matching user's prefix)
-      // The provided documentation says code can be sent in payload.code as well
       const referenceCodeSearch = payload.code || description.match(/Bmass[0-9]{3,12}/i)?.[0];
+
+      let invoiceData: any = null;
       
       if (referenceCodeSearch) {
-        // Find pending invoice using multiple case fallbacks to ensure absolute success
-        let invoiceRef = doc(db, "invoices", referenceCodeSearch);
-        let invoiceSnap = await getDoc(invoiceRef);
-        
-        if (!invoiceSnap.exists()) {
-          invoiceRef = doc(db, "invoices", referenceCodeSearch.toUpperCase());
-          invoiceSnap = await getDoc(invoiceRef);
-        }
-        
-        if (!invoiceSnap.exists()) {
-          invoiceRef = doc(db, "invoices", referenceCodeSearch.toLowerCase());
-          invoiceSnap = await getDoc(invoiceRef);
-        }
-
-        if (!invoiceSnap.exists()) {
-          const formatted = "Bmass" + referenceCodeSearch.replace(/^[A-Za-z]+/, "");
-          invoiceRef = doc(db, "invoices", formatted);
-          invoiceSnap = await getDoc(invoiceRef);
-        }
-        
-        if (invoiceSnap.exists()) {
-          const invoiceData = invoiceSnap.data();
-          const referenceCode = invoiceSnap.id;
-          if (invoiceData.status === "pending") {
-            // Check if amount matches. Use amount >= invoiceData.totalAmount as a safer check.
-            if (amount >= (invoiceData.totalAmount - 100)) { // Allow minor display diff
-               await updateDoc(invoiceRef, {
-                 status: "paid",
-                 paidAt: Timestamp.now(),
-                 "paymentDetails.sepayTransactionId": transactionId,
-                 "paymentDetails.actualAmount": amount
-               });
-               await updateWalletOnPayment(invoiceData);
-               console.log(`Invoice ${referenceCode} marked as PAID via SePay`);
-            } else {
-               console.log(`Amount mismatch for invoice ${referenceCode}: expected ${invoiceData.totalAmount}, got ${amount}`);
-            }
+        // Find pending invoice
+        if (adminDb) {
+          const snap = await adminDb.doc(`invoices/${referenceCodeSearch}`).get();
+          if (snap.exists) {
+            invoiceData = snap.data();
           } else {
-            console.log(`Invoice ${referenceCode} is already in state: ${invoiceData.status}`);
+            const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
+            if (snapUpper.exists) {
+              invoiceData = snapUpper.data();
+            }
           }
         } else {
-          console.log(`No pending invoice found for reference code: ${referenceCodeSearch}`);
+          let ref = doc(db, `invoices/${referenceCodeSearch}`);
+          let snap = await getDoc(ref);
+          
+          if (!snap.exists()) {
+             ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
+             snap = await getDoc(ref);
+          }
+          
+          if (snap.exists()) {
+            invoiceData = snap.data();
+          }
         }
+      }
+
+      if (adminDb) {
+        await adminDb.runTransaction(async (t) => {
+          const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
+          const logSnap = await t.get(logRefAdmin);
+          
+          if (logSnap.exists) {
+            throw new Error("Already processed");
+          }
+
+          // Mark as processed
+          t.set(logRefAdmin, {
+            payload,
+            createdAt: admin.firestore.Timestamp.now()
+          });
+
+          if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+             // Update invoice
+             const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
+             t.update(invoiceRefAdmin, {
+               status: "paid",
+               paidAt: admin.firestore.Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount
+             });
+
+             // Wallet update logic (if needed)
+             if (invoiceData.type === "deposit") {
+               const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
+               const userSnap = await t.get(userRef);
+               const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+               
+               t.set(userRef, {
+                  balance: currentBalance + invoiceData.totalAmount,
+               }, { merge: true });
+
+               // Also record in deposits collection
+               const depositId = `DEP_${invoiceData.id}`;
+               t.set(adminDb!.doc(`deposits/${depositId}`), {
+                 id: depositId,
+                 invoiceId: invoiceData.id,
+                 userId: invoiceData.userId,
+                 userEmail: invoiceData.userEmail,
+                 amount: invoiceData.totalAmount,
+                 status: "completed",
+                 createdAt: admin.firestore.Timestamp.now()
+               });
+             }
+             console.log(`Invoice ${invoiceData.id} marked as PAID via SePay transaction ${transactionId} (Admin SDK)`);
+          }
+        });
+      } else {
+        let invoiceRef: any = null;
+        if (invoiceData) {
+          invoiceRef = doc(db, `invoices/${invoiceData.id}`);
+        }
+
+        await runTransaction(db, async (t) => {
+          const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+          const logSnap = await t.get(logRef);
+          
+          if (logSnap.exists) {
+            throw new Error("Already processed");
+          }
+
+          // Mark as processed
+          t.set(logRef, {
+            payload,
+            createdAt: Timestamp.now()
+          });
+
+          if (invoiceData && invoiceRef && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+             // Update invoice
+             t.update(invoiceRef, {
+               status: "paid",
+               paidAt: Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount
+             });
+
+             // Wallet update logic (if needed)
+             if (invoiceData.type === "deposit") {
+               const userRef = doc(db, `users/${invoiceData.userId}`);
+               const userSnap = await t.get(userRef);
+               const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+               
+               t.set(userRef, {
+                  balance: currentBalance + invoiceData.totalAmount,
+               }, { merge: true });
+
+               // Also record in deposits collection
+               const depositId = `DEP_${invoiceData.id}`;
+               t.set(doc(db, `deposits/${depositId}`), {
+                 id: depositId,
+                 invoiceId: invoiceData.id,
+                 userId: invoiceData.userId,
+                 userEmail: invoiceData.userEmail,
+                 amount: invoiceData.totalAmount,
+                 status: "completed",
+                 createdAt: Timestamp.now()
+               });
+             }
+             console.log(`Invoice ${invoiceRef.id} marked as PAID via SePay transaction ${transactionId}`);
+          }
+        });
       }
 
       res.json({ success: true });
-    } catch (error) {
-      console.error("SePay Webhook Error:", error);
-      res.status(500).json({ error: "Webhook processing failed" });
+    } catch (error: any) {
+      console.error("SePay Webhook Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack,
+        payload: req.body
+      });
+      res.status(500).json({ 
+        error: "Webhook processing failed", 
+        details: error.message || String(error),
+        code: error.code 
+      });
     }
   };
 
@@ -432,29 +724,52 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Missing invoiceId" });
       }
 
-      const invoiceRef = doc(db, "invoices", invoiceId);
-      const invoiceSnap = await getDoc(invoiceRef);
+      let invoiceData;
+      let invoiceExists = false;
+      if (adminDb) {
+        const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
+        const invoiceSnap = await invoiceRefAdmin.get();
+        if (invoiceSnap.exists) {
+          invoiceExists = true;
+          invoiceData = invoiceSnap.data();
+        }
+      } else {
+        const invoiceRef = doc(db, `invoices/${invoiceId}`);
+        const invoiceSnap = await getDoc(invoiceRef);
+        if (invoiceSnap.exists()) {
+          invoiceExists = true;
+          invoiceData = invoiceSnap.data();
+        }
+      }
 
-      if (!invoiceSnap.exists()) {
+      if (!invoiceExists) {
         return res.status(404).json({ error: "No invoice found" });
       }
 
-      const invoiceData = invoiceSnap.data();
-      if (invoiceData.status === "paid") {
+      if (invoiceData?.status === "paid") {
         return res.json({ success: true, status: "paid", message: "Hóa đơn này đã được xác nhận thanh toán thành công!" });
       }
 
-      const referenceCode = invoiceData.paymentDetails?.referenceCode || invoiceId;
-      const expectedAmount = invoiceData.totalAmount;
+      const referenceCode = invoiceData?.paymentDetails?.referenceCode || invoiceId;
+      const expectedAmount = invoiceData?.totalAmount || 0;
 
       // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
       if (isSandboxMock) {
-        await updateDoc(invoiceRef, {
-          status: "paid",
-          paidAt: Timestamp.now(),
-          "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
-          "paymentDetails.isSandboxMock": true
-        });
+        if (adminDb) {
+          await adminDb.doc(`invoices/${invoiceId}`).update({
+            status: "paid",
+            paidAt: admin.firestore.Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        } else {
+          await updateDoc(doc(db, "invoices", invoiceId), {
+            status: "paid",
+            paidAt: Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        }
         await updateWalletOnPayment(invoiceData);
         return res.json({ success: true, status: "paid", message: "Duyệt giao dịch mô phỏng nâng cao thành công!" });
       }
@@ -462,8 +777,8 @@ app.use(cookieParser());
       // 2. Query SePay API to fetch latest bank transactions in real-time
       const sepayApiKey = process.env.SEPAY_API_KEY;
       if (sepayApiKey) {
-        const sysSnap = await getDoc(doc(db, "settings", "system"));
-        const bankingConfig = sysSnap.exists() ? sysSnap.data().bankingConfig : null;
+        const sysSnap = await getDoc(doc(db, "settings/system"));
+        const bankingConfig = sysSnap.exists() ? sysSnap.data()?.bankingConfig : null;
         const bankAccount = bankingConfig?.bankAccount || "";
 
         let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
@@ -499,20 +814,39 @@ app.use(cookieParser());
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
-              const logRef = doc(db, "webhook_logs", String(transactionId));
-              await setDoc(logRef, {
-                payload: matchedTx,
-                createdAt: Timestamp.now(),
-                manualCheck: true
-              });
 
-              await updateDoc(invoiceRef, {
-                status: "paid",
-                paidAt: Timestamp.now(),
-                "paymentDetails.sepayTransactionId": transactionId,
-                "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
-                "paymentDetails.actualSource": "sepay_api_manual_check"
-              });
+              if (adminDb) {
+                const logRef = adminDb.doc(`webhook_logs/${String(transactionId)}`);
+                await logRef.set({
+                  payload: matchedTx,
+                  createdAt: admin.firestore.Timestamp.now(),
+                  manualCheck: true
+                });
+
+                const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
+                await invoiceRefAdmin.update({
+                  status: "paid",
+                  paidAt: admin.firestore.Timestamp.now(),
+                  "paymentDetails.sepayTransactionId": transactionId,
+                  "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
+                  "paymentDetails.actualSource": "sepay_api_manual_check"
+                });
+              } else {
+                const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+                await setDoc(logRef, {
+                  payload: matchedTx,
+                  createdAt: Timestamp.now(),
+                  manualCheck: true
+                });
+
+                await updateDoc(doc(db, "invoices", invoiceId), {
+                  status: "paid",
+                  paidAt: Timestamp.now(),
+                  "paymentDetails.sepayTransactionId": transactionId,
+                  "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
+                  "paymentDetails.actualSource": "sepay_api_manual_check"
+                });
+              }
 
               await updateWalletOnPayment(invoiceData);
 
@@ -542,7 +876,7 @@ app.use(cookieParser());
       });
 
     } catch (error: any) {
-      console.error("Manual verify action error:", error);
+      console.error("Manual verify action error:", safeStringify(error));
       res.status(500).json({ error: "Lỗi kiểm tra hóa đơn: " + (error.message || error) });
     }
   });
@@ -597,7 +931,7 @@ app.use(cookieParser());
     if (!uid) return res.status(400).json({ error: "Missing uid" });
 
     try {
-        await updateDoc(doc(db, "users", uid), {
+        await updateDoc(doc(db, `users/${uid}`), {
           "socialLinks.telegram": telegramData
         });
         res.json({ success: true });

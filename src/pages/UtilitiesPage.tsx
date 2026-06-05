@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
@@ -16,6 +16,7 @@ import AvatarFrameManager from './utilities/AvatarFrameManager';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
+import { useBookmarkStore } from '../store/bookmarkStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { PaymentDialog } from '../components/payment/PaymentDialog';
@@ -38,6 +39,19 @@ const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.
 const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [], isHot = false }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[], isHot?: boolean }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
+  const { isBookmarked, toggleBookmark } = useBookmarkStore();
+  const bookmarked = isBookmarked(item.id);
+
+  const handleBookmarkToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleBookmark({
+      itemId: item.id,
+      title: item.title,
+      type: 'utility',
+      url: `/utilities?tab=${item.id}`
+    });
+  };
+
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
   const config = systemTools?.[item.id];
@@ -158,23 +172,39 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
             Icon ? <Icon className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />
           )}
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className={cn(
-            "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-            isMaintenanceActive 
-              ? 'bg-rose-100 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' 
-              : isInternal 
-                ? 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
-                : 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
-          )}>
-            {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Bookmark star control */}
+          <button
+            type="button"
+            onClick={handleBookmarkToggle}
+            className={`p-1.5 rounded-lg active:scale-95 transition-all duration-300 z-25 ${
+              bookmarked 
+                ? 'text-amber-500 bg-amber-500/10' 
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+            }`}
+            title={bookmarked ? "Xóa khỏi dấu trang" : "Lưu vào dấu trang"}
+          >
+            <Star className={`w-3.5 h-3.5 ${bookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
+          </button>
+
+          <div className="flex flex-col items-end gap-1.5">
+            <div className={cn(
+              "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
+              isMaintenanceActive 
+                ? 'bg-rose-100 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' 
+                : isInternal 
+                  ? 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
+                  : 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+            )}>
+              {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
+            </div>
           {(visits !== undefined && visits > 0) && (
             <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-slate-400 dark:text-zinc-500 bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded border border-slate-200/50 dark:border-white/10 shadow-sm">
               <Eye className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
               <span>{visits.toLocaleString('vi-VN')}</span>
             </div>
           )}
+          </div>
         </div>
       </div>
       

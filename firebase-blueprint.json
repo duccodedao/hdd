@@ -1,5 +1,39 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with badges and social links",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "bio": { "type": "string" },
+        "socialLinks": {
+          "type": "object",
+          "properties": {
+            "github": { "type": "string" },
+            "twitter": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "facebook": { "type": "string" }
+          }
+        },
+        "badges": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "User activity log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "createdAt"]
+    },
     "Form": {
       "title": "Form",
       "description": "Metadata and question structure for a dynamic form (folder)",
@@ -268,6 +302,14 @@
     }
   },
   "firestore": {
+    "activity_feed": {
+      "schema": "Activity",
+      "description": "User activity log for real-time feed"
+    },
+    "user_profiles": {
+      "schema": "UserProfile",
+      "description": "User profiles with badges and social links"
+    },
     "admin_sessions": {
       "schema": "AdminSession",
       "description": "Admin login sessions tracked for real-time security alerts on multi-device or location conflicts"

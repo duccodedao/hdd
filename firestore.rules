@@ -5,10 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
     function isSuperAdmin() {
-      return isSignedIn() && (request.auth.token.email == 'sonlyhongduc@gmail.com' || request.auth.token.email == 'sonlyhongduc1@ghn.vn');
+      return isSignedIn() && (request.auth.token.get('email', '') == 'sonlyhongduc@gmail.com' || request.auth.token.get('email', '') == 'sonlyhongduc1@ghn.vn');
     }
     function isAdmin() {
-      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin']);
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin']);
     }
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
@@ -39,7 +39,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
       allow create: if isOwner(userId) || isSuperAdmin();
-      allow update: if isSuperAdmin() || (isOwner(userId) && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'isBanned']))) || (isAdmin() && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])));
+      allow update: if isSuperAdmin() || (isOwner(userId) && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'isBanned', 'balance']))) || (isAdmin() && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'balance']))) || (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance']));
       allow delete: if isSuperAdmin();
     }
     match /users/{userId}/private/security {
@@ -69,14 +69,20 @@ service cloud.firestore {
     match /transactions/{txId} {
       allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow write: if isSuperAdmin();
+      allow create: if true; // Backend uses client SDK unauthenticated
+      allow update, delete: if isSuperAdmin();
     }
     match /invoices/{invoiceId} {
-      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment');
-      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment');
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment') || request.auth == null;
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.get('type', '') == 'payment') || request.auth == null;
+      allow create: if true; 
+      allow update: if isAdmin() || (request.auth == null);
       allow delete: if isAdmin();
+    }
+    match /deposits/{depositId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if true;
+      allow update, delete: if isAdmin();
     }
     match /withdrawals/{withdrawalId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
@@ -135,9 +141,15 @@ service cloud.firestore {
       allow create, update, delete: if true;
     }
     match /activities/{id} {
-      allow read: if true;
-      allow create, update: if true;
-      allow delete: if isAdmin();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isSuperAdmin();
+    }
+    match /user_profiles/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
     match /blockedIps/{ip} {
       allow read: if true;

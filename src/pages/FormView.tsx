@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, limit, getDoc, doc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -468,8 +468,6 @@ export default function FormView() {
                                   updateAnswer(q.id, 'Đang tải lên Hệ thống...');
                                   toast.loading('Đang xử lý biên dịch dữ liệu...', { id: `upload-${q.id}` });
                                   try {
-                                    const { getDoc, doc } = await import('firebase/firestore');
-                                    const { db } = await import('../lib/firebase');
                                     const configDoc = await getDoc(doc(db, 'settings', 'github_integration'));
                                     
                                     let uploadedUrl = null;

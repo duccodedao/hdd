@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { AppWindow, ExternalLink, Search, RefreshCw, Box, Lock } from 'lucide-react';
+import { AppWindow, ExternalLink, Search, RefreshCw, Box, Lock, Star } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
+import { useBookmarkStore } from '../store/bookmarkStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import AppLogo from '../components/ui/AppLogo';
@@ -255,6 +256,19 @@ export default function AppsPage() {
 }
 
 function AppCard({ app, onOpen, maintenanceTabs, maintenanceStampConfig }: { app: AppItem, onOpen: (app: AppItem) => void, maintenanceTabs: any, maintenanceStampConfig: any }) {
+  const { isBookmarked, toggleBookmark } = useBookmarkStore();
+  const bookmarked = isBookmarked(app.id);
+
+  const handleBookmarkToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleBookmark({
+      itemId: app.id,
+      title: app.title,
+      type: 'app',
+      url: `/apps`
+    });
+  };
+
   return (
     <motion.div
         layout
@@ -265,6 +279,19 @@ function AppCard({ app, onOpen, maintenanceTabs, maintenanceStampConfig }: { app
         onClick={() => onOpen(app)}
         className="group relative bg-white dark:bg-zinc-900/40 border border-slate-100 dark:border-white/5 active:scale-95 transition-all duration-300 rounded-2xl p-3 flex flex-col items-center text-center cursor-pointer shadow-sm hover:shadow-md dark:hover:bg-zinc-900/80 hover:border-indigo-500/20"
       >
+        {/* Bookmark Star Overlay */}
+        <button
+          onClick={handleBookmarkToggle}
+          className={`absolute top-2 right-2 p-1.5 rounded-lg active:scale-90 transition-all duration-300 z-30 ${
+            bookmarked 
+              ? 'text-amber-500 hover:text-amber-600 bg-amber-500/10' 
+              : 'text-slate-300 hover:text-slate-500 bg-transparent opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-white/5'
+          }`}
+          title={bookmarked ? "Xóa khỏi dấu trang" : "Lưu vào dấu trang"}
+        >
+          <Star className={`w-3.5 h-3.5 ${bookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
+        </button>
+
         {/* Logo Area */}
         <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0 mb-3 transition-all relative">
           {app.logoUrl ? (

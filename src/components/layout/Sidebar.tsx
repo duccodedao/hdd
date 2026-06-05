@@ -5,11 +5,12 @@ import {
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
   Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail, Sparkles,
-  Wallet, ShoppingBag
+  Wallet, ShoppingBag, Star, Bookmark
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
+import { useBookmarkStore } from '../../store/bookmarkStore';
 import AppLogo from '../ui/AppLogo';
 import { db } from '../../lib/firebase';
 
@@ -28,9 +29,10 @@ const subUtilities = [
 export default function Sidebar({ className }: { className?: string }) {
   const { user, isAdmin, isSuperAdmin, userData } = useAuthStore();
   const { setSidebarOpen, maintenanceTabs, hasUnapprovedSessions } = useAppStore();
+  const { bookmarks } = useBookmarkStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng']);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng', 'Dấu trang']);
   const [utilitiesExpanded, setUtilitiesExpanded] = useState(false);
   const [dynamicUtils, setDynamicUtils] = useState<any[]>([]);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -359,6 +361,57 @@ export default function Sidebar({ className }: { className?: string }) {
             )}
           </AnimatePresence>
         </div>
+
+        {/* Dấu trang đã lưu group */}
+        {user && bookmarks.length > 0 && (
+          <div className="space-y-1 border-t border-slate-200/50 dark:border-white/5 pt-4">
+            <button 
+              type="button"
+              onClick={() => toggleGroup('Dấu trang')}
+              className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 transition-all border-none bg-transparent"
+            >
+              <div className="flex items-center gap-2">
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                <span>Dấu trang ({bookmarks.length})</span>
+              </div>
+              <ChevronDown className={cn("w-3 h-3 transition-transform duration-300", expandedGroups.includes('Dấu trang') && "rotate-180")} />
+            </button>
+            
+            <AnimatePresence initial={false}>
+              {expandedGroups.includes('Dấu trang') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="overflow-hidden space-y-1 block pl-1 pt-1"
+                >
+                  {bookmarks.map((b) => (
+                    <NavLink
+                      key={b.id}
+                      to={b.url}
+                      onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                      className={({ isActive }) => cn(
+                        "flex items-center justify-between px-3 py-1.5 rounded-md transition-all text-xs font-medium group",
+                        isActive 
+                          ? "text-blue-750 bg-blue-50/50 dark:text-white dark:bg-white/5 font-semibold" 
+                          : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/60 dark:hover:bg-white/[0.02]"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 max-w-[80%] min-w-0">
+                        <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0 animate-pulse" />
+                        <span className="truncate">{b.title}</span>
+                      </div>
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-zinc-500 rounded shrink-0 leading-none scale-90">
+                        {b.type === 'app' ? 'App' : 'Tiện ích'}
+                      </span>
+                    </NavLink>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
       </nav>
 
