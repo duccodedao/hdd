@@ -63,10 +63,9 @@ const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 // Initialize Firebase Admin (for privileged server-side operations)
 let adminDb: admin.firestore.Firestore | null = null;
 try {
-  const projectId = firebaseConfig.projectId;
-  if (!projectId) {
-    console.warn("Firebase Admin: No project ID available for initialization.");
-  } else if (admin.apps.length === 0) {
+  const projectId = firebaseConfig?.projectId;
+  
+  if (admin.apps.length === 0) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccountJson) {
@@ -76,27 +75,32 @@ try {
           credential: admin.credential.cert(serviceAccount),
           projectId: projectId
         });
-        console.log("Firebase Admin initialized via service account env var");
+        console.log("Firebase Admin: Initialized via FIREBASE_SERVICE_ACCOUNT");
       } catch (parseErr) {
-        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable", parseErr);
-        admin.initializeApp({ projectId: projectId });
+        console.error("Firebase Admin: Failed to parse service account JSON", parseErr);
+        admin.initializeApp({ projectId });
       }
     } else {
-      // Basic init with projectId only
-      admin.initializeApp({ projectId: projectId });
-      console.log(`Firebase Admin initialized with project ID: ${projectId}`);
+      try {
+        // On Cloud Run / GCP, this is the most reliable way to pick up project & credentials
+        admin.initializeApp();
+        console.log("Firebase Admin: Initialized via environment defaults (ADC/GCP)");
+      } catch (initErr) {
+        // Fallback for local dev if ADC is not set
+        admin.initializeApp({ projectId });
+        console.log(`Firebase Admin: Initialized with projectId fallback: ${projectId}`);
+      }
     }
   }
   
   if (admin.apps.length > 0) {
     try {
       const dbId = databaseId === "(default)" ? undefined : databaseId;
-      // Note: admin.firestore() without credentials might fail during operations if not on GCP.
       // @ts-ignore
       adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
-      console.log(`Firebase Admin Firestore handle acquired for database: ${databaseId || '(default)'}`);
+      console.log(`Firebase Admin Firestore: Handle acquired for db: ${databaseId}`);
     } catch (dbErr: any) {
-      console.warn(`Admin SDK handle failed for database '${databaseId}'. Fallback to default handle.`);
+      console.warn(`Firebase Admin Firestore: Failed for db '${databaseId}'. Error: ${dbErr.message}`);
       try {
         adminDb = admin.firestore();
       } catch (finalErr) {
@@ -105,7 +109,7 @@ try {
     }
   }
 } catch (e: any) {
-  console.error("Critical: Failed to initialize Firebase Admin SDK", e.message);
+  console.error("Critical: Firebase Admin SDK setup failed", e.message);
 }
 
 
@@ -1121,7 +1125,7 @@ app.use(cookieParser());
     });
   }
 
-  // Khởi động nội bộ khi không chạy trên Vercel Serverless
-  if (!process.env.VERCEL) {
-    startServer();
-  }
+  startServer().catch(err => {
+    console.error("Fatal startup error:", err);
+    process.exit(1);
+  });
