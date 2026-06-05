@@ -39,16 +39,18 @@ try {
     });
   }
   
+  // Try specifically for the configured database
   try {
-    // Try specifically for the configured database
-    adminDb = databaseId && databaseId !== "(default)" ? admin.firestore(databaseId) : admin.firestore();
-    console.log(`Firebase Admin initialized for database: ${databaseId}`);
-  } catch (dbErr) {
-    console.warn(`Failed to initialize Admin for database '${databaseId}', falling back to default`);
-    adminDb = admin.firestore(); // Fallback to default database
+    const dbId = databaseId === "(default)" ? undefined : databaseId;
+    // @ts-ignore - admin.firestore type might not show databaseId param in some versions but it exists
+    adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
+    console.log(`Firebase Admin initialized successfully targeting database: ${databaseId || '(default)'}`);
+  } catch (dbErr: any) {
+    console.warn(`Admin SDK specifically failed for database '${databaseId}', falling back to default database. Error: ${dbErr.message}`);
+    adminDb = admin.firestore();
   }
-} catch (e) {
-  console.error("Failed to initialize Firebase Admin basic apps", e);
+} catch (e: any) {
+  console.error("Critical: Failed to initialize Firebase Admin basic apps", e.message);
 }
 
 // Initialize Firebase Client SDK
@@ -211,19 +213,22 @@ app.use(cookieParser());
   });
 
   app.post("/api/invoices/create", async (req, res) => {
+    console.log("Received request to /api/invoices/create:", safeStringify(req.body));
     try {
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
+      if (!totalAmount || Number(totalAmount) <= 0) {
+        return res.status(400).json({ error: "Số tiền không hợp lệ (phải lớn hơn 0)." });
+      }
+
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      
-      // Use basic JS date for initial return object to avoid serialization issues
       const dateNow = new Date();
       const invoiceData: any = {
         id: referenceCode,
         userId: userId || "guest",
         userEmail: userEmail || "guest",
         items: items || [],
-        totalAmount: totalAmount || 0,
+        totalAmount: Number(totalAmount),
         status: "pending",
         type: type || "purchase",
         paymentMethod: "bank_transfer",
@@ -236,7 +241,7 @@ app.use(cookieParser());
       let success = false;
       let lastErr = null;
 
-      // 1. Try Admin SDK first (specifically database might fail if it doesn't exist)
+      // 1. Try Admin SDK first
       if (adminDb) {
         try {
           await adminDb.doc(`invoices/${referenceCode}`).set({
@@ -246,75 +251,74 @@ app.use(cookieParser());
           success = true;
           console.log(`Invoice ${referenceCode} created via Admin SDK`);
         } catch (err: any) {
-          console.error("Admin SDK Invoice Create Error:", err.message);
+          console.error(`Admin SDK Error creating invoice ${referenceCode}:`, err.message);
           lastErr = err;
           
-          // If the error is about not finding the database, we might want to try default database via admin
-          if (err.message?.includes("not found") || err.code === 5) {
+          // Retry with default DB if "not found"
+          const errMsg = String(err.message || "").toLowerCase();
+          if (errMsg.includes("not found") || errMsg.includes("database") || err.code === 5) {
              try {
                 await admin.firestore().doc(`invoices/${referenceCode}`).set({
                   ...invoiceData,
                   createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 success = true;
-                console.log(`Invoice ${referenceCode} created via Admin SDK (Default DB fallback)`);
-             } catch (innerErr) {
-                // Ignore, we will fallback to client SDK
+                console.log(`Invoice ${referenceCode} created via Admin SDK (Fallback to default DB)`);
+             } catch (innerErr: any) {
+                console.error("Admin SDK Fallback also failed:", innerErr.message);
              }
           }
         }
       }
 
-      // 2. Fallback to Client SDK if Admin failed or wasn't available
+      // 2. Fallback to Client SDK
       if (!success) {
         try {
+          console.log(`Attempting Client SDK fallback for invoice ${referenceCode}`);
           const invoiceRef = doc(db, `invoices/${referenceCode}`);
           await setDoc(invoiceRef, {
             ...invoiceData,
-            createdAt: Timestamp.now() // Client SDK doesn't have ServerTimestamp easily accessible without extra import
+            createdAt: Timestamp.now()
           });
           success = true;
           console.log(`Invoice ${referenceCode} created via Client SDK`);
         } catch (err: any) {
-          console.error("Client SDK Invoice Create Error:", err.message);
+          console.error(`Client SDK Error creating invoice ${referenceCode}:`, err.message);
           lastErr = lastErr || err;
         }
       }
 
       if (!success) {
-        throw lastErr || new Error("All Firestore SDKs failed to create invoice");
+        const finalMsg = lastErr?.message || "Lỗi không xác định khi lưu hóa đơn vào Firestore";
+        throw new Error(finalMsg);
       }
 
       res.json(invoiceData);
     } catch (error: any) {
-      console.error("Create Invoice Error details:", safeStringify({
-        message: error.message,
+      const errDetails = {
+        message: error.message || String(error),
         code: error.code,
-        details: error.details,
-        stack: error.stack
-      }));
+        stack: error.stack?.split("\n").slice(0, 3).join("\n")
+      };
+      
+      console.error("Detailed Create Invoice Error:", safeStringify(errDetails));
 
-      let errorMessage = "Failed to create invoice: " + (error.message || error);
-      let hint = "";
+      let userMsg = "Lỗi máy chủ khi tạo hóa đơn.";
+      let hint = "Vui lòng kiểm tra console logs để biết thêm chi tiết.";
 
-      if (error.message?.includes("PERMISSION_DENIED") || error.code === 7 || error.code === "permission-denied") {
-        const projId = firebaseConfig.projectId;
-        errorMessage = "Lỗi: Quyền truy cập Firestore bị từ chối (PERMISSION_DENIED).";
-        
-        if (error.message?.includes("API not used") || error.message?.includes("disabled")) {
-          hint = `Cloud Firestore API chưa được kích hoạt. Hãy truy cập link này để kích hoạt: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projId}`;
-        } else {
-          hint = `Có thể do Security Rules chặn truy xuất hoặc do API chưa được kích hoạt cho Project ID: ${projId}.`;
-        }
-      } else if (error.message?.includes("NOT_FOUND") || error.message?.includes("database") || error.code === 5 || error.code === "not-found") {
-        errorMessage = `Lỗi: Không tìm thấy database '${databaseId}'.`;
-        hint = `Vui lòng kiểm tra xem bạn đã tạo database tên là '${databaseId}' trong Firestore console chưa. Nếu chỉ dùng database mặc định, hãy xóa 'firestoreDatabaseId' trong cài đặt hoặc đổi thành '(default)'.`;
+      const errMsg = String(error.message || "").toLowerCase();
+      if (errMsg.includes("permission_denied") || error.code === 7 || error.code === "permission-denied") {
+        userMsg = "Lỗi: Quyền truy cập Firestore bị từ chối.";
+        hint = "Hãy đảm bảo Cloud Firestore API đã được kích hoạt và Security Rules cho phép ghi vào collection 'invoices'.";
+      } else if (errMsg.includes("not_found") || errMsg.includes("database") || error.code === 5) {
+        userMsg = `Lỗi: Không tìm thấy database Firestore '${databaseId}'.`;
+        hint = "Hãy tạo database tên là 'main' trong Firebase Console hoặc đổi config về '(default)'.";
       }
 
       res.status(500).json({ 
-        error: errorMessage,
-        hint: hint,
-        details: error.message
+        error: userMsg,
+        details: error.message,
+        hint: hint
       });
     }
   });
