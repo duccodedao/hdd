@@ -65,73 +65,44 @@ let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
   
-  // Safe helper to get apps array - handles different import/bundling styles
+  // Safe helper to check for apps
   const getApps = () => {
     try {
+      if (admin && admin.apps) return admin.apps;
       const a = admin as any;
-      if (a && Array.isArray(a.apps)) return a.apps;
-      if (a && a.default && Array.isArray(a.default.apps)) return a.default.apps;
-      
-      // Some versions of the SDK might have it hidden or differently structured in some bundlers
-      const adminNamespace = (admin as any).admin || admin;
-      if (adminNamespace && Array.isArray(adminNamespace.apps)) return adminNamespace.apps;
-    } catch (e) {
-      console.warn("Error accessing admin.apps:", e);
-    }
+      if (a && a.default && a.default.apps) return a.default.apps;
+    } catch (e) {}
     return [];
   };
 
   if (getApps().length === 0) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-    
     if (serviceAccountJson) {
       try {
         const serviceAccount = JSON.parse(serviceAccountJson);
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          projectId: projectId
+          projectId
         });
-        console.log("Firebase Admin: Initialized via FIREBASE_SERVICE_ACCOUNT");
-      } catch (parseErr) {
-        console.error("Firebase Admin: Failed to parse service account JSON", parseErr);
+      } catch (e) {
         admin.initializeApp({ projectId });
       }
     } else {
       try {
-        // On Cloud Run / GCP, this is the most reliable way to pick up project & credentials
-        admin.initializeApp();
-        console.log("Firebase Admin: Initialized via environment defaults (ADC/GCP)");
-      } catch (initErr) {
-        // Fallback for local dev if ADC is not set
         admin.initializeApp({ projectId });
-        console.log(`Firebase Admin: Initialized with projectId fallback: ${projectId}`);
+      } catch (e) {
+        // May already be initialized by environment
       }
     }
   }
-  
-  // Refresh apps list after init
-  const appsAfterInit = getApps();
-  if (appsAfterInit.length > 0) {
-    try {
-      const dbId = databaseId === "(default)" ? undefined : databaseId;
-      // Use the first app to get firestore handle
-      const appToUse = appsAfterInit[0];
-      adminDb = dbId ? admin.firestore(appToUse) : admin.firestore(appToUse);
-      
-      // If the above failed or returned something non-functional, try the direct call
-      if (!adminDb || typeof adminDb.doc !== 'function') {
-        adminDb = dbId ? (admin as any).firestore(dbId) : admin.firestore();
-      }
-      
-      console.log(`Firebase Admin Firestore: Handle acquired for db: ${databaseId}`);
-    } catch (dbErr: any) {
-      console.warn(`Firebase Admin Firestore: Failed for db '${databaseId}'. Error: ${dbErr.message}`);
-      try {
-        adminDb = admin.firestore();
-      } catch (finalErr) {
-        adminDb = null;
-      }
-    }
+
+  try {
+    const dbId = databaseId === "(default)" ? undefined : databaseId;
+    // @ts-ignore
+    adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
+  } catch (dbErr: any) {
+    console.warn("Admin Firestore handle failed, falling back to default.");
+    adminDb = admin.firestore();
   }
 } catch (e: any) {
   console.error("Critical: Firebase Admin SDK setup failed:", e.message);
@@ -139,19 +110,19 @@ try {
 
 
 // Initialize Firebase Client SDK
-let firebaseApp: any;
+let firebaseApp: any = null;
 try {
-  if (!firebaseConfig.projectId) {
-    throw new Error("Missing Firebase Project ID in configuration.");
+  if (!firebaseConfig || !firebaseConfig.projectId) {
+    console.error("Firebase configuration is missing or invalid. Check your setup.");
+  } else {
+    firebaseApp = initializeApp(firebaseConfig);
+    console.log(`Firebase Client App initialized successfully: ${firebaseConfig.projectId}`);
   }
-  firebaseApp = initializeApp(firebaseConfig);
-  console.log(`Firebase Client App initialized successfully: ${firebaseConfig.projectId}`);
 } catch (appErr: any) {
   console.error("Critical: Failed to initialize Firebase Client App", appErr.message);
-  // We'll try to provide a dummy app if possible or just let subsequent calls fail with clear errors
 }
 
-let db: any;
+let db: any = null;
 if (firebaseApp) {
   try {
     db = getFirestore(firebaseApp, databaseId === "(default)" ? undefined : databaseId);
@@ -340,6 +311,9 @@ app.use(cookieParser());
   app.post("/api/invoices/create", async (req, res) => {
     console.log(`[Invoice Create] Request from ${req.ip}. Project: ${firebaseConfig?.projectId}. DB: ${databaseId}`);
     try {
+      if (!db && !adminDb) {
+        throw new Error("Cơ sở dữ liệu chưa được khởi tạo. Vui lòng kiểm tra cấu hình Firebase.");
+      }
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
       if (!totalAmount || Number(totalAmount) <= 0) {
@@ -952,9 +926,17 @@ app.use(cookieParser());
 
       // 2. Query SePay API to fetch latest bank transactions in real-time
       const sepayApiKey = process.env.SEPAY_API_KEY;
-      if (sepayApiKey) {
-        const sysSnap = await getDoc(doc(db, "settings/system"));
-        const bankingConfig = sysSnap.exists() ? sysSnap.data()?.bankingConfig : null;
+      if (sepayApiKey && (db || adminDb)) {
+        let sysSnap = null;
+        if (db) {
+          try {
+            sysSnap = await getDoc(doc(db, "settings/system"));
+          } catch (e) {
+            console.warn("Failed to get system settings via client SDK:", e);
+          }
+        }
+        
+        const bankingConfig = sysSnap?.exists() ? sysSnap.data()?.bankingConfig : null;
         const bankAccount = bankingConfig?.bankAccount || "";
 
         let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
@@ -1052,8 +1034,13 @@ app.use(cookieParser());
       });
 
     } catch (error: any) {
-      console.error("Manual verify action error:", safeStringify(error));
-      res.status(500).json({ error: "Lỗi kiểm tra hóa đơn: " + (error.message || error) });
+      const errMsg = error.message || String(error);
+      const errStack = error.stack || "";
+      console.error("Manual verify action error:", errMsg, errStack);
+      res.status(500).json({ 
+        error: "Lỗi kiểm tra hóa đơn: " + errMsg,
+        debug: { stack: errStack.split('\n').slice(0, 3) }
+      });
     }
   });
 
