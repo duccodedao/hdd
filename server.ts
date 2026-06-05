@@ -1123,7 +1123,7 @@ app.use(cookieParser());
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     // Serve index.html for all undefined GET requests (SPA catch-all)
-    app.get('*', (req, res, next) => {
+    app.get('*all', (req, res, next) => {
       // Don't intercept API or webhook routes
       if (req.path.startsWith('/api/') || req.path.startsWith('/hooks/')) {
         return next();
