@@ -1019,31 +1019,23 @@ app.use(cookieParser());
           if (data && data.transactions && Array.isArray(data.transactions)) {
             console.log(`[Invoice Verify] Found ${data.transactions.length} transactions in history. Matching against: ${referenceCode}`);
             const matchedTx = data.transactions.find((tx: any) => {
-              const content = String(tx.transaction_content || tx.content || tx.description || "").toUpperCase();
-              const txCode = String(tx.code || tx.transaction_code || "").toUpperCase();
-              const referenceUpper = referenceCode.toUpperCase();
+              const content = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
+              const txCode = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase();
+              const searchStr = referenceCode.toLowerCase();
               
-              // Broad matching: reference in content, OR tx code matches reference, 
-              // OR reference matches some other field the API might provide
-              const codeInContent = content.includes(referenceUpper);
-              const codeMatches = txCode === referenceUpper || txCode.includes(referenceUpper);
-              
+              const isMatch = content.includes(searchStr) || txCode.includes(searchStr);
               const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
-              const amountOut = Number(tx.amount_out || 0);
-              const actualAmount = amountIn || amountOut; // In case the API structures it differently
-              
-              // Allow a small margin for bank fees or rounding
-              const amountMatches = actualAmount >= (expectedAmount - 500);
+              const amountMatches = Math.abs(amountIn - expectedAmount) <= 500;
 
-              if (codeInContent || codeMatches) {
-                 console.log(`[Invoice Verify] Potential Match Detected: CodeMatch=${codeMatches}, ContentMatch=${codeInContent}, Amount=${actualAmount}, MatchesAmount=${amountMatches}`);
+              if (isMatch) {
+                 console.log(`[Invoice Verify] Potential match: "${txCode}" / "${content.substring(0, 30)}...". Amount=${amountIn}. ValidAmount=${amountMatches}`);
               }
-
-              return (codeInContent || codeMatches) && amountMatches;
+              return isMatch && amountMatches;
             });
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
+              console.log(`[Invoice Verify] MATCHED Transaction: ${transactionId} for Invoice: ${invoiceId}`);
 
               if (adminDb) {
                 const logRef = adminDb.doc(`webhook_logs/${String(transactionId)}`);
