@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAnalytics, isSupported } from "firebase/analytics";
 // @ts-ignore
 import configFromFile from "../../firebase-applet-config.json";
 
@@ -14,6 +15,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || config.storageBucket,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.messagingSenderId,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || config.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || config.measurementId,
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || config.firestoreDatabaseId || "(default)"
 };
 
@@ -23,6 +25,14 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 export const storage = getStorage(app);
+
+// Initialize Analytics conditionally (only in browser)
+export const analytics = typeof window !== 'undefined' ? (async () => {
+  if (await isSupported()) {
+    return getAnalytics(app);
+  }
+  return null;
+})() : Promise.resolve(null);
 
 export enum OperationType {
   CREATE = 'create',
