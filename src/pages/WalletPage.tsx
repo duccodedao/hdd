@@ -275,10 +275,26 @@ export default function WalletPage() {
       });
 
       if (!resp.ok) {
-        const errorData = await resp.json().catch(() => ({}));
-        const msg = errorData.error || 'Create invoice server failure';
-        if (errorData.hint) {
-          toast.error(`${msg}\n${errorData.hint}`, { duration: 8000 });
+        let msg = 'Lỗi hệ thống khi tạo hóa đơn.';
+        let hint = '';
+        try {
+          const errorData = await resp.json();
+          msg = errorData.error || msg;
+          hint = errorData.hint || '';
+        } catch (e) {
+          msg = `Lỗi server ${resp.status}: ${resp.statusText}`;
+        }
+        
+        if (hint) {
+          toast.error(
+            <div className="flex flex-col gap-1">
+              <p className="font-bold">{msg}</p>
+              <p className="text-[10px] opacity-80 leading-tight">{hint}</p>
+            </div>, 
+            { duration: 8000 }
+          );
+        } else {
+          toast.error(msg);
         }
         throw new Error(msg);
       }
