@@ -9,14 +9,14 @@ import configFromFile from "../../firebase-applet-config.json";
 const config: any = configFromFile || {};
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || config.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || config.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || config.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || config.appId,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || config.measurementId,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || config.firestoreDatabaseId || "(default)"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || config.apiKey || "AIzaSyCXAxmprEv9fF-P-1lLpUzykkxG4HjDVI4",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain || "sonlyhongduc-ca6d6.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || config.projectId || "sonlyhongduc-ca6d6",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || config.storageBucket || "sonlyhongduc-ca6d6.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.messagingSenderId || "757658501532",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || config.appId || "1:757658501532:web:08c87ad6c041e0bc140859",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || config.measurementId || "G-GXHCCW2KMH",
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || config.firestoreDatabaseId || "main"
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
