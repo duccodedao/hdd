@@ -275,10 +275,26 @@ export default function WalletPage() {
       });
 
       if (!resp.ok) {
-        const errorData = await resp.json().catch(() => ({}));
-        const msg = errorData.error || 'Create invoice server failure';
-        if (errorData.hint) {
-          toast.error(`${msg}\n${errorData.hint}`, { duration: 8000 });
+        let msg = 'Lỗi hệ thống khi tạo hóa đơn.';
+        let hint = '';
+        try {
+          const errorData = await resp.json();
+          msg = errorData.error || msg;
+          hint = errorData.hint || '';
+        } catch (e) {
+          msg = `Lỗi server ${resp.status}: ${resp.statusText}`;
+        }
+        
+        if (hint) {
+          toast.error(
+            <div className="flex flex-col gap-1">
+              <p className="font-bold">{msg}</p>
+              <p className="text-[10px] opacity-80 leading-tight">{hint}</p>
+            </div>, 
+            { duration: 8000 }
+          );
+        } else {
+          toast.error(msg);
         }
         throw new Error(msg);
       }
@@ -702,19 +718,19 @@ export default function WalletPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2.5 w-full">
+                    <div className="flex flex-col sm:flex-row gap-2.5 w-full">
                       <button
                         onClick={() => handleVerifyInvoiceStatus(activeInvoice.id, false)}
-                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-655 dark:bg-zinc-900 dark:text-slate-350 dark:hover:bg-zinc-850 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200/50 dark:border-white/5"
+                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-500/10"
                       >
-                        Kiểm tra lại ngay
+                        Kiểm tra thanh toán thực tế
                       </button>
 
                       <button
                         onClick={() => handleVerifyInvoiceStatus(activeInvoice.id, true)}
-                        className="hidden flex-1 py-3 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                        className="flex-1 py-3 bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
                       >
-                        Duyệt Mô phỏng (Sandbox)
+                        Thanh toán giả lập (Sandbox)
                       </button>
                     </div>
 
