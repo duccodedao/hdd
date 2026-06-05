@@ -103,6 +103,12 @@ try {
   }
 
   try {
+    // Final check for adminApp if initialization logic was bypassed or failed but app exists
+    if (!adminApp) {
+      const apps = getApps();
+      if (apps.length > 0) adminApp = apps[0];
+    }
+
     // For specific database ID, we try several common patterns in different SDK versions
     if (databaseId && databaseId !== "(default)") {
       try {
@@ -110,16 +116,20 @@ try {
         adminDb = (admin as any).firestore(databaseId);
       } catch (e) {
         try {
-          // Try newer SDK approach via app.firestore()
-          adminDb = adminApp.firestore(databaseId);
+          if (adminApp) {
+            adminDb = adminApp.firestore(databaseId);
+          } else {
+            // Fallback to direct library call if adminApp is still null
+            adminDb = (admin as any).firestore(databaseId);
+          }
         } catch (e2) {
-          // Fallback to default and manual collection check if needed
-          adminDb = adminApp.firestore();
+          // Fallback to default
+          adminDb = adminApp ? adminApp.firestore() : admin.firestore();
           console.warn(`Could not bind to database "${databaseId}", using default.`);
         }
       }
     } else {
-      adminDb = admin.firestore();
+      adminDb = adminApp ? adminApp.firestore() : admin.firestore();
     }
     console.log(`Firebase Admin: Global Firestore handle acquired for DB: ${databaseId}`);
   } catch (e: any) {
