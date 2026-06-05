@@ -64,120 +64,47 @@ const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
   
-  // Safe helper to check for initialized apps
-  const getApps = () => {
+  if (serviceAccountJson) {
     try {
-      if (admin && admin.apps) return admin.apps;
       const a = admin as any;
-      if (a && a.default && a.default.apps) return a.default.apps;
-    } catch (e) {}
-    return [];
-  };
-
-  const currentApps = getApps();
-  let adminApp: any = null;
-  const a = admin as any;
-  const adminBase = a.default || a;
-
-  if (currentApps.length === 0) {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (serviceAccountJson) {
-      try {
+      const adminBase = a.default || a;
+      const currentApps = adminBase.apps || [];
+      let adminApp;
+      
+      if (currentApps.length === 0) {
         const serviceAccount = JSON.parse(serviceAccountJson);
         adminApp = adminBase.initializeApp({
           credential: adminBase.credential.cert(serviceAccount),
           projectId
         });
-        console.log("Firebase Admin: Initialized via service account");
-      } catch (e) {
-        adminApp = adminBase.initializeApp({ projectId });
+      } else {
+        adminApp = currentApps[0];
       }
-    } else {
-      try {
-        adminApp = adminBase.initializeApp({ projectId });
-      } catch (e) {
-        console.warn("Firebase Admin: Default init failed, may be already initialized");
+      
+      // Get firestore handle
+      if (databaseId && databaseId !== "(default)") {
+        try {
+          adminDb = adminApp.firestore(databaseId);
+        } catch (e) {
+          adminDb = adminApp.firestore();
+        }
+      } else {
+        adminDb = adminApp.firestore();
       }
+      
+      if (adminDb) {
+        console.log(`Firebase Admin: Initialized with service account. Project=${projectId}, DB=${databaseId}`);
+      }
+    } catch (e: any) {
+      console.warn("Firebase Admin: Initialization failed (using client SDK fallback):", e.message);
     }
   } else {
-    adminApp = currentApps[0];
-  }
-
-  try {
-    // Final check for adminApp if initialization logic was bypassed or failed but app exists
-    if (!adminApp) {
-      const apps = getApps();
-      if (apps.length > 0) adminApp = apps[0];
-    }
-
-    // Modern SDKs often prefer direct imports or getFirestore(app)
-    // However, with namespaced admin import, we use admin.firestore(app) or app.firestore()
-    
-    // For specific database ID, we try several common patterns in different SDK versions
-    if (databaseId && databaseId !== "(default)") {
-      try {
-        // Try adminBase first
-        if (typeof adminBase.firestore === 'function') {
-          try {
-            adminDb = adminBase.firestore(databaseId);
-          } catch(e) {
-            if (adminApp) adminDb = adminApp.firestore(databaseId);
-          }
-        } else if (adminApp && typeof adminApp.firestore === 'function') {
-          adminDb = adminApp.firestore(databaseId);
-        }
-      } catch (e) {
-        try {
-          if (adminApp && typeof adminApp.firestore === 'function') {
-            adminDb = adminApp.firestore(databaseId);
-          } else if (typeof adminBase.firestore === 'function') {
-            adminDb = adminBase.firestore(databaseId);
-          }
-        } catch (e2) {
-          // Fallback to default
-          try {
-            adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                      (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
-          } catch(e3) {
-            adminDb = null;
-          }
-          console.warn(`Could not bind to database "${databaseId}", using default.`);
-        }
-      }
-    } else {
-      try {
-        adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                  (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
-      } catch(e) {
-        adminDb = null;
-      }
-    }
-    
-    if (adminDb) {
-      console.log(`Firebase Admin: Global Firestore handle acquired for DB: ${databaseId}`);
-      // Test the handle immediately to catch credential issues early
-      try {
-        await adminDb.collection("_health").limit(1).get();
-        console.log("Firebase Admin: Credential check PASSED.");
-      } catch (e: any) {
-        if (e.message.includes("credentials") || e.message.includes("auth")) {
-          console.warn("Firebase Admin: Credential check FAILED. Admin SDK will be disabled to avoid 500 errors in production.", e.message);
-          adminDb = null;
-        } else {
-          console.log("Firebase Admin: Optional handle test failed (ignoring):", e.message);
-        }
-      }
-    } else {
-      console.error("Critical: Could not acquire Firestore handle from Admin SDK.");
-    }
-  } catch (e: any) {
-    console.error("Critical: Firebase Admin SDK setup failed:", e.message);
-    adminDb = null;
+    console.log("Firebase Admin: No service account found. Privileged operations will use client SDK fallback.");
   }
 } catch (e: any) {
-  console.error("Critical: Firebase Admin outer setup failed:", e.message);
-  adminDb = null;
+  console.warn("Firebase Admin: Setup blocked by unexpected error:", e.message);
 }
 
 
@@ -1127,15 +1054,19 @@ app.use(cookieParser());
             console.log(`[Invoice Verify] Scanned ${data.transactions.length} recent transactions.`);
             const matchedTx = data.transactions.find((tx: any) => {
               const content = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
-              const txCode = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase();
-              const searchStr = referenceCode.toLowerCase();
+              const txCode = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase().trim();
+              const searchStr = referenceCode.toLowerCase().trim();
               
-              const isMatch = content.includes(searchStr) || txCode.includes(searchStr);
+              // More flexible matching
+              const isMatch = content.includes(searchStr) || 
+                              txCode.includes(searchStr) || 
+                              (txCode.length >= 5 && searchStr.includes(txCode));
+                              
               const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
               const amountMatches = Math.abs(amountIn - expectedAmount) <= 500;
 
-              if (isMatch) {
-                 console.log(`[Invoice Verify] Potential match: "${txCode}" / "${content.substring(0, 30)}...". Amount=${amountIn}. ValidAmount=${amountMatches}`);
+              if (isMatch || content.includes(searchStr.replace(/[^0-9]/g, '')) || (txCode && searchStr.includes(txCode))) {
+                 console.log(`[Invoice Verify] Checking potential match: TxCode="${txCode}", ContentSnippet="${content.substring(0, 40)}...", Search="${searchStr}", Amount=${amountIn}, Match=${isMatch && amountMatches}`);
               }
               return isMatch && amountMatches;
             });
@@ -1188,7 +1119,7 @@ app.use(cookieParser());
             }
           }
         } catch (apiErr: any) {
-          console.log(`SePay list API connection issue: ${apiErr?.message || apiErr}`);
+          console.log(`SePay list API connection issue or timeout: ${apiErr?.message || apiErr}`);
         }
       }
 
@@ -1307,3 +1238,4 @@ app.use(cookieParser());
     console.error("Fatal startup error:", err);
     process.exit(1);
   });
+
