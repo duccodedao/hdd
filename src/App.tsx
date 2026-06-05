@@ -313,6 +313,56 @@ export default function App() {
         }, (error) => {
           handleFirestoreError(error, OperationType.LIST, 'admin_sessions');
         });
+        // 6. Listen to invoices to notify admin about new orders
+        const unsubscribeInvoices = onSnapshot(collection(db, 'invoices'), (snap) => {
+          if (!isSubscribed) return;
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              const createdAtMs = data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt instanceof Date ? data.createdAt.getTime() : (typeof data.createdAt === 'number' ? data.createdAt : 0));
+              
+              if (createdAtMs > listenerStartTime) {
+                toast.success(
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                      💳 ĐƠN HÀNG MỚI!
+                    </span>
+                    <span className="text-xs text-slate-800 dark:text-zinc-200">
+                      Đơn: <strong className="font-mono bg-indigo-500/10 px-1 py-0.5 rounded text-indigo-500">{change.doc.id}</strong>
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Số tiền: {Number(data.totalAmount || 0).toLocaleString()}đ
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                        {data.type === 'deposit' ? '💳 Nạp tiền' : '🛍️ Mua sắm'}
+                      </span>
+                      <span className="text-[10px] text-emerald-500 font-bold uppercase">
+                        {data.status || 'pending'}
+                      </span>
+                    </div>
+                  </div>,
+                  { duration: 8000, position: 'top-right' }
+                );
+              }
+            }
+          });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'invoices');
+        });
+
+        // Add unsubscribe to cleanup
+        const originalCleanup = () => {
+          isSubscribed = false;
+          if (unsubscribeSessionListener) unsubscribeSessionListener();
+          if (unsubscribeConflicts) unsubscribeConflicts();
+          if (unsubscribeUsers) unsubscribeUsers();
+          if (unsubscribeBlockedIps) unsubscribeBlockedIps();
+          if (unsubscribeAdminSessions) unsubscribeAdminSessions();
+          if (unsubscribeInvoices) unsubscribeInvoices();
+        };
+
+        return originalCleanup;
       } catch (err) {
         console.error("Error setting up security sessions:", err);
       }
@@ -320,14 +370,7 @@ export default function App() {
     
     initSession();
     
-    return () => {
-      isSubscribed = false;
-      if (unsubscribeSessionListener) unsubscribeSessionListener();
-      if (unsubscribeConflicts) unsubscribeConflicts();
-      if (unsubscribeUsers) unsubscribeUsers();
-      if (unsubscribeBlockedIps) unsubscribeBlockedIps();
-      if (unsubscribeAdminSessions) unsubscribeAdminSessions();
-    };
+    // The previous code had a return () => ... here, but we are moving it into initSession due to async nature
   }, [user, userData, isAdmin]);
 
   useEffect(() => {
