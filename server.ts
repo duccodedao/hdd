@@ -65,13 +65,24 @@ let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
   
-  // Safe helper to check for apps and firestore handle
+  // Safe helper to check for initialized apps
+  const getApps = () => {
+    try {
+      if (admin && admin.apps) return admin.apps;
+      const a = admin as any;
+      if (a && a.default && a.default.apps) return a.default.apps;
+    } catch (e) {}
+    return [];
+  };
+
   const getAdminDb = (dbId?: string) => {
     try {
       const targetDb = dbId && dbId !== "(default)" ? dbId : undefined;
       // @ts-ignore - Handle different SDK versions/bundling
       if (typeof admin.firestore === 'function') {
-        return targetDb ? admin.firestore(targetDb) : admin.firestore();
+        const dbHandle = targetDb ? (admin.firestore as any)(targetDb) : admin.firestore();
+        // Check if handles the main database correctly
+        return dbHandle;
       }
       const a = admin as any;
       if (a.default && typeof a.default.firestore === 'function') {
@@ -665,52 +676,54 @@ app.use(cookieParser());
         if (match) referenceCodeSearch = match[0];
       }
 
+      if (!referenceCodeSearch) {
+        console.log("[SePay Webhook] No reference code found in payload.");
+        return res.json({ success: true, message: "No reference code" });
+      }
+
       let invoiceData: any = null;
+      console.log(`[SePay Webhook] Processing transaction ${transactionId}, amount ${amount}, reference: ${referenceCodeSearch}`);
       
       if (referenceCodeSearch) {
-        console.log(`[SePay Webhook] Searching for invoice: ${referenceCodeSearch}`);
-        // Find pending invoice
-        if (adminDb) {
-          try {
-            const snap = await adminDb.doc(`invoices/${referenceCodeSearch}`).get();
-            if (snap.exists) {
-              invoiceData = snap.data();
-            } else {
-              // Try case-insensitive fallback if ID format varies
-              const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
-              if (snapUpper.exists) {
-                invoiceData = snapUpper.data();
-              }
-            }
-          } catch (err: any) {
-            console.warn("[SePay Webhook] Admin SDK lookup failed:", err.message);
-          }
-        }
+        // Try searching by ID directly (case sensitive as created)
+        const possibleIds = [referenceCodeSearch, referenceCodeSearch.toUpperCase(), referenceCodeSearch.toLowerCase()];
         
-        if (!invoiceData && db) {
-          try {
-            let ref = doc(db, `invoices/${referenceCodeSearch}`);
-            let snap = await getDoc(ref);
-            
-            if (!snap.exists()) {
-               ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
-               snap = await getDoc(ref);
+        for (const idToTry of possibleIds) {
+          if (invoiceData) break;
+          
+          if (adminDb) {
+            try {
+              const snap = await adminDb.doc(`invoices/${idToTry}`).get();
+              if (snap.exists) {
+                invoiceData = snap.data();
+                console.log(`[SePay Webhook] Found invoice via Admin SDK: ${idToTry}`);
+              }
+            } catch (err: any) {
+              console.warn(`[SePay Webhook] Admin SDK lookup failed for ${idToTry}:`, err.message);
             }
-            
-            if (snap.exists()) {
-              invoiceData = snap.data();
+          }
+          
+          if (!invoiceData && db) {
+            try {
+              const snap = await getDoc(doc(db, `invoices/${idToTry}`));
+              if (snap.exists()) {
+                invoiceData = snap.data();
+                console.log(`[SePay Webhook] Found invoice via Client SDK: ${idToTry}`);
+              }
+            } catch (err: any) {
+              console.error(`[SePay Webhook] Client SDK lookup failed for ${idToTry}:`, err.message);
             }
-          } catch (err: any) {
-            console.error("[SePay Webhook] Client SDK lookup failed:", err.message);
           }
         }
       }
 
       if (!invoiceData) {
-        console.log(`[SePay Webhook] No matching invoice found for reference: ${referenceCodeSearch || 'None'}`);
-        // We still return 200 to SePay to acknowledgereceipt, but log the miss
-        return res.json({ success: true, message: "No matching invoice" });
+        console.log(`[SePay Webhook] No invoice found for ${referenceCodeSearch} (Tried variants)`);
+        // We still return 200 to SePay to acknowledge receipt
+        return res.json({ success: true, message: `Invoice ${referenceCodeSearch} not found` });
       }
+
+      console.log(`[SePay Webhook] Invoice status: ${invoiceData.status}, Expected: ${invoiceData.totalAmount}`);
 
       let processed = false;
       if (adminDb) {
@@ -720,17 +733,25 @@ app.use(cookieParser());
             const logSnap = await t.get(logRefAdmin);
             
             if (logSnap.exists) {
-              processed = true; // Already done
+              processed = true;
               return;
             }
 
-            // Mark as processed
+            // Check if amount is enough (allow small margin)
+            const isAmountValid = amount >= (invoiceData.totalAmount - 500);
+            
+            // Mark log as processed REGARDLESS of amount to avoid double hooks
             t.set(logRefAdmin, {
+              transactionId,
+              amount,
+              referenceCode: referenceCodeSearch,
+              invoiceId: invoiceData.id,
+              status: isAmountValid ? "success" : "invalid_amount",
               payload: { ...payload, processedAt: new Date().toISOString() },
               createdAt: admin.firestore.Timestamp.now()
             });
 
-            if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 500)) {
+            if (invoiceData.status === "pending" && isAmountValid) {
                // Update invoice
                const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
                t.update(invoiceRefAdmin, {
@@ -763,12 +784,14 @@ app.use(cookieParser());
                    createdAt: admin.firestore.Timestamp.now()
                  });
                }
-               console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID (Admin SDK)`);
+               console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID via Transaction ${transactionId}`);
+            } else {
+              console.log(`[SePay Webhook] Invoice ${invoiceData.id} NOT PAID: Status=${invoiceData.status}, ValidAmount=${isAmountValid}`);
             }
           });
           processed = true;
         } catch (err: any) {
-          console.error("[SePay Webhook] Admin SDK Transaction Error:", err.message);
+          console.error("[SePay Webhook] Transaction execution error:", err.message);
         }
       } 
       
@@ -782,13 +805,15 @@ app.use(cookieParser());
             return;
           }
 
-          // Mark as processed
+          const isAmountValid = amount >= (invoiceData.totalAmount - 500);
+
           t.set(logRef, {
             payload: { ...payload, processedAt: new Date().toISOString() },
-            createdAt: Timestamp.now()
+            createdAt: Timestamp.now(),
+            validAmount: isAmountValid
           });
 
-          if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 500)) {
+          if (invoiceData.status === "pending" && isAmountValid) {
              // Update invoice
              t.update(invoiceRef, {
                status: "paid",
@@ -819,12 +844,11 @@ app.use(cookieParser());
                  createdAt: Timestamp.now()
                });
              }
-             console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID (Client SDK)`);
           }
         });
       }
 
-      res.json({ success: true });
+      res.json({ success: true, invoiceId: invoiceData.id });
     } catch (error: any) {
       console.error("SePay Webhook Error details:", {
         message: error.message,
