@@ -4,7 +4,7 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 import { 
   getFirestore, 
   doc,
@@ -61,11 +61,27 @@ if (firebaseConfig.projectId) {
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 
 // Initialize Firebase Admin (for privileged server-side operations)
-let adminDb: admin.firestore.Firestore | null = null;
+let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
   
-  if (admin.apps.length === 0) {
+  // Safe helper to get apps array - handles different import/bundling styles
+  const getApps = () => {
+    try {
+      const a = admin as any;
+      if (a && Array.isArray(a.apps)) return a.apps;
+      if (a && a.default && Array.isArray(a.default.apps)) return a.default.apps;
+      
+      // Some versions of the SDK might have it hidden or differently structured in some bundlers
+      const adminNamespace = (admin as any).admin || admin;
+      if (adminNamespace && Array.isArray(adminNamespace.apps)) return adminNamespace.apps;
+    } catch (e) {
+      console.warn("Error accessing admin.apps:", e);
+    }
+    return [];
+  };
+
+  if (getApps().length === 0) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccountJson) {
@@ -93,11 +109,20 @@ try {
     }
   }
   
-  if (admin.apps.length > 0) {
+  // Refresh apps list after init
+  const appsAfterInit = getApps();
+  if (appsAfterInit.length > 0) {
     try {
       const dbId = databaseId === "(default)" ? undefined : databaseId;
-      // @ts-ignore
-      adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
+      // Use the first app to get firestore handle
+      const appToUse = appsAfterInit[0];
+      adminDb = dbId ? admin.firestore(appToUse) : admin.firestore(appToUse);
+      
+      // If the above failed or returned something non-functional, try the direct call
+      if (!adminDb || typeof adminDb.doc !== 'function') {
+        adminDb = dbId ? (admin as any).firestore(dbId) : admin.firestore();
+      }
+      
       console.log(`Firebase Admin Firestore: Handle acquired for db: ${databaseId}`);
     } catch (dbErr: any) {
       console.warn(`Firebase Admin Firestore: Failed for db '${databaseId}'. Error: ${dbErr.message}`);
@@ -109,7 +134,7 @@ try {
     }
   }
 } catch (e: any) {
-  console.error("Critical: Firebase Admin SDK setup failed", e.message);
+  console.error("Critical: Firebase Admin SDK setup failed:", e.message);
 }
 
 
