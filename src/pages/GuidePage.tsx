@@ -9,9 +9,29 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useState, useEffect } from 'react';
+
 export default function GuidePage() {
   const { userData } = useAuthStore();
   const isAdmin = userData?.role === 'admin' || userData?.role === 'superadmin';
+  const [internalConfigs, setInternalConfigs] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
+      if (docSnap.exists()) {
+        setInternalConfigs(docSnap.data());
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isVisible = (tabKey: string) => {
+    if (isAdmin) return true;
+    const config = internalConfigs[tabKey];
+    return !(config?.internal);
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6 md:p-8">
@@ -49,144 +69,168 @@ export default function GuidePage() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <SubGuideCard
-                  icon={Wrench}
-                  title="Tất cả tiện ích"
-                  link="/utilities"
-                  description="Bấm vào (Tiện ích) để xem toàn danh sách."
-                  details={[
-                    "Hiển thị giao diện danh sách thẻ tiện ích.",
-                    "Hỗ trợ ghim các tiện ích yêu thích (Bấm icon ngôi sao).",
-                    "Tìm kiếm nhanh và lọc theo trạng thái Nội Bộ / Công Khai."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={ImageIcon}
-                  title="Khung Ảnh Đại Diện"
-                  link="/utilities/avatar-frame"
-                  description="Ghép khung cho ảnh đại diện của bạn dự theo các sự kiện."
-                  details={[
-                    "1. Chọn khung mẫu (Frame) từ danh sách được cung cấp.",
-                    "2. Tải lên hình ảnh cá nhân (Avatar) của bạn.",
-                    "3. Điều chỉnh kích thước và tải xuống bức ảnh hoàn chỉnh."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={Laptop}
-                  title="Quản Lý File Cá Nhân"
-                  link="/utilities/file-manager"
-                  description="Tải lên và quản lý tệp tin bí mật/riêng tư cá nhân."
-                  details={[
-                    "Phân loại tệp tin theo thư mục (Folder) một cách ngăn nắp.",
-                    "Tải lên an toàn tài liệu, hình ảnh, văn bản.",
-                    "Dễ dàng xem trước, đổi tên, và tải xuống."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={FolderOpen}
-                  title="Kho Văn Bản"
-                  link="/utilities/kho-van-ban"
-                  description="Lưu trữ tài liệu văn bản quan trọng của tổ chức."
-                  details={[
-                    "Tìm kiếm văn bản nhanh theo tên hoặc ngày tạo.",
-                    "Xem trước tài liệu Word/PDF ngay trong trình duyệt.",
-                    "Công cụ giúp quản lý văn bản nội bộ phân quyền rõ ràng."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={Scan}
-                  title="Quét Văn Bản AI"
-                  link="/utilities/ai-scanner"
-                  description="Nhận diện chữ cái (OCR) từ hình ảnh."
-                  details={[
-                    "1. Upload bức ảnh chứa nội dung chữ (Biên lai, Sách, Hóa đơn).",
-                    "2. AI sẽ quét và bóc tách toàn bộ phần chữ ra văn bản thuần.",
-                    "3. Sao chép và dùng trực tiếp kết quả."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={FileImage}
-                  title="Ảnh sang PDF"
-                  link="/utilities/image-to-pdf"
-                  description="Ghép một hay nhiều ảnh thành tệp PDF."
-                  details={[
-                    "1. Kéo thả nhiều ảnh cùng lúc, hoặc chọn từng ảnh rời.",
-                    "2. Có thể sắp xếp, thay đổi thứ tự các trang ảnh.",
-                    "3. Xuất ra một file PDF duy nhất."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={FileText}
-                  title="PDF sang Word"
-                  link="/utilities/pdf-to-word"
-                  description="Trích xuất PDF thành tệp Word có thể chỉnh sửa."
-                  details={[
-                    "1. Tải lên file PDF bạn cần thay đổi nội dung.",
-                    "2. Hệ thống chuyển đổi thành một tệp Word (.docx).",
-                    "3. Có thể tải về chỉnh sửa trên Office."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={FilePlus}
-                  title="Ghép PDF"
-                  link="/utilities/pdf-merger"
-                  description="Ghép nhiều file PDF thành 1 file hiển thị xuyên suốt dòng tài liệu."
-                  details={[
-                    "1. Tải lên hoặc kéo thả nhiều file PDF cùng một lúc.",
-                    "2. Có thể sắp xếp thứ tự các file PDF trước khi bắt đầu nối.",
-                    "3. Nhận về 1 tệp văn bản PDF hợp nhất dùng liền."
-                  ]}
-                />
-                <SubGuideCard
-                  icon={Scissors}
-                  title="Tách PDF"
-                  link="/utilities/pdf-splitter"
-                  description="Tách một file PDF lớn thành các trang nhỏ để thu trích xuất trang cần."
-                  details={[
-                    "Hỗ trợ gõ các trang hoặc khoảng trang để tách (VD: 1-5, 8).",
-                    "Thời gian cắt lấy linh hoạt và nhanh chóng."
-                  ]}
-                />
+                {isVisible('utilities') && (
+                  <SubGuideCard
+                    icon={Wrench}
+                    title="Tất cả tiện ích"
+                    link="/utilities"
+                    description="Bấm vào (Tiện ích) để xem toàn danh sách."
+                    details={[
+                      "Hiển thị giao diện danh sách thẻ tiện ích.",
+                      "Hỗ trợ ghim các tiện ích yêu thích (Bấm icon ngôi sao).",
+                      "Tìm kiếm nhanh và lọc theo trạng thái Nội Bộ / Công Khai."
+                    ]}
+                  />
+                )}
+                {isVisible('avatar-frame') && (
+                  <SubGuideCard
+                    icon={ImageIcon}
+                    title="Khung Ảnh Đại Diện"
+                    link="/utilities/avatar-frame"
+                    description="Ghép khung cho ảnh đại diện của bạn dự theo các sự kiện."
+                    details={[
+                      "1. Chọn khung mẫu (Frame) từ danh sách được cung cấp.",
+                      "2. Tải lên hình ảnh cá nhân (Avatar) của bạn.",
+                      "3. Điều chỉnh kích thước và tải xuống bức ảnh hoàn chỉnh."
+                    ]}
+                  />
+                )}
+                {isVisible('file-manager') && (
+                  <SubGuideCard
+                    icon={Laptop}
+                    title="Quản Lý File Cá Nhân"
+                    link="/utilities/file-manager"
+                    description="Tải lên và quản lý tệp tin bí mật/riêng tư cá nhân."
+                    details={[
+                      "Phân loại tệp tin theo thư mục (Folder) một cách ngăn nắp.",
+                      "Tải lên an toàn tài liệu, hình ảnh, văn bản.",
+                      "Dễ dàng xem trước, đổi tên, và tải xuống."
+                    ]}
+                  />
+                )}
+                {isVisible('kho-van-ban') && (
+                  <SubGuideCard
+                    icon={FolderOpen}
+                    title="Kho Văn Bản"
+                    link="/utilities/kho-van-ban"
+                    description="Lưu trữ tài liệu văn bản quan trọng của tổ chức."
+                    details={[
+                      "Tìm kiếm văn bản nhanh theo tên hoặc ngày tạo.",
+                      "Xem trước tài liệu Word/PDF ngay trong trình duyệt.",
+                      "Công cụ giúp quản lý văn bản nội bộ phân quyền rõ ràng."
+                    ]}
+                  />
+                )}
+                {isVisible('ai-scanner') && (
+                  <SubGuideCard
+                    icon={Scan}
+                    title="Quét Văn Bản AI"
+                    link="/utilities/ai-scanner"
+                    description="Nhận diện chữ cái (OCR) từ hình ảnh."
+                    details={[
+                      "1. Upload bức ảnh chứa nội dung chữ (Biên lai, Sách, Hóa đơn).",
+                      "2. AI sẽ quét và bóc tách toàn bộ phần chữ ra văn bản thuần.",
+                      "3. Sao chép và dùng trực tiếp kết quả."
+                    ]}
+                  />
+                )}
+                {isVisible('image-to-pdf') && (
+                  <SubGuideCard
+                    icon={FileImage}
+                    title="Ảnh sang PDF"
+                    link="/utilities/image-to-pdf"
+                    description="Ghép một hay nhiều ảnh thành tệp PDF."
+                    details={[
+                      "1. Kéo thả nhiều ảnh cùng lúc, hoặc chọn từng ảnh rời.",
+                      "2. Có thể sắp xếp, thay đổi thứ tự các trang ảnh.",
+                      "3. Xuất ra một file PDF duy nhất."
+                    ]}
+                  />
+                )}
+                {isVisible('pdf-to-word') && (
+                  <SubGuideCard
+                    icon={FileText}
+                    title="PDF sang Word"
+                    link="/utilities/pdf-to-word"
+                    description="Trích xuất PDF thành tệp Word có thể chỉnh sửa."
+                    details={[
+                      "1. Tải lên file PDF bạn cần thay đổi nội dung.",
+                      "2. Hệ thống chuyển đổi thành một tệp Word (.docx).",
+                      "3. Có thể tải về chỉnh sửa trên Office."
+                    ]}
+                  />
+                )}
+                {isVisible('pdf-merger') && (
+                  <SubGuideCard
+                    icon={FilePlus}
+                    title="Ghép PDF"
+                    link="/utilities/pdf-merger"
+                    description="Ghép nhiều file PDF thành 1 file hiển thị xuyên suốt dòng tài liệu."
+                    details={[
+                      "1. Tải lên hoặc kéo thả nhiều file PDF cùng một lúc.",
+                      "2. Có thể sắp xếp thứ tự các file PDF trước khi bắt đầu nối.",
+                      "3. Nhận về 1 tệp văn bản PDF hợp nhất dùng liền."
+                    ]}
+                  />
+                )}
+                {isVisible('pdf-splitter') && (
+                  <SubGuideCard
+                    icon={Scissors}
+                    title="Tách PDF"
+                    link="/utilities/pdf-splitter"
+                    description="Tách một file PDF lớn thành các trang nhỏ để thu trích xuất trang cần."
+                    details={[
+                      "Hỗ trợ gõ các trang hoặc khoảng trang để tách (VD: 1-5, 8).",
+                      "Thời gian cắt lấy linh hoạt và nhanh chóng."
+                    ]}
+                  />
+                )}
               </div>
             </div>
 
             {/* Các Mục Khác */}
-            <GuideCard
-              icon={AppWindow}
-              title="Ứng dụng"
-              description="Bấm vào biểu tượng các cửa sổ xếp chồng (AppWindow) ở menu để xem một số ứng dụng bổ sung."
-              link="/apps"
-              features={[
-                { icon: ChevronRight, text: "Sử dụng thanh tìm kiếm để lọc nhanh số lượng ứng dụng nhiều." },
-                { icon: ChevronRight, text: "Nắm bắt trạng thái bảo trì hoặc tag Nội Bộ để dùng cho đặc quyền nhân sự." },
-                { icon: ChevronRight, text: "Bấm nút 'Mở' để truy cập ứng dụng hoặc liên kết ra nền tảng cung cấp bên ngoài." }
-              ]}
-            />
+            {isVisible('apps') && (
+              <GuideCard
+                icon={AppWindow}
+                title="Ứng dụng"
+                description="Bấm vào biểu tượng các cửa sổ xếp chồng (AppWindow) ở menu để xem một số ứng dụng bổ sung."
+                link="/apps"
+                features={[
+                  { icon: ChevronRight, text: "Sử dụng thanh tìm kiếm để lọc nhanh số lượng ứng dụng nhiều." },
+                  { icon: ChevronRight, text: "Nắm bắt trạng thái bảo trì hoặc tag Nội Bộ để dùng cho đặc quyền nhân sự." },
+                  { icon: ChevronRight, text: "Bấm nút 'Mở' để truy cập ứng dụng hoặc liên kết ra nền tảng cung cấp bên ngoài." }
+                ]}
+              />
+            )}
 
-            <GuideCard
-              icon={Calendar}
-              title="Lịch làm việc"
-              description="Bấm vào biểu tượng cuốn lịch (Calendar) ở menu để quản lý lịch trình."
-              link="/calendar"
-              features={[
-                { icon: ChevronRight, text: "Hiển thị tổng quan các sự kiện trong tháng, tuần, ngày." },
-                { icon: ChevronRight, text: "Click đúp vào ô lịch ngày đó để tạo mới sự kiện / phân bổ công việc nhanh." },
-                { icon: ChevronRight, text: "Tạo các Todo-list nhỏ dạng 'Đầu việc' theo từng lịch hẹn." },
-                { icon: ChevronRight, text: "Kéo giãn ngày, di chuyển sự kiện giữa các ngày qua thao tác kéo và thả." }
-              ]}
-            />
+            {isVisible('calendar') && (
+              <GuideCard
+                icon={Calendar}
+                title="Lịch làm việc"
+                description="Bấm vào biểu tượng cuốn lịch (Calendar) ở menu để quản lý lịch trình."
+                link="/calendar"
+                features={[
+                  { icon: ChevronRight, text: "Hiển thị tổng quan các sự kiện trong tháng, tuần, ngày." },
+                  { icon: ChevronRight, text: "Click đúp vào ô lịch ngày đó để tạo mới sự kiện / phân bổ công việc nhanh." },
+                  { icon: ChevronRight, text: "Tạo các Todo-list nhỏ dạng 'Đầu việc' theo từng lịch hẹn." },
+                  { icon: ChevronRight, text: "Kéo giãn ngày, di chuyển sự kiện giữa các ngày qua thao tác kéo và thả." }
+                ]}
+              />
+            )}
 
-            <GuideCard
-              icon={Users}
-              title="Nhân sự"
-              description="Bấm vào biểu tượng người dùng (Users) ở menu để quản lý hồ sơ nhân sự."
-              link="/nhan-su"
-              features={[
-                { icon: ChevronRight, text: "Danh bạ liên lạc nhân sự chuyên nghiệp với bố cục gọn gàng." },
-                { icon: ChevronRight, text: "Tìm kiếm nhân sự nhanh qua tên, số điện thoại, tag phòng ban." },
-                { icon: ChevronRight, text: "Chỉ định rõ thẻ thành viên là Công khai hay nhân sự Nội bộ." }
-              ]}
-            />
+            {isVisible('hrm') && (
+              <GuideCard
+                icon={Users}
+                title="Nhân sự"
+                description="Bấm vào biểu tượng người dùng (Users) ở menu để quản lý hồ sơ nhân sự."
+                link="/nhan-su"
+                features={[
+                  { icon: ChevronRight, text: "Danh bạ liên lạc nhân sự chuyên nghiệp với bố cục gọn gàng." },
+                  { icon: ChevronRight, text: "Tìm kiếm nhân sự nhanh qua tên, số điện thoại, tag phòng ban." },
+                  { icon: ChevronRight, text: "Chỉ định rõ thẻ thành viên là Công khai hay nhân sự Nội bộ." }
+                ]}
+              />
+            )}
           </div>
         </section>
 

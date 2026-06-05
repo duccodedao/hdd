@@ -1,5 +1,39 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with badges and social links",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "bio": { "type": "string" },
+        "socialLinks": {
+          "type": "object",
+          "properties": {
+            "github": { "type": "string" },
+            "twitter": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "facebook": { "type": "string" }
+          }
+        },
+        "badges": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "displayName", "email"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "User activity log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "createdAt"]
+    },
     "Form": {
       "title": "Form",
       "description": "Metadata and question structure for a dynamic form (folder)",
@@ -178,9 +212,124 @@
         "createdAt": { "type": "number" }
       },
       "required": ["title", "type", "day", "importance"]
+    },
+    "AiTool": {
+      "title": "AI Tool",
+      "description": "Store recommended AI tools and services",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "url"]
+    },
+    "WordCover": {
+      "title": "Word Cover",
+      "description": "Information and download links for Word cover page templates",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "previewUrl": { "type": "string" },
+        "docUrl": { "type": "string" },
+        "downloadCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "previewUrl", "docUrl"]
+    },
+    "AdminSession": {
+      "title": "Admin Session",
+      "description": "Session tracking for admin logins to monitor multi-device or IP conflicts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string" },
+        "device": { "type": "string" },
+        "ip": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastActiveAt": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "uid", "email", "device", "ip", "createdAt", "active"]
+    },
+    "UserWallet": {
+      "title": "User Wallet",
+      "description": "User balance information",
+      "type": "object",
+      "properties": {
+        "balance": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["balance"]
+    },
+    "Deposit": {
+      "title": "Deposit",
+      "description": "Top-up history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "amount": { "type": "number" },
+        "bank": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "referenceCode": { "type": "string" },
+        "status": { "enum": ["pending", "completed", "expired"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "amount", "status", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Purchase history",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "productName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "enum": ["purchase", "refund", "adjustment"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "productName", "amount", "type", "createdAt"]
     }
   },
   "firestore": {
+    "activity_feed": {
+      "schema": "Activity",
+      "description": "User activity log for real-time feed"
+    },
+    "user_profiles": {
+      "schema": "UserProfile",
+      "description": "User profiles with badges and social links"
+    },
+    "admin_sessions": {
+      "schema": "AdminSession",
+      "description": "Admin login sessions tracked for real-time security alerts on multi-device or location conflicts"
+    },
+    "wallets": {
+      "schema": "UserWallet",
+      "description": "User balances"
+    },
+    "deposits": {
+      "schema": "Deposit",
+      "description": "Deposit requests"
+    },
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Transaction logs"
+    },
+    "ai_tools": {
+      "schema": "AiTool",
+      "description": "Store recommended AI tools and services"
+    },
     "forms": {
       "schema": "Form",
       "description": "Store all dynamic forms (folders)"
@@ -228,6 +377,10 @@
     "recurring_events": {
       "schema": "RecurringEvent",
       "description": "Store custom recurring tasks of the organization"
+    },
+    "word_covers": {
+      "schema": "WordCover",
+      "description": "Metadata for Word cover page templates"
     }
   }
 }

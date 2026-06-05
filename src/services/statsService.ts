@@ -21,35 +21,47 @@ export const statsService = {
     const month = format(normalDateInput, 'yyyy-MM');
     const year = format(normalDateInput, 'yyyy');
 
+    let deviceId = localStorage.getItem('site_device_id');
+    if (!deviceId) {
+      deviceId = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('site_device_id', deviceId);
+    }
+    const lastDeviceTrackDate = localStorage.getItem('last_device_track_date');
+    const shouldTrackDevice = lastDeviceTrackDate !== today;
+
+    if (shouldTrackDevice) {
+      localStorage.setItem('last_device_track_date', today);
+    }
+
     const statIds = [
-      'total',
-      `day_${today}`,
-      `month_${month}`,
-      `year_${year}`
+      { id: 'total', inc: increment(1) },
+      { id: `day_${today}`, inc: increment(1) },
+      { id: `month_${month}`, inc: increment(1) },
+      { id: `year_${year}`, inc: increment(1) }
     ];
+
+    if (shouldTrackDevice) {
+      statIds.push({ id: `devices_day_${today}`, inc: increment(1) });
+    }
 
     const batch = writeBatch(db);
 
-    for (const id of statIds) {
-      const ref = doc(db, 'site_visitation_stats', id);
+    for (const stat of statIds) {
+      const ref = doc(db, 'site_visitation_stats', stat.id);
       try {
-        // We use a small trick: if we don't know if doc exists, 
-        // we can either try to get it first or just use set with merge.
-        // But increment(1) on a non-existent field works if the doc exists.
-        // For atomic batch with increment, set with merge is safer if doc might not exist.
         batch.set(ref, {
-          count: increment(1),
+          count: stat.inc,
           lastUpdated: serverTimestamp()
         }, { merge: true });
       } catch (e) {
-        console.error(`Error adding to batch for ${id}:`, e);
+        console.error(`Error adding to batch for ${stat.id}:`, e?.message || String(e));
       }
     }
 
     try {
       await batch.commit();
     } catch (e) {
-      console.error("Error committing stats batch:", e);
+      console.error("Error committing stats batch:", e?.message || String(e));
     }
   },
 
@@ -72,7 +84,7 @@ export const statsService = {
       }, { merge: true });
       await batch.commit();
     } catch (e) {
-      console.error(`Error incrementing utility stats for ${utilityId}:`, e);
+      console.error(`Error incrementing utility stats for ${utilityId}:`, e?.message || String(e));
     }
   }
 };

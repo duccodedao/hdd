@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { FileText, Upload, Loader2, Download, ArrowLeft, FileType } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
-import { cn } from '../../lib/utils';
+import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 interface PdfToWordProps {
@@ -46,7 +46,7 @@ export default function PdfToWord({ onBack }: PdfToWordProps) {
       const response = await fetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           model: "gemini-3.5-flash",
           contents: {
             parts: [

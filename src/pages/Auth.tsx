@@ -17,16 +17,36 @@ import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Helmet } from 'react-helmet-async';
+import { useAppStore } from '../store/appStore';
 import MiniLoading from '../components/ui/MiniLoading';
 import AppLogo from '../components/ui/AppLogo';
 
-export default function Auth() {
+const Auth = () => {
+  const { googleClientId } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
   const isRegisterRoute = location.pathname.includes('register');
   const [activeCard, setActiveCard] = useState<'login' | 'register'>(isRegisterRoute ? 'register' : 'login');
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Render Google Login Button
+  useEffect(() => {
+    const clientId = googleClientId || (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+    const googleBtn = document.getElementById('google-signin-btn');
+    
+    if (clientId && googleBtn && window.google?.accounts?.id) {
+      window.google.accounts.id.renderButton(googleBtn, {
+        type: 'standard',
+        shape: 'pill',
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        width: googleBtn.offsetWidth,
+        locale: 'vi'
+      });
+    }
+  }, [googleClientId, activeCard]);
 
   // Login states
   const [identifier, setIdentifier] = useState('');
@@ -117,7 +137,8 @@ export default function Auth() {
       const userCred = await signInWithEmailAndPassword(auth, email, loginPassword);
       await logActivity(ActivityType.LOGIN, `Đã đăng nhập qua ${identifier.includes('@') ? 'Email' : 'Giao thức'}`);
       await checkAndSaveLocation(userCred.user.uid);
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Authentication failed.');
     } finally {
@@ -163,7 +184,8 @@ export default function Auth() {
       });
       await checkAndSaveLocation(userCred.user.uid);
       toast.success('Entity registered.');
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Registration failed.');
     } finally {
@@ -215,7 +237,8 @@ export default function Auth() {
 
       await checkAndSaveLocation(userCred.user.uid);
       await logActivity(ActivityType.LOGIN, 'Đã thiết lập liên kết hệ thống');
-      navigate('/');
+      const destination = location.state?.from?.pathname + (location.state?.from?.search || '') || '/';
+      navigate(destination, { replace: true });
     } catch (error: any) {
        toast.error('Neural handshaked failed.');
     } finally {
@@ -601,22 +624,35 @@ export default function Auth() {
               </motion.div>
             </AnimatePresence>
 
-            <div className="space-y-8 pt-4">
-              <div className="flex items-center gap-6">
-                 <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
-                 <span className="text-[10px] font-bold text-slate-300 dark:text-zinc-700 uppercase tracking-widest whitespace-nowrap">Access via secure relay</span>
-                 <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
-              </div>
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-6">
+                   <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
+                   <span className="text-[10px] font-bold text-slate-300 dark:text-zinc-700 uppercase tracking-widest whitespace-nowrap">Access via secure relay</span>
+                   <div className="flex-1 h-px bg-slate-100 dark:bg-white/5"></div>
+                </div>
 
-              <button 
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={loginLoading || registerLoading || googleLoading}
-                className="w-full h-14 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-50 group shadow-sm"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
-                <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 uppercase tracking-widest">Đăng nhấp bằng Google</span>
-              </button>
+                <div className="relative">
+                  <div 
+                    id="google-signin-btn" 
+                    className="w-full h-14 flex items-center justify-center overflow-hidden rounded-2xl"
+                  >
+                    <button 
+                      type="button"
+                      onClick={handleGoogleAuth}
+                      disabled={loginLoading || registerLoading || googleLoading}
+                      className="w-full h-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-50 group shadow-sm"
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" alt="Google" />
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 uppercase tracking-widest">Đăng nhập bằng Google</span>
+                    </button>
+                  </div>
+                  {/* Overlay to catch clicks if GSI button fails to render or we want consistent loading state */}
+                  {googleLoading && (
+                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-2xl">
+                      <MiniLoading className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
 
               <footer className="flex justify-center gap-10 pt-4 opacity-70 hover:opacity-100 transition-opacity">
                  <Link to="/help" className="text-[10px] font-bold text-slate-400 dark:text-zinc-600 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors">Hỗ trợ</Link>
@@ -681,4 +717,6 @@ export default function Auth() {
       </AnimatePresence>
     </div>
   );
-}
+};
+
+export default Auth;

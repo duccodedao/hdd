@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, X, Check, Search, Settings } from 'lucide-react';
 
+import { cn, safeJsonStringify } from '../../lib/utils';
+
 export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -22,7 +24,7 @@ export default function CookieConsent() {
   }, []);
 
   const handleAcceptAll = () => {
-    localStorage.setItem('bmass_cookie_consent', JSON.stringify({
+    localStorage.setItem('bmass_cookie_consent', safeJsonStringify({
       necessary: true,
       analytics: true,
       marketing: true,
@@ -32,7 +34,7 @@ export default function CookieConsent() {
   };
 
   const handleRejectAll = () => {
-    localStorage.setItem('bmass_cookie_consent', JSON.stringify({
+    localStorage.setItem('bmass_cookie_consent', safeJsonStringify({
       necessary: true,
       analytics: false,
       marketing: false,
@@ -42,7 +44,7 @@ export default function CookieConsent() {
   };
 
   const handleSavePreferences = () => {
-    localStorage.setItem('bmass_cookie_consent', JSON.stringify({
+    localStorage.setItem('bmass_cookie_consent', safeJsonStringify({
       ...preferences,
       timestamp: Date.now()
     }));

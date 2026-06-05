@@ -1,12 +1,13 @@
 import { ArrowRight, ShieldCheck, Zap, Globe, Code } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { doc, getDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { format } from 'date-fns';
-import { motion, useSpring, useTransform } from 'motion/react';
+import { motion, useSpring, useTransform, AnimatePresence } from 'motion/react';
+import ActivityFeed from '../components/activity/ActivityFeed';
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
@@ -19,11 +20,105 @@ function Counter({ value }: { value: number }) {
   return <motion.span>{display}</motion.span>;
 }
 
+const obfuscateEmail = (email: string) => {
+  if (!email || !email.includes('@')) return email;
+  const [name, domain] = email.split('@');
+  if (name.length <= 3) return name + '****@' + domain;
+  return name.substring(0, 3).toUpperCase() + '****@' + domain;
+};
+
+function RecentLoginsStream({ logins }: { logins: {id: string, email: string, photoURL?: string}[] }) {
+  const [items, setItems] = useState<{id: string, email: string, photoURL?: string}[]>([]);
+
+  useEffect(() => {
+    if (logins.length > 0) {
+      setItems(logins);
+    }
+  }, [logins]);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const interval = setInterval(() => {
+      setItems(prev => {
+        const newItems = [...prev];
+        const first = newItems.shift();
+        if (first) newItems.push(first);
+        return newItems;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [items.length]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="relative h-[120px] w-full overflow-hidden" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }}>
+      <AnimatePresence mode="popLayout">
+        {items.slice(0, 3).map((item, index) => {
+           const isTop = index === 0;
+           return (
+             <motion.div
+               layout
+               key={item.id}
+               initial={{ opacity: 0, y: 40, scale: 0.9 }}
+               animate={{ 
+                 opacity: isTop ? 1 : Math.max(0.15, 0.8 - (index * 0.2)), 
+                 y: 0,
+                 scale: isTop ? 1 : 1 - (index * 0.05),
+                 zIndex: 10 - index
+               }}
+               exit={{ opacity: 0, y: -40, scale: 1.08, filter: "blur(4px)" }}
+               transition={{ type: "spring", stiffness: 400, damping: 40, mass: 0.8 }}
+               className={`flex items-center gap-3 py-2 px-4 rounded-xl border mb-2 transition-colors duration-500 relative ${
+                 isTop 
+                   ? 'bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] shadow-indigo-500/10' 
+                   : 'bg-transparent border-transparent'
+               }`}
+             >
+               {item.photoURL ? (
+                 <img src={item.photoURL} alt="Avatar" className={`w-5 h-5 rounded-full object-cover shrink-0 ${isTop ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-transparent' : 'opacity-60'}`} />
+               ) : (
+                 <div className={`w-2 h-2 rounded-full shrink-0 ${isTop ? 'bg-indigo-400 animate-pulse' : 'bg-transparent'}`} />
+               )}
+               <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center -mt-0.5 sm:mt-0">
+                 <span className={`font-mono text-xs sm:text-sm tracking-tight truncate ${isTop ? 'text-indigo-600 dark:text-indigo-300 font-bold' : 'text-slate-500'}`}>
+                   {obfuscateEmail(item.email)}
+                 </span>
+                 <span className={`text-[10px] sm:text-xs sm:ml-2 truncate ${isTop ? 'text-indigo-500/80 dark:text-indigo-400/80 font-medium' : 'text-slate-600'}`}>
+                   <span className="hidden sm:inline">| </span>Đã đăng nhập thành công.
+                 </span>
+               </div>
+             </motion.div>
+           );
+        })}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function HomePage() {
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 12) setGreeting('Chào buổi sáng');
+      else if (hour >= 12 && hour < 18) setGreeting('Chào buổi chiều');
+      else if (hour >= 18 && hour < 22) setGreeting('Chào buổi tối');
+      else setGreeting('Chúc bạn đêm ngon giấc');
+    };
+    updateGreeting();
+    const timer = setInterval(updateGreeting, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthStore();
-  const { stampConfig } = useAppStore();
+  const { stampConfig, webLogo } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
+  const [recentLogins, setRecentLogins] = useState<{id: string, email: string, photoURL?: string}[]>([]);
+  const [partners, setPartners] = useState<{ id: string, name: string, logoUrl: string }[]>([]);
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
@@ -40,7 +135,7 @@ export default function HomePage() {
           setAboutConfig(prev => ({ ...prev, ...snap.data() }));
         }
       } catch (e) {
-         console.warn(e);
+         console.warn(e?.message || "Unknown error");
       }
     };
     fetchAbout();
@@ -66,18 +161,65 @@ export default function HomePage() {
       });
       setSiteStats(stats);
     }, (err) => {
-      console.error("HomePage stats listener error:", err);
+      console.error("HomePage stats listener error:", err?.message || "Unknown error");
     });
 
-    return () => unsubStats();
-  }, []);
+    const unsubLogins = onSnapshot(query(collection(db, 'users'), orderBy('lastLoginAt', 'desc'), limit(15)), (snapshot) => {
+      const users: {id: string, email: string, photoURL?: string}[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const email = data.email;
+        const role = data.role;
+        const photoURL = data.photoURL;
+        // Do not display Admin or Manager accounts
+        if (email && role !== 'admin' && role !== 'manager' && email !== 'sonlyhongduc@gmail.com') {
+          users.push({ id: doc.id, email, photoURL });
+        }
+      });
+      
+      // Setup 10 fake emails
+      const fakeEmails = [
+        "nguyenanhminh@gmail.com",
+        "trunghieu1998@gmail.com",
+        "lethuyduong@gmail.com",
+        "hoangnamhai@gmail.com",
+        "phamthimai@gmail.com",
+        "dangquangvinh@gmail.com",
+        "hoaison_92@gmail.com",
+        "trinhngocdiep@gmail.com",
+        "vulamanh@gmail.com",
+        "ngodung_88@gmail.com"
+      ].map((email, index) => ({ 
+        id: `fake-${index}`, 
+        email,
+        photoURL: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`
+      }));
+      
+      // Merge and ensure we have items for the stream
+      setRecentLogins([...users, ...fakeEmails]);
+    }, (error) => {
+      console.warn("Logins stream blocked due to local guest rules:", error?.message);
+    });
+
+    const unsubPartners = onSnapshot(collection(db, 'partners'), (snapshot) => {
+      setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
+    }, (error) => {
+      console.warn("Partners stream blocked:", error?.message);
+    });
+
+    return () => {
+      unsubStats();
+      unsubLogins();
+      unsubPartners();
+    };
+  }, [user]);
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden font-sans text-zinc-300">
-      <nav className="relative z-10 w-full max-w-7xl mx-auto px-6 py-8 flex items-center justify-between">
+    <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden font-sans text-slate-900 dark:text-zinc-300">
+      <nav className="relative z-20 w-full max-w-7xl mx-auto px-6 py-6 md:py-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/10 border border-white/5 p-2 bg-white/10 backdrop-blur-xl ring-1 ring-white/10">
-             <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Logo" className="w-full h-full object-contain" />
+             <img src={webLogo || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl tracking-tighter bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 bg-clip-text text-transparent leading-normal pb-1">BMASS</span>
@@ -88,39 +230,48 @@ export default function HomePage() {
         <div className="flex items-center gap-4">
           {!user && (
             <button 
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login', { state: { from: location } })}
               className="hidden md:block px-6 py-2.5 text-sm font-bold text-zinc-500 hover:text-white transition-colors"
             >
               Đăng nhập
             </button>
           )}
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            animate={{ 
+              boxShadow: ["0px 0px 0px rgba(99, 102, 241, 0)", "0px 0px 20px rgba(99, 102, 241, 0.4)", "0px 0px 0px rgba(99, 102, 241, 0)"] 
+            }}
+            transition={{ 
+              boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+            }}
             onClick={() => navigate('/utilities')}
-            className="px-6 py-2.5 bg-white text-slate-950 hover:bg-indigo-500 hover:text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-indigo-500/10 active:scale-95"
+            className="px-8 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full text-sm font-bold transition-all shadow-xl shadow-indigo-500/20 flex items-center gap-2"
           >
             Truy cập
-          </button>
+            <Zap className="w-4 h-4 fill-white/20" />
+          </motion.button>
         </div>
       </nav>
 
-      <main className="flex-1 relative z-10 flex flex-col items-center px-6 py-12 md:py-20 max-w-7xl mx-auto w-full">
+      <main className="flex-1 relative z-10 flex flex-col items-center px-4 md:px-6 max-w-7xl mx-auto w-full">
         {/* Admin Bio Card - Refined */}
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-4xl mx-auto mt-10 md:mt-16"
+           initial={{ opacity: 0, y: 50 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+           className="w-full max-w-4xl mx-auto mt-0 md:-mt-2"
         >
-          <div className="glass-card p-10 md:p-16 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-12 opacity-[0.02] -rotate-12 translate-x-10 -translate-y-10 group-hover:opacity-5 transition-opacity">
-               <ShieldCheck className="w-96 h-96 text-indigo-900" />
+          <div className="glass-card p-6 md:p-12 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 md:p-12 opacity-[0.02] -rotate-12 translate-x-10 -translate-y-10 group-hover:opacity-5 transition-opacity">
+               <ShieldCheck className="w-64 h-64 md:w-96 md:h-96 text-indigo-900" />
             </div>
             
-            <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 md:gap-20 text-center md:text-left">
-              <div className="shrink-0 relative">
-                <div className="w-40 h-40 rounded-[2.5rem] border-[6px] border-slate-50 dark:border-white/5 p-1.5 relative shadow-2xl shadow-indigo-500/10 bg-white dark:bg-zinc-900">
-                  <div className="absolute inset-0 bg-indigo-100 dark:bg-indigo-500/20 rounded-[2.5rem] animate-pulse blur-2xl opacity-20"></div>
-                  <img src={aboutConfig.adminPhoto || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Admin" className="w-full h-full rounded-[2rem] object-cover p-0 relative z-10 bg-white dark:bg-zinc-900" />
+            <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 text-center md:text-left">
+              <div className="shrink-0 relative mx-auto md:mx-0">
+                <div className="w-40 h-40 md:w-40 md:h-40 rounded-[2.5rem] md:rounded-[2.5rem] border-[4px] border-slate-50 dark:border-white/5 p-1.5 relative shadow-2xl shadow-indigo-500/10 bg-white dark:bg-zinc-900">
+                  <div className="absolute inset-0 bg-indigo-100 dark:bg-indigo-500/20 rounded-[2.5rem] animate-pulse blur-xl opacity-20"></div>
+                  <img src={aboutConfig.adminPhoto || "https://tytpht.hdd.io.vn/img/bmassloadings.png"} alt="Admin" className="w-full h-full rounded-[2rem] md:rounded-[2rem] object-cover p-0 relative z-10 bg-white dark:bg-zinc-900" />
                   
                   {stampConfig && stampConfig.active && stampConfig.imageUrl && (
                     <img 
@@ -129,7 +280,7 @@ export default function HomePage() {
                       className="absolute z-20 pointer-events-none drop-shadow-xl"
                       style={{
                         opacity: (stampConfig.opacity || 50) / 100,
-                        width: `${Math.min(stampConfig.width || 120, 80)}px`,
+                        width: `${Math.min(stampConfig.width || 80, 80)}px`,
                         bottom: '-15%',
                         right: '-15%',
                         transform: 'rotate(-5deg)'
@@ -138,16 +289,20 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <div className="space-y-6 flex-1">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] border border-indigo-100 dark:border-indigo-500/20 ring-4 ring-indigo-50/50 dark:ring-indigo-500/5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              <div className="space-y-4 md:space-y-6 flex-1 mt-4 md:mt-0">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] md:text-[10px] font-black uppercase tracking-[0.2em] border border-indigo-100 dark:border-indigo-500/20 ring-4 ring-indigo-50/50 dark:ring-indigo-500/5">
+                  <span className="w-2 h-2 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-ping"></span>
                   Quản trị viên
                 </div>
                 <div>
-                  <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent pb-2">{aboutConfig.adminName?.trim() || 'Sơn Lý Hồng Đức'}</h2>
-                  <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs uppercase">BMASS Digital Platform</p>
+                  <div className="text-xs md:text-sm font-bold text-indigo-500/80 dark:text-indigo-400/80 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                    <Zap className="w-3 h-3" />
+                    {greeting},
+                  </div>
+                  <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent pb-1 md:pb-2 leading-tight">{aboutConfig.adminName?.trim() || 'Sơn Lý Hồng Đức'}</h2>
+                  <p className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-xs md:text-xs uppercase mt-1 md:mt-1">BMASS Digital Platform</p>
                 </div>
-                <p className="text-slate-600 dark:text-zinc-400 text-lg leading-relaxed max-w-xl font-medium">
+                <p className="text-slate-600 dark:text-zinc-400 text-base md:text-lg leading-relaxed max-w-xl mx-auto md:mx-0 font-medium">
                   {aboutConfig.adminBio || 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.'}
                 </p>
 
@@ -178,24 +333,46 @@ export default function HomePage() {
                     </span>
                   </div>
                 </div>
+                
+                {/* Recent Logins Stream */}
+                {user && (
+                  <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5">
+                    <h3 className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Hoạt động trực tuyến
+                    </h3>
+                    <ActivityFeed />
+                    <div className="mt-4">
+                      <RecentLoginsStream logins={recentLogins} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </motion.div>
       </main>
 
-      <footer className="relative z-10 border-t border-slate-50 py-16 text-center">
+      {partners.length > 0 && (
+        <div className="relative z-10 w-full overflow-hidden py-6 md:py-8">
+          <div className="flex w-full overflow-hidden mask-edges relative group">
+            <motion.div 
+              className="flex gap-8 md:gap-16 items-center px-4 md:px-8 w-max shrink-0"
+              animate={{ x: [0, "-50%"] }}
+              transition={{ repeat: Infinity, ease: "linear", duration: Math.max(20, partners.length * 4) }}
+            >
+              {Array.from({ length: 6 }).flatMap(() => partners).map((p, idx) => (
+                <div key={`${p.id}-${idx}`} className="flex items-center justify-center shrink-0 w-24 md:w-32 h-10 md:h-12 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                  <img src={p.logoUrl} alt={p.name} className="max-w-full max-h-full object-contain" />
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      <footer className="relative z-10 py-8 md:py-12 text-center">
         <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3 opacity-30 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500 cursor-pointer">
-            <img src="https://tytpht.hdd.io.vn/img/bmassloadings.png" alt="Footer Logo" className="h-8 w-auto" />
-            <span className="font-black text-sm tracking-tighter uppercase bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent pb-0.5">BMASS</span>
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-            <button onClick={() => navigate('/privacy')} className="hover:text-indigo-600 transition-colors">Bảo mật</button>
-            <button onClick={() => navigate('/policy')} className="hover:text-indigo-600 transition-colors">Policy</button>
-            <button onClick={() => navigate('/terms')} className="hover:text-indigo-600 transition-colors">Điều khoản</button>
-            <button onClick={() => navigate('/contact')} className="hover:text-indigo-600 transition-colors">Liên hệ</button>
-          </div>
         </div>
       </footer>
     </div>

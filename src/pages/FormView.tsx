@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, limit, getDoc, doc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, CheckCircle2, AlertCircle, ArrowLeft, Loader2, Files } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AppLogo from '../components/ui/AppLogo';
 import { useAuthStore } from '../store/authStore';
+import { safeJsonStringify } from '../lib/utils';
 
 interface Question {
   id: string;
@@ -51,7 +53,11 @@ export default function FormView() {
     setAnswers(prev => {
       const newAnswers = { ...prev, [qId]: value };
       if (form) {
-        localStorage.setItem(`form_draft_${form.slug}`, JSON.stringify(newAnswers));
+        try {
+          localStorage.setItem(`form_draft_${form.slug}`, safeJsonStringify(newAnswers));
+        } catch (e) {
+          console.error("Local draft saving status error:", e);
+        }
       }
       return newAnswers;
     });
@@ -147,7 +153,11 @@ export default function FormView() {
     });
     setAnswers(updatedAnswers);
     if (form) {
-      localStorage.setItem(`form_draft_${form.slug}`, JSON.stringify(updatedAnswers));
+      try {
+        localStorage.setItem(`form_draft_${form.slug}`, safeJsonStringify(updatedAnswers));
+      } catch (e) {
+        console.error("Local prefilled draft saving status error:", e);
+      }
     }
   }, [selectedRecordId]);
 
@@ -204,7 +214,7 @@ export default function FormView() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-zinc-950">
-        <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+        <AppLogo className="w-20 h-20" isLoading={true} />
       </div>
     );
   }
@@ -458,8 +468,6 @@ export default function FormView() {
                                   updateAnswer(q.id, 'Đang tải lên Hệ thống...');
                                   toast.loading('Đang xử lý biên dịch dữ liệu...', { id: `upload-${q.id}` });
                                   try {
-                                    const { getDoc, doc } = await import('firebase/firestore');
-                                    const { db } = await import('../lib/firebase');
                                     const configDoc = await getDoc(doc(db, 'settings', 'github_integration'));
                                     
                                     let uploadedUrl = null;

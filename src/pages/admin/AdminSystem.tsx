@@ -18,6 +18,8 @@ import {
   FileSpreadsheet,
   FolderOpen
 } from 'lucide-react';
+import { useConfirmStore } from '../../store/confirmStore';
+import { safeJsonStringify } from '../../lib/utils';
 
 interface CollectionStatus {
   name: string;
@@ -29,6 +31,7 @@ interface CollectionStatus {
 export default function AdminSystem() {
   const [loading, setLoading] = useState(false);
   const [customCollectionName, setCustomCollectionName] = useState('');
+  const { openConfirm } = useConfirmStore();
   
   // Default comprehensive list of all system & utility collections
   const [collections, setCollections] = useState<CollectionStatus[]>([
@@ -177,7 +180,7 @@ export default function AdminSystem() {
         data: backupData
       };
 
-      const blob = new Blob([JSON.stringify(backupEnvelope, null, 2)], { type: 'application/json' });
+      const blob = new Blob([safeJsonStringify(backupEnvelope, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       const nowStr = new Date().toISOString().replace(/[:.]/g, '-');
@@ -242,20 +245,21 @@ export default function AdminSystem() {
   const executeImport = async () => {
     if (!importFile) return;
 
-    const confirmAction = window.confirm(
-      `CẢNH BÁO QUAN TRỌNG:\nPhương pháp này sẽ tiến hành hòa trộn và ghi đè dữ liệu đối với các tài liệu trùng ID trên toàn bộ hệ thống Firebase.\nBạn có chắc chắn muốn tiến hành khôi phục từ tệp "${importFileName}" không?`
-    );
-    if (!confirmAction) return;
+    openConfirm({
+      title: 'Xác nhận khôi phục dữ liệu',
+      message: `Phương pháp này sẽ tiến hành hòa trộn và ghi đè dữ liệu đối với các tài liệu trùng ID trên toàn bộ hệ thống Firebase.\nBạn có chắc chắn muốn tiến hành khôi phục từ tệp "${importFileName}" không?`,
+      confirmText: 'Khôi phục',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        setLoading(true);
+        const toastId = toast.loading('Đang chuẩn bị luồng ghi đè dữ liệu...', { id: 'import_run' });
 
-    setLoading(true);
-    const toastId = toast.loading('Đang chuẩn bị luồng ghi đè dữ liệu...', { id: 'import_run' });
-
-    try {
-      let batch = writeBatch(db);
-      let opCount = 0;
-      const BATCH_SIZE = 400; // Safe threshold for Firestore limits
-      let importedCollectionCount = 0;
-      let importedDocsCount = 0;
+        try {
+          let batch = writeBatch(db);
+          let opCount = 0;
+          const BATCH_SIZE = 400; // Safe threshold for Firestore limits
+          let importedCollectionCount = 0;
+          let importedDocsCount = 0;
 
       // EXTREMELY ROBUST: Iterate dynamically through EVERY key inside the JSON's data.
       // This guarantees that any new features/new collections are flawlessly imported on dynamic models!
@@ -316,6 +320,8 @@ export default function AdminSystem() {
     } finally {
       setLoading(false);
     }
+      }
+    });
   };
 
   return (

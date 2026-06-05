@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
-  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors
+  Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail, Sparkles,
+  Wallet, ShoppingBag, Star, Bookmark
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
+import { useBookmarkStore } from '../../store/bookmarkStore';
 import AppLogo from '../ui/AppLogo';
 import { db } from '../../lib/firebase';
 
@@ -25,11 +27,12 @@ const subUtilities = [
 ];
 
 export default function Sidebar({ className }: { className?: string }) {
-  const { isAdmin, isSuperAdmin, userData } = useAuthStore();
-  const { setSidebarOpen, maintenanceTabs } = useAppStore();
+  const { user, isAdmin, isSuperAdmin, userData } = useAuthStore();
+  const { setSidebarOpen, maintenanceTabs, hasUnapprovedSessions } = useAppStore();
+  const { bookmarks } = useBookmarkStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng']);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng', 'Dấu trang']);
   const [utilitiesExpanded, setUtilitiesExpanded] = useState(false);
   const [dynamicUtils, setDynamicUtils] = useState<any[]>([]);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -39,7 +42,7 @@ export default function Sidebar({ className }: { className?: string }) {
       const unsubUtils = onSnapshot(collection(db, 'utilities'), (snap) => {
         setDynamicUtils(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((u: any) => !u.hidden || isAdmin));
       }, (err) => {
-        console.error("Sidebar utilities error:", err);
+        console.error("Sidebar utilities error:", err?.message || String(err));
         if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
           useAppStore.getState().setQuotaExceeded(true);
         }
@@ -49,7 +52,7 @@ export default function Sidebar({ className }: { className?: string }) {
           setSystemTools(docSnap.data());
         }
       }, (err) => {
-        console.error("Sidebar tool_permissions error:", err);
+        console.error("Sidebar tool_permissions error:", err?.message || String(err));
         if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
           useAppStore.getState().setQuotaExceeded(true);
         }
@@ -86,11 +89,11 @@ export default function Sidebar({ className }: { className?: string }) {
   ];
 
   return (
-    <aside className={cn("flex flex-col relative z-20 w-64 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
-      <div className="p-8 flex items-center gap-4">
-        <AppLogo className="w-8 h-8" />
+    <aside className={cn("flex flex-col relative z-20 w-64 lg:w-60 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-slate-50/20 lg:dark:bg-zinc-950/20 backdrop-blur-xl border-r border-slate-200 dark:border-white/5", className)}>
+      <div className="p-4 flex items-center gap-3 border-b border-slate-200/60 dark:border-white/5">
+        <AppLogo className="w-9 h-9" />
         <div className="flex flex-col">
-          <h2 className="font-display font-black text-slate-900 dark:text-white text-lg tracking-tighter uppercase italic leading-none">BMASS.</h2>
+          <h2 className="font-display font-black text-slate-900 dark:text-white text-md tracking-tighter uppercase italic leading-none">BMASS.</h2>
         </div>
       </div>
 
@@ -119,90 +122,86 @@ export default function Sidebar({ className }: { className?: string }) {
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden space-y-1"
               >
-                {/* Tiện ích Item (with nested sub-utility items) */}
-                <div className="space-y-1">
-                  <div 
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium cursor-pointer group",
-                      location.pathname.startsWith('/utilities') 
-                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                {/* Trang chủ Item */}
+                <NavLink
+                  to="/"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    (isActive || location.pathname === '/')
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm"
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Home className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/' && "font-semibold")}>Trang chủ</span>
+                  </div>
+                </NavLink>
+
+                {/* Cửa hàng Item */}
+                <NavLink
+                  to="/store"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    isActive 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm font-semibold" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <ShoppingBag className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/store' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/store' && "font-semibold")}>Cửa hàng</span>
+                  </div>
+                </NavLink>
+
+                {/* Ví điện tử Item */}
+                {user && (
+                  <NavLink
+                    to="/wallet"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm font-semibold" 
                         : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
                     )}
-                    onClick={() => {
-                      navigate('/utilities');
-                      setUtilitiesExpanded(!utilitiesExpanded);
-                    }}
                   >
                     <div className="flex items-center gap-3">
-                      <Wrench className={cn("w-4 h-4 transition-colors duration-300", location.pathname.startsWith('/utilities') ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                      <span className={cn(location.pathname.startsWith('/utilities') && "font-semibold")}>Tiện ích</span>
+                      <Wallet className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/wallet' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/wallet' && "font-semibold")}>Ví điện tử</span>
                     </div>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation(); // Stop navigation, just toggle expand
-                        setUtilitiesExpanded(!utilitiesExpanded);
-                      }}
-                      className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded transition-all"
-                    >
-                      <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", utilitiesExpanded && "rotate-180")} />
-                    </button>
-                  </div>
+                  </NavLink>
+                )}
 
-                  <AnimatePresence initial={false}>
-                    {utilitiesExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.15, ease: "easeOut" }}
-                        className="overflow-hidden pl-4 space-y-1 border-l border-slate-200 dark:border-white/5 ml-5 mt-1"
-                      >
-                        {allSubUtilities
-                          .filter((sub: any) => {
-                            const isInternal = systemTools[sub.id]?.internal || sub.internalOnly || false;
-                            if (isInternal) {
-                              return isAdmin || isSuperAdmin;
-                            }
-                            return true;
-                          })
-                          .map((sub: any) => {
-                          const isSubActive = sub.id === 'all' 
-                            ? location.pathname === '/utilities'
-                            : location.pathname === sub.path;
-                          const isMaintenance = maintenanceTabs[sub.maintenanceKey];
-                          const isInternal = systemTools[sub.id]?.internal || sub.internalOnly || false;
-                          
-                          return (
-                            <NavLink
-                              key={sub.path}
-                              to={sub.path}
-                              onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                              className={cn(
-                                "flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all text-xs font-medium group text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200",
-                                isSubActive && "text-blue-600 dark:text-white bg-blue-50/30 dark:bg-white/5 font-semibold"
-                              )}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <sub.icon className={cn("w-3.5 h-3.5 shrink-0", isSubActive ? "text-blue-500 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600 group-hover:text-slate-600 dark:group-hover:text-zinc-400")} />
-                                <span className="truncate">{sub.name}</span>
-                              </div>
-                              
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {isInternal && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
-                                )}
-                                {isMaintenance && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
-                                )}
-                              </div>
-                            </NavLink>
-                          );
-                        })}
-                      </motion.div>
+                {/* AI Tools Item */}
+                {(!systemTools['ai_tools']?.internal || isAdmin || isSuperAdmin) && (
+                  <NavLink
+                    to="/ai-tools"
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                      isActive 
+                        ? "text-indigo-700 bg-gradient-to-r from-indigo-50 to-indigo-100/50 dark:from-indigo-500/10 dark:to-indigo-500/5 dark:text-indigo-400 shadow-sm font-semibold whitespace-nowrap"
+                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02] whitespace-nowrap"
                     )}
-                  </AnimatePresence>
-                </div>
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0", location.pathname === '/ai-tools' ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                      <span className={cn(location.pathname === '/ai-tools' && "font-semibold")}>AI Tools</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {systemTools['ai_tools']?.internal && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                      )}
+                      {maintenanceTabs['ai_tools'] && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                      )}
+                    </div>
+                  </NavLink>
+                )}
 
                 {/* Ứng dụng Item */}
                 {(!systemTools['apps']?.internal || isAdmin || isSuperAdmin) && (
@@ -231,7 +230,6 @@ export default function Sidebar({ className }: { className?: string }) {
                     </div>
                   </NavLink>
                 )}
-
 
                 {/* Calendar Item */}
                 {(!systemTools['calendar']?.internal || isAdmin || isSuperAdmin) && (
@@ -289,6 +287,49 @@ export default function Sidebar({ className }: { className?: string }) {
                   </NavLink>
                 )}
 
+                {/* Tiện ích Item (Simple link, no dropdown) */}
+                <NavLink
+                  to="/utilities"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    (isActive || location.pathname.startsWith('/utilities')) 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Wrench className={cn("w-4 h-4 transition-colors duration-300", location.pathname.startsWith('/utilities') ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname.startsWith('/utilities') && "font-semibold")}>Tiện ích</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {systemTools['utilities']?.internal && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                    )}
+                    {maintenanceTabs['utilities'] && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6_px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
+                    )}
+                  </div>
+                </NavLink>
+
+                {/* Contact Tab */}
+                <NavLink
+                  to="/contact"
+                  onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                  className={({ isActive }) => cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                    isActive 
+                      ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
+                      : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className={cn("w-4 h-4 transition-colors duration-300", location.pathname === '/contact' ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                    <span className={cn(location.pathname === '/contact' && "font-semibold")}>Liên hệ</span>
+                  </div>
+                </NavLink>
+
                 {/* Guide Tab */}
                 {(!systemTools['guide']?.internal || isAdmin || isSuperAdmin) && (
                   <NavLink
@@ -321,25 +362,60 @@ export default function Sidebar({ className }: { className?: string }) {
           </AnimatePresence>
         </div>
 
+        {/* Dấu trang đã lưu group */}
+        {user && bookmarks.length > 0 && (
+          <div className="space-y-1 border-t border-slate-200/50 dark:border-white/5 pt-4">
+            <button 
+              type="button"
+              onClick={() => toggleGroup('Dấu trang')}
+              className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 transition-all border-none bg-transparent"
+            >
+              <div className="flex items-center gap-2">
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                <span>Dấu trang ({bookmarks.length})</span>
+              </div>
+              <ChevronDown className={cn("w-3 h-3 transition-transform duration-300", expandedGroups.includes('Dấu trang') && "rotate-180")} />
+            </button>
+            
+            <AnimatePresence initial={false}>
+              {expandedGroups.includes('Dấu trang') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="overflow-hidden space-y-1 block pl-1 pt-1"
+                >
+                  {bookmarks.map((b) => (
+                    <NavLink
+                      key={b.id}
+                      to={b.url}
+                      onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                      className={({ isActive }) => cn(
+                        "flex items-center justify-between px-3 py-1.5 rounded-md transition-all text-xs font-medium group",
+                        isActive 
+                          ? "text-blue-750 bg-blue-50/50 dark:text-white dark:bg-white/5 font-semibold" 
+                          : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/60 dark:hover:bg-white/[0.02]"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 max-w-[80%] min-w-0">
+                        <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0 animate-pulse" />
+                        <span className="truncate">{b.title}</span>
+                      </div>
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-zinc-500 rounded shrink-0 leading-none scale-90">
+                        {b.type === 'app' ? 'App' : 'Tiện ích'}
+                      </span>
+                    </NavLink>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
       </nav>
 
-      {isSuperAdmin ? (
-        <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
-          <NavLink
-            to="/admin"
-            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-            className={({ isActive }) => cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-[11px] font-bold uppercase tracking-widest",
-              isActive 
-                ? "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" 
-                : "text-slate-500 dark:text-zinc-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-400/5"
-            )}
-          >
-            <Shield className="w-4 h-4" />
-            <span>Admin Center</span>
-          </NavLink>
-        </div>
-      ) : !userData && (
+      {(!userData && !user) && (
         <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50/90 dark:bg-zinc-950/90 lg:bg-transparent shrink-0">
           <NavLink
             to="/login"

@@ -1,0 +1,65 @@
+src/pages/admin/AdminSystem.tsx:101:    const trimmed = customCollectionName.trim();
+src/pages/admin/AdminForms.tsx:365:          const headers = jsonData[0].map(h => String(h || '').toLowerCase().trim());
+src/pages/admin/AdminForms.tsx:375:            const label = String(row[labelIdx] || '').trim();
+src/pages/admin/AdminForms.tsx:378:            const type = String(row[typeIdx] || 'text').trim() as any;
+src/pages/admin/AdminForms.tsx:380:            const options = String(row[optIdx] || '').split('|').map(o => o.trim()).filter(Boolean);
+src/pages/admin/AdminForms.tsx:395:          const headers = jsonData[0].map(h => String(h || '').trim()).filter(Boolean);
+src/pages/admin/AdminForms.tsx:906:                                          const val = e.currentTarget.value.trim();
+src/pages/admin/AdminDashboard.tsx:860:    if (!newCategoryName.trim()) return;
+src/pages/admin/AdminDashboard.tsx:863:        name: newCategoryName.trim(),
+src/pages/admin/AdminDashboard.tsx:892:    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+src/pages/admin/AdminDashboard.tsx:894:      await updateDoc(doc(db, 'app_categories', id), { name: newName.trim() });
+src/pages/admin/AdminDashboard.tsx:981:              title: String(title).trim(),
+src/pages/admin/AdminDashboard.tsx:982:              logoUrl: logoUrl ? String(logoUrl).trim() : '',
+src/pages/admin/AdminDashboard.tsx:983:              appUrl: String(appUrl).trim(),
+src/pages/admin/AdminDashboard.tsx:984:              description: String(description).trim(),
+src/pages/utilities/GeminiChat.tsx:197:    const textToSend = overrideText || input.trim();
+src/pages/utilities/GeminiChat.tsx:605:                    disabled={!input.trim() || isLoading}
+src/pages/utilities/GeminiChat.tsx:608:                      input.trim() && !isLoading
+src/pages/utilities/AvatarFrameManager.tsx:422:    if (!adminFrameName.trim()) {
+src/pages/utilities/AvatarFrameManager.tsx:472:          const cleanEventName = adminFrameName.trim().replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+src/pages/utilities/AvatarFrameManager.tsx:513:        const cleanEventName = adminFrameName.trim().replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+src/pages/utilities/DocumentVault.tsx:912:    if (!newCat.trim()) return;
+src/pages/utilities/DocumentVault.tsx:914:      await addDoc(collection(db, 'document_categories'), { name: newCat.trim() });
+src/pages/utilities/DocumentVault.tsx:921:    if (!editValue.trim()) return;
+src/pages/utilities/DocumentVault.tsx:923:      await updateDoc(doc(db, 'document_categories', id), { name: editValue.trim() });
+src/pages/utilities/DocumentVault.tsx:927:      const batchPromises = snap.docs.map(d => updateDoc(doc(db, 'documents', d.id), { categoryName: editValue.trim() }));
+src/pages/utilities/PdfSplitter.tsx:42:      const trimmed = part.trim();
+src/pages/HomePage.tsx:253:                  <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent pb-1 md:pb-2 leading-tight">{aboutConfig.adminName?.trim() || 'Sơn Lý Hồng Đức'}</h2>
+src/pages/CalendarPage.tsx:150:    if (!recurringForm.title.trim()) return toast.error('Vui lòng nhập tiêu đề');
+src/pages/CalendarPage.tsx:154:        title: recurringForm.title.trim(),
+src/pages/CalendarPage.tsx:160:        description: recurringForm.description.trim(),
+src/pages/CalendarPage.tsx:245:          if (!title || String(title).trim() === '') {
+src/pages/CalendarPage.tsx:265:          const importanceRaw = String(row["Độ quan trọng (low / medium / high)"] || row["Độ quan trọng"] || row["Do quan trong"] || row["importance"] || '').toLowerCase().trim();
+src/pages/CalendarPage.tsx:276:            title: String(title).trim(),
+src/pages/CalendarPage.tsx:281:            description: String(description).trim(),
+src/pages/CalendarPage.tsx:331:    if (!eventForm.title.trim()) return tooltipError('Vui lòng nhập tiêu đề');
+src/pages/CalendarPage.tsx:425:          (ev.title?.trim().toLowerCase() === title.trim().toLowerCase() && ev.date === dateStr)
+src/pages/CalendarPage.tsx:639:      (filterDescription === 'has-desc' && !!item.description?.trim()) ||
+src/pages/CalendarPage.tsx:640:      (filterDescription === 'no-desc' && !item.description?.trim());
+src/pages/CalendarPage.tsx:1393:                    disabled={!eventForm.title.trim()}
+src/pages/CalendarPage.tsx:1631:                      disabled={!recurringForm.title.trim()}
+src/pages/HrmPage.tsx:40:    const rawVal = typeof dateStr === 'string' ? dateStr.trim() : dateStr;
+src/pages/HrmPage.tsx:94:    const rawVal = typeof dateStr === 'string' ? dateStr.trim() : dateStr;
+src/pages/HrmPage.tsx:273:    if (!fullName.trim() || !birthDate || !phone.trim()) {
+src/pages/HrmPage.tsx:279:      fullName: fullName.trim(),
+src/pages/HrmPage.tsx:282:      phone: phone.trim(),
+src/pages/HrmPage.tsx:288:      if (!idCard.trim()) {
+src/pages/HrmPage.tsx:292:      payload.idCard = idCard.trim();
+src/pages/HrmPage.tsx:294:      if (!region.trim()) {
+src/pages/HrmPage.tsx:298:      payload.region = region.trim();
+src/pages/HrmPage.tsx:441:              if (row[ph] !== undefined) return String(row[ph]).trim();
+src/pages/HrmPage.tsx:515:    const q = searchQuery.toLowerCase().trim();
+src/components/ui/GeminiChatBox.tsx:53:    if (!input.trim() || isLoading) return;
+src/components/ui/GeminiChatBox.tsx:55:    const userText = input.trim();
+src/components/ui/GeminiChatBox.tsx:230:                    disabled={!input.trim() || isLoading}
+src/services/githubService.ts:36:    let rawRepo = config.repo.trim();
+src/services/githubService.ts:45:    const cleanRepo = rawRepo.split('/').pop()?.trim() || rawRepo;
+src/services/githubService.ts:46:    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : config.owner).trim();
+src/services/githubService.ts:47:    const cleanToken = config.token.trim();
+src/services/githubService.ts:65:          branch: (config.branch || 'main').trim(),
+src/services/githubService.ts:121:    let rawRepo = config.repo.trim();
+src/services/githubService.ts:130:    const cleanRepo = rawRepo.split('/').pop()?.trim() || rawRepo;
+src/services/githubService.ts:131:    const effectiveOwner = (rawRepo.includes('/') && !rawRepo.startsWith('http') ? rawRepo.split('/')[0] : config.owner).trim();
+src/services/githubService.ts:132:    const cleanToken = config.token.trim();
+src/services/githubService.ts:147:          branch: (config.branch || 'main').trim(),

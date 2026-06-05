@@ -38,7 +38,7 @@ export default function WelcomePopup() {
         }
       }
     }, (err) => {
-      console.error("WelcomePopup real-time listener error:", err);
+      console.error("WelcomePopup real-time listener error:", err?.message || String(err));
       if (err?.message?.includes('quota') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }

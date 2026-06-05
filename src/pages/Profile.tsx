@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useSearchParams } from 'react-router-dom';
-import { doc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { updateProfile, sendPasswordResetEmail, sendEmailVerification, signOut } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import { 
   Camera, User, Shield, CheckCircle2, ChevronRight, KeyRound, 
   Activity, Loader2, Settings, HelpCircle, Zap, Brush, Mail,
-  Smartphone, Bell, Globe, LogOut, Clock, ArrowUpRight, MapPin
+  Smartphone, Bell, Globe, LogOut, Clock, ArrowUpRight, MapPin, Download
 } from 'lucide-react';
 import { toSafeDate, cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ import { logActivity, ActivityType } from '../services/activityService';
 import { motion, AnimatePresence } from 'motion/react';
 import { KeyboardShortcutsModal } from '../components/ui/KeyboardShortcutsModal';
 import { Helmet } from 'react-helmet-async';
+import { PaymentTransactionStatus } from '../components/payment/PaymentTransactionStatus';
 
 interface ActivityLog {
   id: string;
@@ -33,16 +34,19 @@ export default function Profile() {
   const { user, userData } = useAuthStore();
   const [displayName, setDisplayName] = useState(userData?.displayName || '');
   const [phoneNumber, setPhoneNumber] = useState(userData?.phoneNumber || '');
+  const [socialLinks, setSocialLinks] = useState({ github: '', twitter: '', linkedin: '', facebook: '' });
+  const [badges, setBadges] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { openConfirm } = useConfirmStore();
 
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'account' | 'info' | 'security' | 'activity'>((searchParams.get('tab') as any) || 'account');
+  const [activeTab, setActiveTab] = useState<'account' | 'info' | 'security' | 'activity' | 'transactions'>((searchParams.get('tab') as any) || 'account');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [passwordCooldown, setPasswordCooldown] = useState(0);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [currentLocationName, setCurrentLocationName] = useState('Đang xác định...');
 
   const [permissions, setPermissions] = useState({
@@ -51,6 +55,16 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
+    
+    // Fetch UserProfile
+    const unsubProfile = onSnapshot(doc(db, 'user_profiles', user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setSocialLinks(data.socialLinks || { github: '', twitter: '', linkedin: '', facebook: '' });
+        setBadges(data.badges || []);
+      }
+    });
+
     const q = query(collection(db, 'activities'), where('userId', '==', user.uid));
     const unsub = onSnapshot(q, (snap) => {
       const all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog));
@@ -59,6 +73,16 @@ export default function Profile() {
         const db = b.timestamp ? toSafeDate(b.timestamp).getTime() : 0;
         return db - da;
       }).slice(0, 15));
+    });
+
+    const qInvoices = query(collection(db, 'invoices'), where('userId', '==', user.uid));
+    const unsubInvoices = onSnapshot(qInvoices, (snap) => {
+      const all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInvoices(all.sort((a: any, b: any) => {
+        const da = a.createdAt ? toSafeDate(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? toSafeDate(b.createdAt).getTime() : 0;
+        return db - da;
+      }));
     });
 
     const timer = setInterval(() => {
@@ -77,7 +101,7 @@ export default function Profile() {
         updateState();
         loc.onchange = updateState;
       } catch (e) {
-        console.error("Permission check failed", e);
+        console.error("Permission check failed", e?.message || String(e));
       }
     };
     checkPermissions();
@@ -111,13 +135,15 @@ export default function Profile() {
 
     return () => {
       unsub();
+      unsubInvoices();
+      unsubProfile();
       clearInterval(timer);
     };
   }, [user]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['account', 'info', 'security', 'activity'].includes(tab)) {
+    if (tab && ['account', 'info', 'security', 'activity', 'transactions'].includes(tab)) {
       setActiveTab(tab as any);
     }
   }, [searchParams]);
@@ -181,9 +207,15 @@ export default function Profile() {
     try {
       await updateProfile(user, { displayName });
       await updateDoc(doc(db, 'users', user.uid), { displayName, phoneNumber });
+      await setDoc(doc(db, 'user_profiles', user.uid), { 
+        uid: user.uid,
+        displayName,
+        email: user.email,
+        socialLinks 
+      }, { merge: true });
       await logActivity(ActivityType.UPDATE_PROFILE, 'Đã cập nhật thông tin tài khoản');
       toast.success('Đã lưu thông tin');
-    } catch (e) { toast.error('Lỗi khi lưu dữ liệu'); } finally { setLoading(false); }
+    } catch (e) { console.error(e); toast.error('Lỗi khi lưu dữ liệu'); } finally { setLoading(false); }
   };
 
   const togglePermission = async (type: 'geolocation') => {
@@ -272,6 +304,7 @@ export default function Profile() {
             {[
               { id: 'account', label: 'Cấu hình định danh', icon: User },
               { id: 'security', label: 'Trung tâm bảo mật', icon: Shield },
+              { id: 'transactions', label: 'Lịch sử giao dịch', icon: Clock },
               { id: 'activity', label: 'Nhật ký truy cập', icon: Activity },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'bg-slate-50 dark:bg-zinc-900/50 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-white/5'}`}>
@@ -352,6 +385,25 @@ export default function Profile() {
                              />
                           </div>
                           
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Social Links</label>
+                             <div className="grid grid-cols-2 gap-4">
+                                <input type="text" placeholder="GitHub" value={socialLinks.github} onChange={e => setSocialLinks({...socialLinks, github: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="Twitter" value={socialLinks.twitter} onChange={e => setSocialLinks({...socialLinks, twitter: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="LinkedIn" value={socialLinks.linkedin} onChange={e => setSocialLinks({...socialLinks, linkedin: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                                <input type="text" placeholder="Facebook" value={socialLinks.facebook} onChange={e => setSocialLinks({...socialLinks, facebook: e.target.value})} className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm" />
+                             </div>
+                          </div>
+
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Badges</label>
+                             <div className="flex flex-wrap gap-2">
+                                {badges.length > 0 ? badges.map(b => (
+                                  <span key={b} className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold">{b}</span>
+                                )) : <span className="text-xs text-slate-400">Chưa có huy hiệu</span>}
+                             </div>
+                          </div>
+                          
                           <div className="pt-4">
                              <button 
                                type="submit" 
@@ -367,6 +419,107 @@ export default function Profile() {
                     </div>
                   </div>
 
+                </div>
+              )}
+
+              {activeTab === 'transactions' && (
+                <div className="premium-card space-y-6">
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                         </div>
+                         <div>
+                            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Lịch sử giao dịch</h3>
+                            <p className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-bold">Danh sách hóa đơn của bạn</p>
+                         </div>
+                      </div>
+                   </div>
+
+                   {/* Real-time transaction status widget */}
+                   <PaymentTransactionStatus className="shadow-sm border-slate-200/60 dark:border-zinc-800 bg-gradient-to-br from-slate-50/50 to-indigo-50/10 dark:from-zinc-950/40 dark:to-zinc-900/10" />
+
+                   <div className="overflow-x-auto">
+                     {invoices.length > 0 ? (
+                       <table className="w-full text-left border-collapse">
+                         <thead>
+                           <tr className="border-b border-slate-100 dark:border-white/5">
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Mã hóa đơn</th>
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Nội dung dịch vụ</th>
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Số tiền</th>
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">PT thanh toán</th>
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Trạng thái</th>
+                             <th className="py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Thời gian</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                           {invoices.map((inv: any) => (
+                             <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                               <td className="py-4 font-mono text-xs font-bold text-slate-900 dark:text-white">
+                                 {inv.id}
+                               </td>
+                               <td className="py-4 text-sm font-medium text-slate-700 dark:text-zinc-300">
+                                 <div className="flex flex-col gap-1.5 justify-start">
+                                   {inv.items && inv.items.length > 0 ? (
+                                     inv.items.map((item: any, idx: number) => (
+                                       <div key={idx} className="flex flex-wrap items-center gap-2">
+                                         <span className="text-slate-800 dark:text-zinc-200">{item.name}</span>
+                                         {inv.status === 'paid' && item.githubUrl && (
+                                           <a
+                                             href={item.githubUrl}
+                                             target="_blank"
+                                             rel="noreferrer"
+                                             className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 px-2 py-0.5 rounded-md transition-all shrink-0 ml-1.5 animate-in fade-in zoom-in-95"
+                                             title="Tải lại tài liệu đã mua"
+                                             id={`download-purchased-${item.itemId || idx}`}
+                                           >
+                                             <Download className="w-2.5 h-2.5" />
+                                             Tải xuống
+                                           </a>
+                                         )}
+                                       </div>
+                                     ))
+                                   ) : (
+                                     'N/A'
+                                   )}
+                                 </div>
+                               </td>
+                               <td className="py-4 text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                 {inv.totalAmount ? inv.totalAmount.toLocaleString() : '0'}đ
+                               </td>
+                               <td className="py-4 text-xs font-medium text-slate-500 dark:text-zinc-400">
+                                 {inv.paymentMethod === 'bank_transfer' ? 'Chuyển khoản SePay' : inv.paymentMethod || 'Chuyển khoản'}
+                               </td>
+                               <td className="py-4">
+                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                   inv.status === 'paid' 
+                                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' 
+                                     : inv.status === 'expired'
+                                     ? 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'
+                                     : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                                 }`}>
+                                   <span className={`w-1.5 h-1.5 rounded-full ${
+                                     inv.status === 'paid' ? 'bg-emerald-500' : inv.status === 'expired' ? 'bg-slate-400' : 'bg-amber-500'
+                                   }`} />
+                                   {inv.status === 'paid' ? 'Thành công' : inv.status === 'expired' ? 'Đã hết hạn' : 'Chờ thanh toán'}
+                                 </span>
+                               </td>
+                               <td className="py-4 text-xs text-slate-500 dark:text-slate-400">
+                                 {inv.createdAt ? format(toSafeDate(inv.createdAt), 'HH:mm • dd/MM/yyyy') : 'Vừa xong'}
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
+                     ) : (
+                       <div className="p-12 text-center">
+                          <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-white/10">
+                             <Clock className="w-6 h-6 text-slate-400" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Không có lịch sử giao dịch</p>
+                       </div>
+                     )}
+                   </div>
                 </div>
               )}
 

@@ -25,7 +25,7 @@ export const TabGuard = ({ children, tabKey }: TabGuardProps) => {
       }
       setLoading(false);
     }, (err) => {
-      console.error("TabGuard error:", err);
+      console.error("TabGuard error:", err?.message || String(err));
       setLoading(false);
     });
     

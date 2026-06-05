@@ -22,7 +22,7 @@ import {
   Pin,
   ShieldAlert
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, safeJsonStringify } from '../../lib/utils';
 import AppLogo from '../../components/ui/AppLogo';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
@@ -138,10 +138,10 @@ export default function GeminiChat() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('ai_chat_sessions', JSON.stringify(sessions));
+      localStorage.setItem('ai_chat_sessions', safeJsonStringify(sessions));
       localStorage.setItem('ai_current_session', currentSessionId);
     } catch (e) {
-      console.error("Failed to save chat sessions to localStorage due to cyclic data:", e);
+      console.error("Failed to save chat sessions to localStorage due to cyclic data:", e?.message || String(e));
     }
   }, [sessions, currentSessionId]);
 
@@ -232,7 +232,7 @@ export default function GeminiChat() {
       const response = await fetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           model: selectedModel,
           contents: {
             parts: [{ text: historyText }]
@@ -259,7 +259,7 @@ export default function GeminiChat() {
         s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMessage] } : s
       ));
     } catch (error: any) {
-      console.error('Gemini error:', error);
+      console.error('Gemini error:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi gọi AI: ' + (error?.message || 'Lỗi không xác định'));
 
       const errorMessage: Message = { 
@@ -285,7 +285,7 @@ export default function GeminiChat() {
 
   if (checkingKey) return (
     <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-zinc-950">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+        <AppLogo className="w-16 h-16 mb-4" isLoading={true} />
         <p className="text-slate-500 dark:text-zinc-400 font-medium tracking-wide">Đang kiểm tra cấu hình hệ thống...</p>
     </div>
   );

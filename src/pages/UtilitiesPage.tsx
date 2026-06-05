@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
@@ -16,8 +16,10 @@ import AvatarFrameManager from './utilities/AvatarFrameManager';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
+import { useBookmarkStore } from '../store/bookmarkStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
+import { PaymentDialog } from '../components/payment/PaymentDialog';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -32,14 +34,68 @@ interface UtilityItem {
   adminOnly?: boolean;
 }
 
-const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number }) => {
+const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.cc/150?img=${i + 1}`);
+
+const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [], isHot = false }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[], isHot?: boolean }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
+  const { isBookmarked, toggleBookmark } = useBookmarkStore();
+  const bookmarked = isBookmarked(item.id);
+
+  const handleBookmarkToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleBookmark({
+      itemId: item.id,
+      title: item.title,
+      type: 'utility',
+      url: `/utilities?tab=${item.id}`
+    });
+  };
+
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
   const config = systemTools?.[item.id];
   const isInternal = config?.internal || (item as any).internalOnly;
   const Icon = item.icon;
+
+  const userCount = React.useMemo(() => {
+    if (!visits || visits === 0) return 0;
+    const charCode = item.title.charCodeAt(0) + (item.title.charCodeAt(item.title.length - 1) || 0);
+    const base = Math.floor(visits * 0.08);
+    const randomAddition = (charCode + visits) % 15;
+    return Math.max(1, base + randomAddition);
+  }, [visits, item.title]);
+  
+  const displayAvatars = React.useMemo(() => {
+    if (userCount === 0) return [];
+    const charCode = item.title.charCodeAt(0) + (item.title.charCodeAt(1) || 0) + idx;
+    
+    // Pick 4 real users if we have them, randomly or based on charCode so they are stable
+    const pickedRealUsers: string[] = [];
+    if (realUsers && realUsers.length > 0) {
+        let realStartIdx = charCode % realUsers.length;
+        const maxPick = Math.min(4, userCount);
+        for (let i = 0; i < realUsers.length; i++) {
+           if (pickedRealUsers.length >= maxPick) break;
+           const u = realUsers[(realStartIdx + i) % realUsers.length];
+           if (u?.photoURL && !pickedRealUsers.includes(u.photoURL)) {
+               pickedRealUsers.push(u.photoURL);
+           }
+        }
+    }
+    
+    const maxNeeded = Math.min(4, userCount);
+    const needed = maxNeeded - pickedRealUsers.length;
+    let finalAvatars = [...pickedRealUsers];
+    if (needed > 0) {
+      const startIdx = charCode % Math.max(1, RANDOM_AVATARS.length - needed);
+      finalAvatars = finalAvatars.concat(RANDOM_AVATARS.slice(startIdx, startIdx + needed));
+    }
+    
+    return finalAvatars;
+  }, [item.title, idx, realUsers, userCount]);
+
+  const remainingUsers = userCount > displayAvatars.length ? userCount - displayAvatars.length : 0;
 
   if (item.adminOnly && !isSuperAdmin) {
     return null;
@@ -68,23 +124,44 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
       transition={{ delay: idx * 0.05 }}
       whileHover={isBlocked ? {} : { y: -4 }}
       className={cn(
-        "premium-card flex flex-col h-full cursor-pointer group relative overflow-hidden",
+        "relative rounded-[1.5rem] group h-full cursor-pointer",
         isBlocked && "opacity-75"
       )}
       onClick={handleClick}
     >
-      {isMaintenanceActive && (
-        <div className="absolute top-0 right-0 p-3 z-10">
-           <div className={cn(
-             "p-1.5 rounded-lg border",
-             isSuperAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
-           )}>
-              <Lock className="w-3.5 h-3.5" />
-           </div>
-        </div>
+      {isHot && (
+         <div className="absolute inset-[-2px] rounded-[calc(1.5rem+2px)] overflow-hidden pointer-events-none z-0 bg-transparent">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250%] h-[250%] bg-[conic-gradient(from_0deg,transparent_0_240deg,#f97316_300deg,#ef4444_360deg)] animate-[spin_3s_linear_infinite] opacity-60 dark:opacity-80" />
+         </div>
       )}
 
-      <div className="flex items-start justify-between mb-8">
+      <div className={cn(
+        "premium-card flex flex-col h-full relative z-10 transition-colors",
+        isHot && "border-transparent bg-white dark:bg-zinc-900"
+      )}>
+        {isMaintenanceActive && (
+          <div className="absolute top-0 right-0 p-3 z-10">
+             <div className={cn(
+               "p-1.5 rounded-lg border",
+               isSuperAdmin ? "bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" : "bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-500 dark:border-amber-500/30"
+             )}>
+                <Lock className="w-3.5 h-3.5" />
+             </div>
+          </div>
+        )}
+
+        {isHot && (
+          <div className="absolute -top-3 -right-3 z-20">
+            <div className="relative">
+              <div className="absolute inset-0 bg-orange-500 blur-md opacity-50 animate-pulse rounded-full" />
+              <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-600 outline outline-2 outline-white dark:outline-zinc-900 rounded-full shadow-lg relative z-10 text-white">
+                 <Flame className="w-4 h-4 fill-white" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between mb-8">
         <div className={cn(
           "w-12 h-12 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-zinc-400 transition-all duration-500",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-white group-hover:bg-blue-50 dark:group-hover:bg-indigo-500/10 group-hover:border-blue-200 dark:group-hover:border-indigo-500/20 group-hover:scale-110"
@@ -95,34 +172,70 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
             Icon ? <Icon className="w-5 h-5" /> : <Lightbulb className="w-5 h-5" />
           )}
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className={cn(
-            "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-            isMaintenanceActive 
-              ? 'bg-rose-100 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' 
-              : isInternal 
-                ? 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
-                : 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
-          )}>
-            {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Bookmark star control */}
+          <button
+            type="button"
+            onClick={handleBookmarkToggle}
+            className={`p-1.5 rounded-lg active:scale-95 transition-all duration-300 z-25 ${
+              bookmarked 
+                ? 'text-amber-500 bg-amber-500/10' 
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+            }`}
+            title={bookmarked ? "Xóa khỏi dấu trang" : "Lưu vào dấu trang"}
+          >
+            <Star className={`w-3.5 h-3.5 ${bookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
+          </button>
+
+          <div className="flex flex-col items-end gap-1.5">
+            <div className={cn(
+              "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
+              isMaintenanceActive 
+                ? 'bg-rose-100 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' 
+                : isInternal 
+                  ? 'bg-emerald-100 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
+                  : 'bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+            )}>
+              {isMaintenanceActive ? 'Bảo trì' : isInternal ? 'Nội bộ' : 'Công khai'}
+            </div>
           {(visits !== undefined && visits > 0) && (
             <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-slate-400 dark:text-zinc-500 bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded border border-slate-200/50 dark:border-white/10 shadow-sm">
               <Eye className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
               <span>{visits.toLocaleString('vi-VN')}</span>
             </div>
           )}
+          </div>
         </div>
       </div>
       
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 space-y-3 flex flex-col">
         <h3 className="text-xl font-semibold text-slate-950 dark:text-white tracking-tight">{item.title}</h3>
-        <p className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 italic">
+        <p className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed line-clamp-2 italic mb-2">
            {item.description}
         </p>
+        
+        <div className="mt-auto pt-3 flex items-center">
+          <div className="flex -space-x-2">
+            {displayAvatars.map((url, i) => (
+              <img 
+                key={i} 
+                src={url} 
+                className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-900 object-cover relative pointer-events-none" 
+                style={{ zIndex: 4 - i }}
+                alt="User"
+              />
+            ))}
+            {remainingUsers > 0 && (
+              <div className="w-6 h-6 rounded-full border-2 border-white dark:border-zinc-900 bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-[8px] font-bold text-slate-600 dark:text-zinc-400 relative" style={{ zIndex: 0 }}>
+                +{remainingUsers}
+              </div>
+            )}
+          </div>
+          <span className="ml-3 text-[10px] font-medium text-slate-500 dark:text-zinc-500">Người sử dụng</span>
+        </div>
       </div>
       
-      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
+      <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/5 flex items-center justify-between group/link relative z-10">
         <span className={cn(
           "text-[10px] font-bold text-slate-500 dark:text-zinc-600 uppercase tracking-widest transition-colors flex items-center gap-2",
           !isBlocked && "group-hover:text-blue-600 dark:group-hover:text-indigo-400"
@@ -146,6 +259,7 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits }: { item: Utili
           }}
         />
       )}
+      </div>
     </motion.div>
   );
 };
@@ -225,6 +339,11 @@ export default function UtilitiesPage() {
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
   const [utilityStats, setUtilityStats] = useState<{ [key: string]: number }>({});
+  const [realUsers, setRealUsers] = useState<any[]>([]);
+  const [paymentDialog, setPaymentDialog] = useState<{ isOpen: boolean; item: any | null }>({
+    isOpen: false,
+    item: null
+  });
   const { setAiActive } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
 
@@ -272,7 +391,7 @@ export default function UtilitiesPage() {
       toast.error('Tiện ích này chỉ dành cho người dùng nội bộ/có ủy quyền.', { icon: '🔐' });
       return;
     }
-    
+
     navigate(`/utilities/${item.id}`);
   };
 
@@ -289,7 +408,7 @@ export default function UtilitiesPage() {
       });
       setUtilityStats(stats);
     }, (err) => {
-      console.error("UtilitiesPage stats listener error:", err);
+      console.error("UtilitiesPage stats listener error:", err?.message || String(err));
     });
     return () => unsub();
   }, []);
@@ -299,7 +418,7 @@ export default function UtilitiesPage() {
     const unsub = onSnapshot(doc(db, 'settings', 'tool_permissions'), (docSnap) => {
       if (docSnap.exists()) setSystemTools(docSnap.data());
     }, (err) => {
-      console.error("UtilitiesPage tool_permissions error:", err);
+      console.error("UtilitiesPage tool_permissions error:", err?.message || String(err));
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
@@ -310,21 +429,75 @@ export default function UtilitiesPage() {
   useEffect(() => {
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem)));
+      const dbUtils = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem));
+      
+      // Override native tools with DB tool overrides
+      const overriddenNative = nativeUtilities.map(nu => {
+        const override = dbUtils.find(dbu => dbu.id === nu.id);
+        if (override) {
+          return { 
+            ...nu, 
+            ...override, 
+            description: override.description || nu.description,
+            title: override.title || nu.title
+          };
+        }
+        return nu;
+      });
+
+      // Filter out ONLY embedded tools from DB (ones that ARE NOT native tool overrides)
+      const embeddedTools = dbUtils.filter(dbu => !nativeUtilities.some(nu => nu.id === dbu.id));
+      
+      // Combined list: Overridden natives first, then embedded tools
+      setUtilities([...overriddenNative, ...embeddedTools]);
       setLoading(false);
     }, (err) => {
-      console.error("UtilitiesPage utilities listener error:", err);
+      console.error("UtilitiesPage utilities listener error:", err?.message || String(err));
       if (err?.message?.includes('quota') || err?.message?.includes('resource-exhausted') || (err as any)?.code === 'resource-exhausted') {
         useAppStore.getState().setQuotaExceeded(true);
       }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const userQ = query(collection(db, 'users'));
+    const unsubUsers = onSnapshot(userQ, (snapshot) => {
+      const users = snapshot.docs.map(doc => doc.data());
+      // Lấy các users có ảnh đại diện, lọc trùng lặp và lấy ngẫu nhiên/hoặc 20 user
+      const withAvatars = users
+        .filter((u: any) => u.photoURL)
+        .map((u: any) => ({ photoURL: u.photoURL, displayName: u.displayName || 'User' }));
+      setRealUsers(withAvatars);
+    }, () => {});
+
+    return () => {
+      unsubscribe();
+      unsubUsers();
+    };
   }, []);
 
   const { maintenanceTabs } = useAppStore();
 
-  const filteredItems = [...nativeUtilities, ...utilities];
+  const allItems = utilities.filter(item => {
+    const config = systemTools[item.id];
+    const isInternal = config?.internal || (item as any).internalOnly;
+    if (isInternal) {
+      return isAdmin || isSuperAdmin;
+    }
+    return true;
+  });
+
+  const topHotIds = React.useMemo(() => {
+    return allItems
+      .map(item => ({ id: item.id, visits: utilityStats[item.id] || 0 }))
+      .sort((a, b) => b.visits - a.visits)
+      .filter(item => item.visits > 0)
+      .slice(0, 3)
+      .map(item => item.id);
+  }, [allItems, utilityStats]);
+
+  const totalTools = allItems.length;
+  const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
+  const activeTools = totalTools - maintenanceTools;
 
   if (loading) {
     return <LoadingScreen />;
@@ -407,18 +580,6 @@ export default function UtilitiesPage() {
     }
   }
 
-  const allItems = filteredItems.filter(item => {
-    const config = systemTools[item.id];
-    const isInternal = config?.internal || (item as any).internalOnly;
-    if (isInternal) {
-      return isAdmin || isSuperAdmin;
-    }
-    return true;
-  });
-  const totalTools = allItems.length;
-  const maintenanceTools = allItems.filter(item => maintenanceTabs[`utility_${item.id}`]).length;
-  const activeTools = totalTools - maintenanceTools;
-
   let internalTools = 0;
   let publicTools = 0;
   if (isAdmin || isSuperAdmin) {
@@ -493,12 +654,25 @@ export default function UtilitiesPage() {
                   onSelect={handleSelect} 
                   systemTools={systemTools} 
                   visits={utilityStats[item.id] || 0}
+                  realUsers={realUsers}
+                  isHot={topHotIds.includes(item.id)}
                 />
               ))}
             </div>
           </div>
         </section>
       </div>
+
+      <PaymentDialog 
+        isOpen={paymentDialog.isOpen}
+        onClose={() => setPaymentDialog({ isOpen: false, item: null })}
+        item={paymentDialog.item}
+        onPaid={() => {
+          if (paymentDialog.item) {
+            navigate(`/utilities/${paymentDialog.item.id}`);
+          }
+        }}
+      />
     </div>
   );
 }

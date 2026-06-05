@@ -28,6 +28,7 @@ interface AppState {
     width: number;
     opacity: number;
     position: string;
+    zIndex?: number;
   } | null;
   setStampConfig: (config: any) => void;
   maintenanceStampConfig: {
@@ -38,9 +39,17 @@ interface AppState {
   setMaintenanceStampConfig: (config: any) => void;
   systemVersion: string;
   setSystemVersion: (v: string) => void;
+  webLogo: string;
+  setWebLogo: (logo: string) => void;
+  hasUnapprovedSessions: boolean;
+  setHasUnapprovedSessions: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  webLogo: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+  setWebLogo: (logo) => set({ webLogo: logo }),
+  hasUnapprovedSessions: false,
+  setHasUnapprovedSessions: (val) => set({ hasUnapprovedSessions: val }),
   sidebarOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),
@@ -62,6 +71,7 @@ export const useAppStore = create<AppState>((set) => ({
     'utility_ai-scanner': false,
     'utility_image-to-pdf': false,
     'utility_pdf-to-word': false,
+    'utility_word-covers': false,
   },
   setMaintenanceTabs: (tabs) => set({ maintenanceTabs: tabs }),
   maintenanceDevices: {
@@ -80,13 +90,7 @@ export const useAppStore = create<AppState>((set) => ({
   darkMode: typeof window !== 'undefined' ? (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) : false,
   toggleDarkMode: () => set((state) => {
     const nextMode = !state.darkMode;
-    if (nextMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
+    localStorage.setItem('theme', nextMode ? 'dark' : 'light');
     return { darkMode: nextMode };
   }),
   googleClientId: null,

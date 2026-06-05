@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar } from 'lucide-react';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
-import { toSafeDate } from '../../lib/utils';
+import { format, subDays } from 'date-fns';
+import { toSafeDate, cn } from '../../lib/utils';
 import { vi } from 'date-fns/locale';
 
 import AdminUtilities from './AdminUtilities';
@@ -17,6 +17,14 @@ import AdminApiKeys from './AdminApiKeys';
 import AdminForms from './AdminForms';
 import AdminDocumentVault from './AdminDocumentVault';
 import AdminSystem from './AdminSystem';
+import AdminPartners from './AdminPartners';
+import AdminOverview from './AdminOverview';
+import AdminAiTools from './AdminAiTools';
+import AdminSecuritySessions from './AdminSecuritySessions';
+import AdminRevenueStats from './AdminRevenueStats';
+import AdminDepositHistory from './AdminDepositHistory';
+import AdminUserPurchases from './AdminUserPurchases';
+import AdminShopSetup from './AdminShopSetup';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -24,12 +32,12 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 
 export default function AdminDashboard() {
   const { isSuperAdmin, userData } = useAuthStore();
-  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices } = useAppStore();
+  const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices, hasUnapprovedSessions } = useAppStore();
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions'>('users');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'revenue_stats' | 'all_transactions' | 'purchase_history' | 'shop_setup'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -37,7 +45,8 @@ export default function AdminDashboard() {
     today: 0,
     month: 0,
     year: 0,
-    total: 0
+    total: 0,
+    last7Days: [] as { date: string, visits: number, devices: number }[]
   });
   
   const [aboutConfig, setAboutConfig] = useState({
@@ -46,6 +55,7 @@ export default function AdminDashboard() {
     adminName: 'Quản trị viên',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
     adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    webLogo: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
     facebook: 'https://facebook.com/your-username',
     github: 'https://github.com/your-username',
     youtube: 'https://youtube.com/@your-channel',
@@ -64,7 +74,14 @@ export default function AdminDashboard() {
     popupMessage: ''
   });
 
+  const [googleClientId, setGoogleClientIdState] = useState('');
   const [appVersion, setAppVersion] = useState('');
+  const [adminPin, setAdminPin] = useState('1234');
+  const [bankingConfig, setBankingConfig] = useState({
+    bankCode: 'MB',
+    bankAccount: '00010302003',
+    ownerName: 'Vũ Minh Đức'
+  });
 
   const [fileManagerConfig, setFileManagerConfig] = useState({
     username: '',
@@ -108,6 +125,7 @@ export default function AdminDashboard() {
     opacity: 50,
     position: 'bottom-right',
     width: 120,
+    zIndex: 9999
   });
 
   const [maintenanceStampConfig, setMaintenanceStampConfig] = useState({
@@ -156,13 +174,13 @@ export default function AdminDashboard() {
       if (docSnap.exists()) {
         setSystemTools(docSnap.data());
       }
-    }, (err) => console.error("Admin: tool_permissions listener error:", err));
+    }, (err) => console.error("Admin: tool_permissions listener error:", err?.message || String(err)));
 
     let unsubContacts = () => {};
     if (isAdmin) {
       unsubContacts = onSnapshot(query(collection(db, 'contact_requests'), orderBy('createdAt', 'desc')), (snap) => {
         setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (err) => console.error("Admin: contact_requests listener error:", err));
+      }, (err) => console.error("Admin: contact_requests listener error:", err?.message || String(err)));
     }
     
     // Fetch settings ONCE to avoid overwriting admin inputs while typing
@@ -171,7 +189,9 @@ export default function AdminDashboard() {
         const sysSnap = await getDoc(doc(db, 'settings', 'system'));
         if (sysSnap.exists()) {
           const data = sysSnap.data();
+          if (data.googleClientId) setGoogleClientIdState(data.googleClientId);
           if (data.appVersion) setAppVersion(data.appVersion);
+          if (data.adminPin) setAdminPin(data.adminPin);
           if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
           if (data.notificationConfig) setNotificationConfig(data.notificationConfig);
           if (data.fileManagerConfig) setFileManagerConfig(data.fileManagerConfig);
@@ -179,6 +199,9 @@ export default function AdminDashboard() {
           if (data.imageUploadConfig) setImageUploadConfig(data.imageUploadConfig);
           if (data.stampConfig) setStampConfig(prev => ({ ...prev, ...data.stampConfig }));
           if (data.maintenanceStampConfig) setMaintenanceStampConfig(prev => ({ ...prev, ...data.maintenanceStampConfig }));
+          if (data.bankingConfig) {
+            setBankingConfig(prev => ({ ...prev, ...data.bankingConfig }));
+          }
         }
 
         const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
@@ -222,7 +245,7 @@ export default function AdminDashboard() {
           });
         }
       } catch (err) {
-        console.error("Error fetching settings:", err);
+        console.error("Error fetching settings:", err?.message || String(err));
       }
     };
     
@@ -231,7 +254,7 @@ export default function AdminDashboard() {
         const snap = await getDoc(doc(db, 'settings', 'about'));
         if (snap.exists()) setAboutConfig(prev => ({ ...prev, ...snap.data() }));
       } catch (e) {
-        console.error("Admin: fetchAbout error:", e);
+        console.error("Admin: fetchAbout error:", e?.message || String(e));
       }
     };
 
@@ -242,16 +265,16 @@ export default function AdminDashboard() {
 
     const unsubAllUtils = onSnapshot(collection(db, 'utilities'), (snapshot) => {
       setAllUtilities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Admin: utilities listener error:", err));
+    }, (err) => console.error("Admin: utilities listener error:", err?.message || String(err)));
 
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
       setAdminApps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Admin: apps listener error:", err));
+    }, (err) => console.error("Admin: apps listener error:", err?.message || String(err)));
 
     const unsubCategories = onSnapshot(collection(db, 'app_categories'), (snapshot) => {
       const cats: any = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAppCategories(cats.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis() || 0));
-    }, (err) => console.error("Admin: categories listener error:", err));
+    }, (err) => console.error("Admin: categories listener error:", err?.message || String(err)));
 
     // Listen to site stats
     const now = new Date();
@@ -260,18 +283,34 @@ export default function AdminDashboard() {
     const yearId = `year_${format(now, 'yyyy')}`;
 
     const unsubStats = onSnapshot(collection(db, 'site_visitation_stats'), (snapshot) => {
-      const stats: any = { today: 0, month: 0, year: 0, total: 0 };
+      const stats: any = { today: 0, month: 0, year: 0, total: 0, last7Days: [] };
+      const docData: Record<string, number> = {};
+      
       snapshot.docs.forEach(doc => {
-        const id = doc.id;
-        const count = doc.data().count || 0;
-        if (id === 'total') stats.total = count;
-        if (id === todayId) stats.today = count;
-        if (id === monthId) stats.month = count;
-        if (id === yearId) stats.year = count;
+        docData[doc.id] = doc.data().count || 0;
       });
+
+      stats.total = docData['total'] || 0;
+      stats.today = docData[todayId] || 0;
+      stats.month = docData[monthId] || 0;
+      stats.year = docData[yearId] || 0;
+
+      // Calculate last 7 days stats
+      for (let i = 6; i >= 0; i--) {
+        const d = subDays(now, i);
+        const dayStr = format(d, 'yyyy-MM-dd');
+        const displayStr = format(d, 'dd/MM');
+        
+        stats.last7Days.push({
+          date: displayStr,
+          visits: docData[`day_${dayStr}`] || 0,
+          devices: docData[`devices_day_${dayStr}`] || 0,
+        });
+      }
+
       setSiteStats(stats);
     }, (error) => {
-      console.error("Error listening to site stats:", error);
+      console.error("Error listening to site stats:", error?.message || String(error));
     });
 
     return () => {
@@ -285,6 +324,7 @@ export default function AdminDashboard() {
   }, []);
 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingWebLogo, setIsUploadingWebLogo] = useState(false);
 
   const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -339,6 +379,54 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUploadWebLogoToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+    const token = githubGlobalConfig.token || githubIntegrationConfig.token || '';
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    const ghConfig = { owner: username, token, repo, branch };
+    
+    setIsUploadingWebLogo(true);
+    const toastId = toast.loading('Đang tải lên logo web...');
+    
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `logo-${Date.now()}.${ext}`;
+      const uploadPath = `system/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Update system web logo ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, webLogo: Math.round(progress) }))
+      );
+
+      setAboutConfig(prev => ({ ...prev, webLogo: result.url }));
+      toast.success('Đã tải lên logo thành công!', { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi tải logo: ${e.message}`, { id: toastId });
+    } finally {
+      setIsUploadingWebLogo(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.webLogo;
+        return next;
+      });
+      e.target.value = '';
+    }
+  };
+
   const saveAboutConfig = async () => {
     try {
       await setDoc(doc(db, 'settings', 'about'), aboutConfig);
@@ -356,6 +444,21 @@ export default function AdminDashboard() {
       toast.success('Đã cập nhật thông báo vòng lặp website');
     } catch (e) {
       toast.error('Lỗi khi lưu thiết lập thông báo');
+    }
+  };
+
+  const handleSaveAdminPin = async () => {
+    try {
+      if (adminPin.length !== 4 || !/^\d+$/.test(adminPin)) {
+        toast.error('Mã PIN bảo mật phải chứa đúng 4 chữ số (0-9)!');
+        return;
+      }
+      await updateDoc(doc(db, 'settings', 'system'), {
+        adminPin
+      });
+      toast.success('Cập nhật mã PIN bảo mật hệ thống thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu mã PIN: ' + e.message);
     }
   };
 
@@ -438,6 +541,17 @@ export default function AdminDashboard() {
       toast.success('Đã cập nhật cấu hình con dấu bảo trì thành công!');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình con dấu bảo trì');
+    }
+  };
+
+  const handleSaveBankingConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), {
+        bankingConfig
+      }, { merge: true });
+      toast.success('Cập nhật tài khoản ngân hàng thụ thưởng VietQR thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu tài khoản ngân hàng: ' + e.message);
     }
   };
 
@@ -554,6 +668,15 @@ export default function AdminDashboard() {
       toast.success('Đã cấu hình Quản lý Kho văn bản thành công');
     } catch (e) {
       toast.error('Lỗi khi lưu cấu hình Kho văn bản');
+    }
+  };
+
+  const handleSaveGoogleConfig = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { googleClientId }, { merge: true });
+      toast.success('Cập nhật Google One Tap Client ID thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu Client ID');
     }
   };
 
@@ -756,7 +879,7 @@ export default function AdminDashboard() {
 
       toast.success('Đã tải lên nhập file MP3 thành công và đồng bộ nhạc nền hệ thống!', { id: originalId });
     } catch (err: any) {
-      console.error('Audio upload error:', err);
+      console.error('Audio upload error:', err?.message || String(err));
       toast.error('Lỗi khi tải nhạc lên GitHub: ' + (err.message || 'Thất bại'), { id: originalId });
     } finally {
       setAudioUploading(false);
@@ -887,7 +1010,7 @@ export default function AdminDashboard() {
       XLSX.writeFile(workbook, "mau_import_ung_dung.xlsx");
       toast.success("Tải tệp mẫu Excel thành công!");
     } catch (err: any) {
-      console.error("Lỗi tạo file mẫu:", err);
+      console.error("Lỗi tạo file mẫu:", err?.message || String(err));
       toast.error("Lỗi khi tạo file mẫu Excel: " + err.message);
     }
   };
@@ -1036,7 +1159,7 @@ export default function AdminDashboard() {
       setUsers(usersData);
       setLoading(false);
     }, (err) => {
-      console.error("Admin: fetchUsers listener error:", err);
+      console.error("Admin: fetchUsers listener error:", err?.message || String(err));
       setLoading(false);
     });
     return unsubscribe;
@@ -1138,6 +1261,25 @@ export default function AdminDashboard() {
         }
       }
     });
+  };
+
+  const handleAdjustBalance = async (user: UserData) => {
+    if (!isSuperAdmin) return toast.error('Quyền truy cập bị từ chối.');
+    const amountStr = window.prompt(`Cộng/Trừ tiền cho ${user.displayName} (vd: 50000 để cộng, -20000 để trừ):`, '0');
+    if (amountStr === null || amountStr === '') return;
+    
+    const amount = parseInt(amountStr);
+    if (isNaN(amount)) return toast.error('Số tiền không hợp lệ');
+
+    try {
+      const currentBalance = user.balance || 0;
+      await updateDoc(doc(db, 'users', user.uid), {
+        balance: currentBalance + amount
+      });
+      toast.success(`Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount).toLocaleString()}đ thành công!`);
+    } catch (e) {
+      toast.error('Lỗi khi cập nhật số dư');
+    }
   };
 
   const toggleBlockedDevice = async (type: 'ios' | 'android') => {
@@ -1274,72 +1416,89 @@ export default function AdminDashboard() {
         
         <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
           {[
+            { id: 'dashboard', label: 'Tổng quan', icon: Activity },
+            { id: 'revenue_stats', label: 'Thống kê Doanh thu', icon: LineChart },
+            { id: 'all_transactions', label: 'Lịch sử Nạp - Rút', icon: Landmark },
+            { id: 'purchase_history', label: 'Lịch sử Mua hàng', icon: ShoppingBag },
+            { id: 'shop_setup', label: 'Shop Setup', icon: Settings },
+            { id: 'system', label: 'Hệ thống', icon: Settings },
             { id: 'users', label: 'Người dùng', icon: Users },
             { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
             { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
             { id: 'forms', label: 'Folders/Form', icon: Files },
-            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
-            { id: 'system', label: 'Hệ thống', icon: Settings },
-            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
-            { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'utilities', label: 'Tiện ích', icon: Wrench },
+            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
+            { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
+            { id: 'partners', label: 'Đối tác', icon: Users },
+            { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
+            { id: 'apikeys', label: 'API Keys', icon: Code },
             { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
+            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
             { id: 'about', label: 'About Setup', icon: Info },
             { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
-          ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink ${activeTab === tab.id ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
-                <tab.icon className="w-5 h-5" />
-                <span className="whitespace-nowrap">{tab.label}</span>
-            </button>
-          ))}
+          ].map(tab => {
+            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+            return (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id as any)} 
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink relative overflow-hidden",
+                  activeTab === tab.id 
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 font-bold" 
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white",
+                  isUnapprovedSecurityTab && "animate-pulse border border-red-500/50 bg-red-500/10 dark:bg-red-500/15 text-red-500 dark:text-red-400 font-bold shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                )}
+              >
+                  <div className="flex items-center gap-3">
+                    <tab.icon className={cn("w-5 h-5", isUnapprovedSecurityTab ? "text-red-500 animate-bounce" : "")} />
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                  </div>
+                  {isUnapprovedSecurityTab && (
+                    <span className="relative flex h-2 w-2 mr-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
         <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            Quản lý { {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', system: 'Hệ thống', versions: 'Phiên bản', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data'}[activeTab as any] }
+            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools', revenue_stats: 'Thống kê Doanh thu & Tài chính', all_transactions: 'Lịch sử Nạp & Rút', purchase_history: 'Lịch sử Mua hàng', shop_setup: 'Shop Setup'}[activeTab as any] }` }
         </h1>
 
-        {/* Visitor Stats Row */}
-         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                    <Activity size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Hôm nay</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.today.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                    <Globe size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tháng này</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.month.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-                    <LineChart size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Năm nay</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.year.toLocaleString()}</div>
-           </div>
-           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-[2rem] shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                    <Activity size={18} />
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Tổng cộng</span>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">{siteStats.total.toLocaleString()}</div>
-           </div>
-        </div>
+        {activeTab === 'dashboard' && (
+           <AdminOverview 
+             siteStats={siteStats} 
+             users={users} 
+             allUtilities={allUtilities} 
+             activityData={activityData} 
+             roleDistribution={roleDistribution} 
+             contacts={contacts} 
+             adminAppsCount={adminApps.length}
+           />
+        )}
+
+        {activeTab === 'revenue_stats' && (
+          <AdminRevenueStats />
+        )}
+
+        {activeTab === 'all_transactions' && (
+          <AdminDepositHistory />
+        )}
+
+        {activeTab === 'purchase_history' && (
+          <AdminUserPurchases />
+        )}
+
+        {activeTab === 'shop_setup' && (
+          <AdminShopSetup />
+        )}
 
 
       {activeTab === 'about' && (
@@ -1410,6 +1569,35 @@ export default function AdminDashboard() {
                       {isUploadingAvatar && (
                         <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
                           <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1 flex items-center justify-between">
+                      <span>Logo Hệ thống (Web Logo)</span>
+                      <label className="cursor-pointer text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <Upload size={12} />
+                        <span className="text-[10px]">Tải lên Logo</span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadWebLogoToGithub} disabled={isUploadingWebLogo} />
+                      </label>
+                    </label>
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        value={aboutConfig.webLogo}
+                        onChange={(e) => setAboutConfig({...aboutConfig, webLogo: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white pr-12"
+                        placeholder="Link logo hệ thống..."
+                      />
+                      {aboutConfig.webLogo && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm pointer-events-none p-1 bg-white/50">
+                          <img src={aboutConfig.webLogo} alt="Logo Prev" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      {isUploadingWebLogo && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                       )}
                     </div>
@@ -1617,6 +1805,18 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'ai_tools' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminAiTools />
+        </motion.div>
+      )}
+
+      {activeTab === 'partners' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminPartners ghConfig={{ owner: githubGlobalConfig.username || imageUploadConfig.username, repo: imageUploadConfig.repo, token: githubGlobalConfig.token || imageUploadConfig.token, branch: imageUploadConfig.branch || 'main' }} />
+        </motion.div>
+      )}
+
       {activeTab === 'forms' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminForms />
@@ -1643,23 +1843,24 @@ export default function AdminDashboard() {
                 {loading ? (
                   <div className="p-12 pl-6 pr-6 text-center text-slate-500">Đang tải biểu dữ liệu...</div>
                 ) : (
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Tài khoản</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Số điện thoại</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vai trò</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Trạng thái</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Địa chỉ IP</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal">Vị trí (Location)</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right">Quản trị</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số dư Ví</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Đăng nhập lần cuối</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Địa chỉ IP</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vị trí (Location)</th>
+                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Quản trị</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
                   {users.map((u) => (
                     <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 border border-slate-300 dark:border-white/20">
                             {u.photoURL ? (
@@ -1674,17 +1875,29 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
+                        <div className="flex items-center gap-2">
+                           <span className="font-black text-indigo-600 dark:text-indigo-400">{(u.balance || 0).toLocaleString()}đ</span>
+                           <button 
+                             onClick={() => handleAdjustBalance(u)}
+                             className="p-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md text-indigo-500 transition-colors"
+                             title="Điều chỉnh số dư"
+                           >
+                             <Plus size={14} />
+                           </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
                           {u.phoneNumber || 'N/A'}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 text-[10px]  font-bold rounded-full ${u.role?.includes('admin') ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                           {u.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="flex items-center gap-1">
                           <div className={`w-2 h-2 rounded-full ${u.isBanned ? 'bg-red-500' : (u.status === 'active' ? 'bg-green-500' : 'bg-amber-500')}`}></div>
                           <span className={u.isBanned ? 'text-red-500 font-medium' : 'text-slate-600 dark:text-slate-300'}>
@@ -1692,12 +1905,12 @@ export default function AdminDashboard() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px] whitespace-nowrap">
                         <div className="text-xs">
                           {u.lastLoginAt ? format(toSafeDate(u.lastLoginAt), 'HH:mm - dd/MM/yyyy') : (u.createdAt ? format(toSafeDate(u.createdAt), 'HH:mm - dd/MM/yyyy') : 'N/A')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[160px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[160px] whitespace-nowrap">
                         <div className="text-[11px] leading-relaxed flex items-center gap-2 group/ip">
                           <div className="flex items-center gap-1.5 font-bold mb-0.5 text-blue-500">
                             <Globe className="w-3 h-3" />
@@ -1715,7 +1928,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-600 min-w-[180px]">
+                      <td className="px-6 py-4 text-slate-600 min-w-[180px] whitespace-nowrap">
                         <div className="text-[11px] leading-relaxed">
                           {u.location ? (
                             <a 
@@ -1729,7 +1942,7 @@ export default function AdminDashboard() {
                                 <span>{u.location.lat.toFixed(6)}, {u.location.lng.toFixed(6)}</span>
                               </div>
                               {u.location.address ? (
-                                <div className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic leading-tight">
+                                <div className="text-[10px] text-slate-600 mt-1 line-clamp-2 italic leading-tight whitespace-normal">
                                   {u.location.address}
                                 </div>
                               ) : (
@@ -1746,7 +1959,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2 opacity-100 transition-opacity">
                           <button
                             onClick={() => handleBanUser(u.uid, !!u.isBanned)}
@@ -1785,6 +1998,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'security_sessions' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminSecuritySessions />
+        </motion.div>
+      )}
+
       {activeTab === 'system' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           
@@ -1812,9 +2031,38 @@ export default function AdminDashboard() {
 
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-              <AppWindow className="w-6 h-6 text-indigo-500" />
-              Bảo trì theo thiết bị
+              <Shield className="w-6 h-6 text-emerald-500" />
+              Google One Tap Authentication
             </h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl text-xs text-blue-600 dark:text-blue-400 mb-4">
+                Google One Tap cho phép người dùng đăng nhập nhanh bằng tài khoản Google ngay khi truy cập trang web mà không cần nhấn vào nút đăng nhập. 
+                Vui lòng lấy <strong>Client ID</strong> từ Google Cloud Console.
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Google Client ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="flex-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-mono"
+                    value={googleClientId}
+                    onChange={(e) => setGoogleClientIdState(e.target.value)}
+                    placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                    disabled={!isSuperAdmin}
+                  />
+                  <button
+                    onClick={handleSaveGoogleConfig}
+                    disabled={!isSuperAdmin}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md"
+                  >
+                    Lưu ID
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
                 { key: 'pc', label: 'Máy tính (PC/Laptop)', icon: Server },
@@ -1855,6 +2103,7 @@ export default function AdminDashboard() {
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
                 { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
                 { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
+                { key: 'ai_tools', label: 'AI Tools', icon: Sparkles, page: 'Trang chủ' },
               ].map((tab) => (
                 <div key={tab.key} className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-3">
@@ -1909,7 +2158,7 @@ export default function AdminDashboard() {
                 { id: 'pdf-merger', title: 'Ghép PDF', icon: FilePlus },
                 { id: 'pdf-splitter', title: 'Tách PDF', icon: Scissors }
               ].map((util) => (
-                <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+                <div key={`native-util-${util.id}`} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                       <util.icon className="w-4 h-4" />
@@ -1954,7 +2203,12 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                   {allUtilities.map((util) => (
+                   {allUtilities
+                     .filter(u => ![
+                       'avatar-frame', 'file-manager', 'kho-van-ban', 'ai-scanner', 
+                       'image-to-pdf', 'pdf-to-word', 'pdf-merger', 'pdf-splitter'
+                     ].includes(u.id))
+                     .map((util) => (
                       <div key={util.id} className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
@@ -2052,6 +2306,41 @@ export default function AdminDashboard() {
                     </button>
                     </div>
                 ))}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-indigo-500" />
+                  Lớp Bảo Mật PIN Admin (4 Số)
+                </h3>
+                <p className="text-xs text-slate-500 mb-6 italic">* Lưu ý: Thiết lập mã PIN gồm đúng 4 chữ số tăng cường bảo mật khi đăng nhập dành riêng cho bộ phận Quản trị viên.</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-2 ml-1 text-slate-500 uppercase tracking-widest">Mã PIN bảo mật hiện tại (4 chữ số)</label>
+                    <input 
+                      type="text"
+                      maxLength={4}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={adminPin}
+                      onChange={(e) => setAdminPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                      disabled={!isSuperAdmin}
+                      placeholder="Nhập 4 số bảo mật, ví dụ: 4321"
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none font-mono tracking-widest font-bold focus:ring-2 focus:ring-indigo-500 dark:text-white disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button 
+                      onClick={handleSaveAdminPin}
+                      disabled={!isSuperAdmin}
+                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                    >
+                      <Save size={14} /> Cập Nhật PIN
+                    </button>
+                  </div>
                 </div>
             </div>
 
@@ -2740,9 +3029,25 @@ export default function AdminDashboard() {
                                 onChange={(e) => setStampConfig({...stampConfig, width: parseInt(e.target.value) || 120})}
                                 placeholder="120"
                                 min={40}
-                                max={500}
+                                max={2000}
                                 disabled={!isSuperAdmin}
                               />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                               <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">Lớp hiển thị (Lớp nền)</label>
+                               <select
+                                 className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                                 value={stampConfig.zIndex || 9999}
+                                 onChange={(e) => setStampConfig({...stampConfig, zIndex: parseInt(e.target.value)})}
+                                 disabled={!isSuperAdmin}
+                               >
+                                 <option value={9999}>Phía trên cùng (Mặc định)</option>
+                                 <option value={1}>Phía dưới cùng (Nền - Under)</option>
+                                 <option value={50}>Phía sau các nút thao tác (Middle)</option>
+                               </select>
                             </div>
                           </div>
 
@@ -2956,6 +3261,111 @@ export default function AdminDashboard() {
                     </div>
                   </div>
             </div>
+
+          {/* Cấu hình Thanh toán & Tài khoản Ngân hàng (VietQR / SePay) */}
+          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Landmark className="w-6 h-6 text-indigo-500" />
+                Cấu hình Tài khoản Ngân hàng (VietQR / SePay)
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Thiết lập thông tin tài khoản ngân hàng thụ hưởng của bạn để tự động tạo mã QR thanh toán hóa đơn.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-xs text-emerald-600 dark:text-emerald-400">
+                <strong>HƯỚNG DẪN:</strong> Mã QR sẽ được tạo tự động thông qua nền tảng SePay. Bạn có thể sử dụng số tài khoản ngân hàng thông thường của mình (ví dụ: MB Bank, Vietcombank, Sacombank...), hoặc số tài khoản định danh do SePay cung cấp.
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Mã ngân hàng (Bank Code)
+                  </label>
+                  <select
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    value={bankingConfig.bankCode}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, bankCode: e.target.value.toUpperCase() }))}
+                    disabled={!isSuperAdmin}
+                  >
+                    <option value="SACOMBANK">Sacombank (STB)</option>
+                    <option value="MB">MB Bank (MBB)</option>
+                    <option value="VCB">Vietcombank</option>
+                    <option value="ACB">ACB</option>
+                    <option value="TCB">Techcombank</option>
+                    <option value="CTG">VietinBank</option>
+                    <option value="BIDV">BIDV</option>
+                    <option value="VPB">VPBank</option>
+                    <option value="TPB">TPBank</option>
+                    <option value="VIB">VIB</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Chọn hoặc điền mã ngân hàng chuẩn VietQR (ví dụ: SACOMBANK, MB, VCB...)</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Số tài khoản thụ hưởng & Tiền tố (Nếu có)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white font-mono"
+                    value={bankingConfig.bankAccount}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, bankAccount: e.target.value.trim() }))}
+                    placeholder="ví dụ: STB_060269666879 hoặc 060269666879"
+                    disabled={!isSuperAdmin}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Nhập chính xác số tài khoản ngân hàng của bạn.</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold mb-1.5 ml-1 text-slate-500 uppercase tracking-widest">
+                    Tên người thụ hưởng (Chủ tài khoản)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    value={(bankingConfig as any).ownerName || ''}
+                    onChange={(e) => setBankingConfig(prev => ({ ...prev, ownerName: e.target.value }))}
+                    placeholder="ví dụ: VU MINH DUC"
+                    disabled={!isSuperAdmin}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">Tên viết hoa không dấu của chủ tài khoản thụ hưởng.</p>
+                </div>
+              </div>
+
+              {/* Preview simulated QR */}
+              {bankingConfig.bankAccount && (
+                <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex flex-col md:flex-row items-center gap-6 bg-slate-50/50 dark:bg-white/5 p-4 rounded-3xl">
+                  <div className="w-32 h-32 shrink-0 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                    <img 
+                      src={`https://qr.sepay.vn/img?acc=${bankingConfig.bankAccount}&bank=${bankingConfig.bankCode}&amount=10000&des=DEMO123`}
+                      alt="VietQR Preview"
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">Xem trước mã QR mô phỏng</h4>
+                    <p className="text-xs text-slate-500">Mã QR xem trước ở trên sử dụng số tiền mẫu 10,000đ và nội dung chuyển khoản nháp. Đảm bảo dùng điện thoại quét thử để kiểm tra xem đã nhận diện đúng tài khoản ngân hàng của bạn hay chưa.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSaveBankingConfig}
+                  disabled={!isSuperAdmin}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shadow-md flex items-center gap-2"
+                >
+                  <Save size={14} />
+                  Lưu cấu hình ngân hàng
+                </button>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
       )}
@@ -3171,7 +3581,7 @@ export default function AdminDashboard() {
                       {appCategories.map(cat => (
                         <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg group">
                            <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-300">{cat.name}</span>
-                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                           <div className="flex items-center gap-1 opacity-100 transition-opacity ml-1">
                              <button onClick={() => handleEditCategory(cat.id, cat.name)} className="text-slate-400 hover:text-blue-500">
                                 <Edit2 size={12} />
                              </button>
@@ -3236,19 +3646,19 @@ export default function AdminDashboard() {
                        <p className="text-xs text-slate-400 max-w-sm mt-1">Dùng bảng bên cạnh để đăng ký ứng dụng liên kết và phân phối lên Thực đơn phía người dùng.</p>
                      </div>
                    ) : (
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                      <div className="overflow-x-auto no-scrollbar scroll-smooth">
+                        <table className="w-full text-left border-collapse min-w-[1200px]">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
-                              <th className="py-3 px-2">Ứng dụng / Logo</th>
-                              <th className="py-3 px-2">Đường dẫn mở</th>
-                              <th className="py-3 px-2 text-right">Thao tác</th>
+                              <th className="py-3 px-2 whitespace-nowrap">Ứng dụng / Logo</th>
+                              <th className="py-3 px-2 whitespace-nowrap">Đường dẫn mở</th>
+                              <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {adminApps.map((app) => (
                               <tr key={app.id} className="text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
-                                <td className="py-4 px-2">
+                                <td className="py-4 px-2 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
                                       {app.logoUrl ? (
@@ -3270,16 +3680,16 @@ export default function AdminDashboard() {
                                         {app.internalOnly && <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[8px] font-bold uppercase rounded-md">Nội bộ</span>}
                                         {maintenanceTabs[`app_${app.id}`] && <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 text-[8px] font-bold uppercase rounded-md">Bảo trì</span>}
                                       </div>
-                                      {app.description && <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{app.description}</p>}
+                                      {app.description && <p className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">{app.description}</p>}
                                     </div>
                                   </div>
                                 </td>
-                                <td className="py-4 px-2 font-mono text-xs max-w-[200px] truncate select-all text-slate-500">
+                                <td className="py-4 px-2 font-mono text-xs select-all text-slate-500 whitespace-nowrap">
                                   <a href={app.appUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1 text-indigo-500">
                                     {app.appUrl} <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
                                   </a>
                                 </td>
-                                <td className="py-4 px-2 text-right">
+                                <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-4 px-2 text-right whitespace-nowrap">
                                   <div className="flex justify-end gap-1.5">
                                     <button 
                                       onClick={() => toggleTabMaintenance(`app_${app.id}`)}

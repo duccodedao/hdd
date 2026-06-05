@@ -100,11 +100,11 @@ export default function LocationGuard({ children }: LocationGuardProps) {
             }, { merge: true });
           } catch (dbErr) {
             if (mounted) {
-              console.error("Location update DB error:", dbErr);
+              console.error("Location update DB error:", dbErr?.message || String(dbErr));
             }
           }
         } catch (err) {
-          console.error("Failed to update location in DB:", err);
+          console.error("Failed to update location in DB:", err?.message || String(err));
         }
       };
       updateLocation();

@@ -1,18 +1,60 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Github, Facebook, MessageCircle, Send, Globe, MapPin, Zap, ExternalLink, X, Loader2, Phone, Hash, Sparkles, ArrowRight, Moon, Sun, Shield } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle, Send, Globe, Facebook, Github, Clock, ChevronDown, MousePointerClick, ArrowRight, Loader2, Navigation, MessageSquare, AlertCircle, ArrowLeft } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import toast from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 
+// Form validation schema
+const contactSchema = z.object({
+  name: z.string().min(2, 'Họ và tên phải có ít nhất 2 ký tự'),
+  phone: z.string().min(10, 'Số điện thoại không hợp lệ').regex(/^[0-9+]+$/, 'Số điện thoại chỉ bao gồm chữ số'),
+  email: z.string().email('Email không đúng định dạng'),
+  subject: z.string().min(5, 'Chủ đề quá ngắn'),
+  message: z.string().min(10, 'Nội dung phải có ít nhất 10 ký tự')
+});
+
+type ContactFormValues = z.infer<typeof contactSchema>;
+
+const faqs = [
+  {
+    question: "Thời gian làm việc của chúng tôi như thế nào?",
+    answer: "Chúng tôi hoạt động từ Thứ 2 đến Thứ 6 (08:00 - 17:30) và Thứ 7 (08:00 - 12:00). Hệ thống hỗ trợ trực tuyến vẫn tiếp nhận yêu cầu 24/7."
+  },
+  {
+    question: "Tốc độ phản hồi qua email là bao lâu?",
+    answer: "Tất cả các email liên hệ sẽ được đội ngũ chăm sóc khách hàng của chúng tôi ưu tiên xử lý và phản hồi trong vòng tối đa 24 giờ làm việc."
+  },
+  {
+    question: "Tôi có thể đặt lịch hẹn trực tiếp không?",
+    answer: "Có, bạn hoàn toàn có thể liên hệ qua Hotline hoặc Zalo để đặt lịch hẹn tham quan và trao đổi công việc trực tiếp tại văn phòng cơ quan."
+  },
+  {
+    question: "Hỗ trợ kỹ thuật có hoạt động 24/7 không?",
+    answer: "Hệ thống Hotline hỗ trợ kỹ thuật và Zalo OA của chúng tôi hoạt động 24/7 đối với các trường hợp khẩn cấp liên quan đến gián đoạn dịch vụ."
+  }
+];
+
 export default function ContactPage() {
-  const { darkMode, toggleDarkMode } = useAppStore();
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
-  const [isSending, setIsSending] = useState(false);
   const [socialConfig, setSocialConfig] = useState<any>({});
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm<ContactFormValues>({
+    resolver: zodResolver(contactSchema)
+  });
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -23,382 +65,367 @@ export default function ContactPage() {
         }
       } catch (e) {
         console.error("Config fetch failed", e);
+      } finally {
+        setLoadingConfig(false);
       }
     };
     fetchConfig();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) return toast.error('Hãy điền đầy đủ các thông tin.');
-    
-    setIsSending(true);
+  const onSubmit = async (data: ContactFormValues) => {
     try {
       await addDoc(collection(db, 'contact_requests'), {
-        ...formData,
+        ...data,
         createdAt: serverTimestamp(),
         status: 'new'
       });
-      toast.success('Thông điệp đã được gửi đi.');
-      setShowRequestModal(false);
-      setFormData({ name: '', email: '', message: '' });
+      toast.success('Gửi thông điệp thành công. Chúng tôi sẽ sớm liên hệ lại với bạn!');
+      reset();
     } catch (err) {
-      toast.error('Gửi tin nhắn thất bại.');
-    } finally {
-      setIsSending(false);
+      toast.error('Có lỗi xảy ra trong quá trình gửi, vui lòng thử lại sau.');
     }
   };
 
-  const contacts = [
-    { 
-      name: 'Email hỗ trợ', 
-      value: socialConfig.email || 'sonlyhongduc@gmail.com', 
-      icon: Mail, 
-      url: `mailto:${socialConfig.email || 'sonlyhongduc@gmail.com'}`, 
-      color: 'from-blue-500/10 to-indigo-500/10',
-      iconColor: 'text-indigo-500',
-      desc: 'Technical Support'
-    },
-    { 
-      name: 'Số điện thoại', 
-      value: socialConfig.phone || '09xx.xxx.xxx', 
-      icon: Phone, 
-      url: `tel:${socialConfig.phone}`, 
-      color: 'from-emerald-500/10 to-teal-500/10',
-      iconColor: 'text-emerald-500',
-      desc: 'Hotline Support'
-    },
-    { 
-      name: 'Zalo', 
-      value: 'Nhắn tin Zalo', 
-      icon: MessageCircle, 
-      url: socialConfig.zalo || '#', 
-      color: 'from-blue-400/10 to-blue-600/10',
-      iconColor: 'text-blue-500',
-      desc: 'Zalo Platform'
-    },
-    { 
-      name: 'Địa chỉ', 
-      value: socialConfig.address || 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức', 
-      icon: MapPin, 
-      url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(socialConfig.address || 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức')}`, 
-      color: 'from-rose-500/10 to-orange-500/10',
-      iconColor: 'text-rose-500',
-      desc: 'Office Location'
-    },
-    { 
-      name: 'Facebook', 
-      value: 'Sơn Lý Hồng Đức', 
-      icon: Facebook, 
-      url: socialConfig.facebook || 'https://facebook.com/your-username', 
-      color: 'from-blue-600/10 to-sky-500/10',
-      iconColor: 'text-blue-600',
-      desc: 'Community & News'
-    },
-    { 
-      name: 'GitHub Repository', 
-      value: '@duclsh', 
-      icon: Github, 
-      url: socialConfig.github || 'https://github.com/duclsh', 
-      color: 'from-zinc-500/10 to-slate-500/10',
-      iconColor: 'text-zinc-600 dark:text-zinc-400',
-      desc: 'Source Control'
-    }
-  ];
+  const defaultAddress = 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức';
+  const addressQuery = socialConfig.address || defaultAddress;
+  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(addressQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
   return (
-    <>
-    <div className="max-w-[1600px] mx-auto px-6 py-12 lg:py-24 relative min-h-screen">
-      {/* Mesh Gradients */}
-      <div className="fixed inset-0 pointer-events-none opacity-20 dark:opacity-40 z-0 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-10%] w-[80vw] h-[80vw] bg-indigo-500/10 blur-[150px] rounded-full" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[70vw] h-[70vw] bg-blue-500/10 blur-[150px] rounded-full" />
-      </div>
+    <div className="min-h-screen text-slate-900 dark:text-slate-50 relative overflow-hidden transition-colors duration-500 pb-20">
+      {/* Background Effects */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-indigo-500/10 dark:bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-blue-500/10 dark:bg-blue-500/5 blur-[150px] rounded-full pointer-events-none translate-x-1/3 translate-y-1/3" />
 
-      <div className="relative z-10 space-y-32">
-        {/* Modern Split Header */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="space-y-10">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="inline-flex items-center gap-3 px-4 py-1.5 bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/10 rounded-full"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              <span className="text-[10px] font-black tracking-[0.3em] uppercase text-indigo-600 dark:text-indigo-400">Communication Node</span>
-            </motion.div>
-            
-            <div className="space-y-6">
-              <motion.h1 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-7xl md:text-9xl font-black tracking-tighter leading-[0.8] uppercase italic text-slate-950 dark:text-white"
-              >
-                Contact<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-blue-600 italic">Network.</span>
-              </motion.h1>
-              <motion.p 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-xl md:text-2xl text-slate-500 dark:text-zinc-400 font-medium leading-relaxed max-w-xl"
-              >
-                Xây dựng cầu nối vững chắc giữa hệ thống quản trị và người dùng thông qua các giao thức liên lạc bảo mật.
-              </motion.p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-20 lg:pt-32">
+        {/* Back Button */}
+        <button 
+          onClick={() => navigate(-1)}
+          className="group flex items-center gap-2 px-4 py-2 mb-8 text-sm font-medium text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors w-fit"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Quay lại
+        </button>
+
+        {/* --- HERO SECTION --- */}
+        <section className="text-center max-w-3xl mx-auto mb-20 lg:mb-32">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm mb-6"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-zinc-400">Trực tuyến 24/7</span>
+          </motion.div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-5xl md:text-7xl font-black tracking-tight mb-6"
+          >
+            Liên hệ với <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-blue-500">Chúng tôi</span>
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-lg md:text-xl text-slate-600 dark:text-zinc-400 max-w-2xl mx-auto"
+          >
+            Hãy cho chúng tôi biết vấn đề của bạn, mọi thắc mắc và yêu cầu sẽ được đội ngũ xử lý một cách nhanh chóng và tận tâm nhất.
+          </motion.p>
+        </section>
+
+        {/* --- MAIN GRID (INFO + FORM) --- */}
+        <div className="grid lg:grid-cols-5 gap-10 lg:gap-16 mb-24">
+          
+          {/* Left: Contact Info */}
+          <div className="lg:col-span-2 space-y-10">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight mb-6 flex items-center gap-2">
+                Thông tin liên hệ
+              </h2>
+              
+              <div className="space-y-6">
+                {/* Info Item */}
+                <div className="group flex gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all hover:border-indigo-500/30">
+                  <div className="w-12 h-12 shrink-0 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1">Văn phòng chính</h3>
+                    {loadingConfig ? (
+                      <div className="h-5 w-48 bg-slate-200 dark:bg-white/10 rounded animate-pulse" />
+                    ) : (
+                      <p className="font-medium">{socialConfig.address || 'Hẻm 46, Phường Tam Phú, TP. Thủ Đức'}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="group flex gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all hover:border-blue-500/30">
+                  <div className="w-12 h-12 shrink-0 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1">Đường dây nóng</h3>
+                    {loadingConfig ? (
+                      <div className="h-5 w-32 bg-slate-200 dark:bg-white/10 rounded animate-pulse" />
+                    ) : (
+                      <a href={`tel:${socialConfig.phone}`} className="font-medium hover:text-blue-500 transition-colors">{socialConfig.phone || '09xx.xxx.xxx'}</a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="group flex gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all hover:border-rose-500/30">
+                  <div className="w-12 h-12 shrink-0 bg-rose-50 dark:bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 group-hover:bg-rose-500 group-hover:text-white transition-all">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1">Email hỗ trợ</h3>
+                    {loadingConfig ? (
+                      <div className="h-5 w-48 bg-slate-200 dark:bg-white/10 rounded animate-pulse" />
+                    ) : (
+                      <a href={`mailto:${socialConfig.email}`} className="font-medium hover:text-rose-500 transition-colors break-all">{socialConfig.email || 'sonlyhongduc@gmail.com'}</a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="group flex gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all hover:border-amber-500/30">
+                  <div className="w-12 h-12 shrink-0 bg-amber-50 dark:bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1">Giờ làm việc</h3>
+                    <p className="font-medium">Thứ 2 - Thứ 6: 08:00 - 17:30<br/>Thứ 7: 08:00 - 12:00</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <motion.div 
-               initial={{ opacity: 0, y: 30 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ delay: 0.2 }}
-               className="flex flex-wrap gap-4"
-            >
-               <button 
-                 onClick={() => setShowRequestModal(true)}
-                 className="px-10 py-5 bg-slate-950 dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4 group"
-               >
-                 Gửi yêu cầu <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-               </button>
-               <a 
-                 href={`mailto:${socialConfig.email || 'sonlyhongduc@gmail.com'}`}
-                 className="px-10 py-5 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all flex items-center gap-4 group"
-               >
-                 Email Node <Mail className="w-4 h-4" />
-               </a>
-            </motion.div>
+            {/* Quick Actions */}
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-4">Kết nối nhanh</h3>
+              <div className="flex flex-wrap gap-3">
+                <a 
+                  href={socialConfig.zalo || '#'} 
+                  target="_blank" rel="noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0068FF]/10 text-[#0068FF] dark:text-[#0068FF] hover:bg-[#0068FF] hover:text-white transition-all font-semibold text-sm border border-[#0068FF]/20"
+                >
+                  <MessageSquare className="w-4 h-4" /> Zalo
+                </a>
+                <a 
+                  href={socialConfig.facebook || '#'} 
+                  target="_blank" rel="noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0866FF]/10 text-[#0866FF] dark:text-[#0866FF] hover:bg-[#0866FF] hover:text-white transition-all font-semibold text-sm border border-[#0866FF]/20"
+                >
+                  <Facebook className="w-4 h-4" /> Messenger
+                </a>
+                <a 
+                  href={`tel:${socialConfig.phone}`} 
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all font-semibold text-sm border border-emerald-500/20"
+                >
+                  <Phone className="w-4 h-4" /> Gọi điện
+                </a>
+              </div>
+            </div>
+
           </div>
 
-          {/* Vùng Tối System Display */}
-          <motion.div 
-            initial={{ opacity: 0, rotateY: 15 }}
-            animate={{ opacity: 1, rotateY: 0 }}
-            transition={{ duration: 1, delay: 0.3 }}
-            className="perspective-2000 hidden lg:block"
-          >
-             <div 
-               onClick={toggleDarkMode}
-               className={cn(
-                 "relative aspect-square rounded-[4rem] border p-12 flex flex-col justify-between transition-all duration-1000 cursor-pointer group hover:scale-[1.02]",
-                 darkMode 
-                   ? "bg-zinc-950 border-white/10 shadow-[0_0_100px_rgba(79,70,229,0.1)]" 
-                   : "bg-white border-slate-200 shadow-[0_0_100px_rgba(0,0,0,0.05)]"
-               )}
-             >
-                <div className="flex items-center justify-between">
-                  <div className={cn(
-                    "w-20 h-20 rounded-3xl flex items-center justify-center border transition-all duration-700 group-hover:rotate-12",
-                    darkMode ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
-                  )}>
-                    {darkMode ? <Moon className="w-10 h-10 fill-white" /> : <Sun className="w-10 h-10" />}
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className={cn("text-[10px] font-black uppercase tracking-[0.3em]", darkMode ? "text-indigo-400" : "text-indigo-600")}>Protocol</span>
-                    <span className={cn("text-2xl font-black tracking-tighter italic", darkMode ? "text-white" : "text-black")}>Vùng Tối.</span>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <p className={cn("text-4xl font-black tracking-tighter leading-none italic uppercase", darkMode ? "text-white/20" : "text-slate-100")}>
-                    Dark Zone<br/>Operating<br/>System
-                  </p>
-                  <div className="space-y-2">
-                    <h3 className={cn("text-3xl font-black tracking-tighter uppercase italic", darkMode ? "text-white" : "text-black")}>Hệ điều hành số.</h3>
-                    <p className={cn("text-sm font-medium leading-relaxed max-w-xs", darkMode ? "text-zinc-400" : "text-slate-500")}>
-                      Chuyển đổi sang giao diện tối ưu hóa thị giác và tiết kiệm năng lượng cho các phiên làm việc đêm khuya.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className={cn("px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest border transition-all", darkMode ? "bg-white text-black border-white" : "bg-black text-white border-black")}>
-                    {darkMode ? "Vô hiệu hóa" : "Kích hoạt ngay"}
-                  </div>
-                  <div className={cn("w-12 h-1 bg-gradient-to-r rounded-full", darkMode ? "from-indigo-500 to-transparent" : "from-black to-transparent")} />
-                </div>
-
-                {/* Decorative Pattern */}
-                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px' }} />
-             </div>
-          </motion.div>
-        </section>
-
-        {/* Bento Grid Contacts */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          {contacts.map((contact, idx) => (
-            <motion.a 
-              key={idx}
-              href={contact.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.1 }}
-              className="group relative overflow-hidden bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[3rem] p-10 transition-all duration-700 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/5"
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${contact.color} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+          {/* Right: Contact Form */}
+          <div className="lg:col-span-3">
+            <div className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-white/5 rounded-[2rem] p-8 md:p-10 shadow-xl shadow-slate-200/50 dark:shadow-none backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-[80px]" />
               
-              <div className="relative z-10 space-y-8 h-full flex flex-col">
-                <div className="flex items-start justify-between">
-                  <div className={cn(
-                    "w-16 h-16 rounded-2xl flex items-center justify-center bg-slate-50 dark:bg-zinc-950 border border-slate-100 dark:border-white/5 transition-all duration-700 group-hover:scale-110 group-hover:bg-white dark:group-hover:bg-black",
-                    contact.iconColor
-                  )}>
-                    <contact.icon className="w-8 h-8" />
+              <h2 className="text-2xl font-bold tracking-tight mb-2 relative z-10">Gửi lời nhắn cho chúng tôi</h2>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 mb-8 relative z-10">Vui lòng điền thông tin chi tiết vào biểu mẫu bên dưới, chúng tôi sẽ sớm liên hệ lại với bạn.</p>
+              
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 relative z-10">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Họ và tên *</label>
+                    <input 
+                      {...register("name")}
+                      className={cn(
+                        "w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border outline-none transition-all placeholder:text-slate-400 font-medium",
+                        errors.name ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-white/5 hover:border-indigo-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      )}
+                      placeholder="Nguyễn Văn A"
+                    />
+                    {errors.name && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {errors.name.message}</p>}
                   </div>
-                  <div className="p-2.5 rounded-full border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all group-hover:rotate-45">
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Số điện thoại *</label>
+                    <input 
+                      {...register("phone")}
+                      className={cn(
+                        "w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border outline-none transition-all placeholder:text-slate-400 font-medium",
+                        errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-white/5 hover:border-indigo-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      )}
+                      placeholder="09xx xxx xxx"
+                    />
+                    {errors.phone && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {errors.phone.message}</p>}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-3xl font-black text-slate-950 dark:text-white tracking-tighter uppercase italic leading-none mb-2">{contact.name}</h3>
-                  <p className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest">{contact.desc}</p>
-                </div>
-
-                <div className="mt-auto space-y-4">
-                  <div className="w-full h-px bg-slate-100 dark:bg-white/5" />
-                  <div className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest truncate">
-                    {contact.value}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Email (Tùy chọn)</label>
+                    <input 
+                      type="email"
+                      {...register("email")}
+                      className={cn(
+                        "w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border outline-none transition-all placeholder:text-slate-400 font-medium",
+                        errors.email ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-white/5 hover:border-indigo-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      )}
+                      placeholder="example@gmail.com"
+                    />
+                    {errors.email && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {errors.email.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Chủ đề *</label>
+                    <input 
+                      {...register("subject")}
+                      className={cn(
+                        "w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border outline-none transition-all placeholder:text-slate-400 font-medium",
+                        errors.subject ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-white/5 hover:border-indigo-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                      )}
+                      placeholder="Yêu cầu hỗ trợ phần mềm"
+                    />
+                    {errors.subject && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {errors.subject.message}</p>}
                   </div>
                 </div>
-              </div>
-            </motion.a>
-          ))}
-        </section>
 
-        {/* Support Banner */}
-        <section>
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="relative bg-slate-50 dark:bg-zinc-950 rounded-[4rem] p-12 lg:p-24 overflow-hidden border border-slate-100 dark:border-white/5"
-          >
-            <div className="absolute top-0 right-0 w-2/3 h-full bg-indigo-500/[0.03] blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
-            
-            <div className="relative z-10 flex flex-col lg:flex-row items-center gap-16 lg:gap-32">
-              <div className="space-y-8 flex-1">
-                <div className="w-16 h-16 rounded-3xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-200 dark:shadow-indigo-900/20">
-                   <MessageCircle className="w-8 h-8" />
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Nội dung chi tiết *</label>
+                  <textarea 
+                    {...register("message")}
+                    rows={5}
+                    className={cn(
+                      "w-full px-5 py-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border outline-none transition-all placeholder:text-slate-400 font-medium resize-none",
+                      errors.message ? "border-red-500 focus:border-red-500" : "border-slate-200 dark:border-white/5 hover:border-indigo-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                    )}
+                    placeholder="Vui lòng mô tả chi tiết yêu cầu hoặc vấn đề của bạn..."
+                  />
+                  {errors.message && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {errors.message.message}</p>}
                 </div>
-                <h2 className="text-5xl lg:text-7xl font-black tracking-tighter text-slate-950 dark:text-white italic uppercase leading-[0.9]">
-                  Kênh phản hồi <br/> đặc biệt.
-                </h2>
-                <p className="text-xl text-slate-600 dark:text-zinc-400 font-medium leading-relaxed max-w-xl">
-                  Chúng tôi xử lý các yêu cầu kỹ thuật và đề xuất tính năng mới trong vòng 24 giờ. Hệ thống luôn mở để tiếp nhận mọi ý tưởng sáng tạo.
-                </p>
-                <div className="flex gap-12 font-black text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-500">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-emerald-500" /> Phản hồi nhanh
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-500" /> Bảo mật RSA
-                  </div>
-                </div>
-              </div>
 
-              <div className="shrink-0 w-full lg:w-96">
                 <button 
-                  onClick={() => setShowRequestModal(true)}
-                  className="w-full aspect-square rounded-[3rem] bg-indigo-600 hover:bg-slate-950 dark:hover:bg-white dark:hover:text-black text-white p-12 flex flex-col justify-between transition-all duration-500 group relative overflow-hidden"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-3 py-5 rounded-xl bg-slate-900 dark:bg-indigo-600 text-white font-bold hover:bg-slate-800 dark:hover:bg-indigo-500 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:pointer-events-none group shadow-lg shadow-indigo-500/20"
                 >
-                  <div className="absolute inset-0 opacity-10 group-hover:scale-110 transition-transform duration-1000" style={{ backgroundImage: 'linear-gradient(45deg, #fff 25%, transparent 25%, transparent 50%, #fff 50%, #fff 75%, transparent 75%, transparent)' , backgroundSize: '100px 100px' }} />
-                  <div className="relative z-10 flex justify-end">
-                    <ArrowRight className="w-12 h-12 rotate-[-45deg] group-hover:rotate-0 transition-transform duration-500" />
-                  </div>
-                  <span className="relative z-10 text-4xl font-black tracking-tighter uppercase italic leading-none text-left">Gửi thông điệp<br/>ngay.</span>
+                  {isSubmitting ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> Đang xử lý...</>
+                  ) : (
+                    <>
+                       Gửi thông điệp
+                       <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    </>
+                  )}
                 </button>
-              </div>
+              </form>
             </div>
-          </motion.div>
+          </div>
+        </div>
+
+        {/* --- GOOGLE MAPS DIRECTORY --- */}
+        <div className="mb-24 rounded-[2rem] overflow-hidden border border-slate-200 dark:border-white/5 relative bg-slate-100 dark:bg-zinc-900 shadow-sm">
+          <div className="absolute top-6 left-6 z-10 p-4 rounded-2xl bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border border-slate-200 dark:border-white/10 shadow-xl max-w-xs">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                <Navigation className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold">Chỉ đường</h3>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-3">{socialConfig.address || defaultAddress}</p>
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`} 
+              target="_blank" rel="noreferrer"
+              className="block w-full py-2.5 text-center bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-xs font-bold hover:opacity-90 transition-opacity"
+            >
+              Mở trên Google Maps
+            </a>
+          </div>
+          <iframe 
+            src={mapSrc}
+            width="100%" 
+            height="500" 
+            style={{ border: 0 }} 
+            allowFullScreen 
+            loading="lazy" 
+            referrerPolicy="no-referrer-when-downgrade"
+            className="filter dark:contrast-[0.9] dark:brightness-75 transition-all"
+            title="Google Maps Location"
+          />
+        </div>
+
+        {/* --- FAQ SECTION --- */}
+        <section className="max-w-3xl mx-auto mb-24">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight mb-4">Câu hỏi thường gặp</h2>
+            <p className="text-slate-500 dark:text-zinc-400">Dưới đây là một số giải đáp nhanh cho các thắc mắc phổ biến nhất của người dùng.</p>
+          </div>
+
+          <div className="space-y-4">
+            {faqs.map((faq, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "border rounded-2xl transition-all duration-300 overflow-hidden bg-white dark:bg-zinc-900/50",
+                  activeFaq === idx ? "border-indigo-500 dark:border-indigo-500/50 shadow-md shadow-indigo-500/5" : "border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10"
+                )}
+              >
+                <button 
+                  onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
+                  className="flex items-center justify-between w-full p-6 text-left"
+                >
+                  <span className="font-semibold">{faq.question}</span>
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ml-4",
+                    activeFaq === idx ? "bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rotate-180" : "bg-slate-50 dark:bg-zinc-800 text-slate-500"
+                  )}>
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {activeFaq === idx && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-6 pb-6 text-slate-500 dark:text-zinc-400 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-4">
+                        {faq.answer}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
         </section>
+
+        {/* --- SOCIAL LINKS --- */}
+        <section className="flex flex-col items-center border-t border-slate-200 dark:border-white/5 pt-16">
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-8">Theo dõi chúng tôi trên mạng xã hội</p>
+          <div className="flex gap-4">
+            <a href={socialConfig.facebook || '#'} target="_blank" rel="noreferrer" className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-[#0866FF] hover:border-[#0866FF]/30 hover:shadow-lg hover:shadow-[#0866FF]/10 hover:-translate-y-1 transition-all">
+              <Facebook className="w-6 h-6" />
+            </a>
+            <a href={socialConfig.github || '#'} target="_blank" rel="noreferrer" className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 hover:dark:text-white hover:border-slate-400 dark:hover:border-white/30 hover:shadow-lg hover:-translate-y-1 transition-all">
+              <Github className="w-6 h-6" />
+            </a>
+            <a href={socialConfig.website || '#'} target="_blank" rel="noreferrer" className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/5 flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-rose-500 hover:border-rose-500/30 hover:shadow-lg hover:shadow-rose-500/10 hover:-translate-y-1 transition-all">
+              <Globe className="w-6 h-6" />
+            </a>
+          </div>
+        </section>
+
       </div>
     </div>
-
-    {/* Dispatch Modal (Enhanced) */}
-    <AnimatePresence>
-      {showRequestModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowRequestModal(false)}
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 30 }}
-            className="relative w-full max-w-2xl bg-white dark:bg-zinc-950 p-10 md:p-16 rounded-[4rem] border border-slate-200 dark:border-white/10 shadow-full overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
-            
-            <button 
-              onClick={() => setShowRequestModal(false)}
-              className="absolute top-10 right-10 p-4 bg-slate-50 dark:bg-zinc-900 rounded-2xl text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all border border-slate-100 dark:border-white/5"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="mb-12 space-y-4 relative z-10">
-              <div className="w-12 h-1 bg-indigo-600 rounded-full" />
-              <h2 className="text-5xl font-black text-slate-950 dark:text-white italic tracking-tighter uppercase leading-none">Liên hệ.</h2>
-              <p className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-[0.3em]">Secure Data Transmission Node</p>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Tên của bạn</label>
-                  <input 
-                    type="text" 
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full h-16 px-6 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
-                    placeholder="Identity"
-                    required
-                  />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Email Address</label>
-                  <input 
-                    type="email" 
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full h-16 px-6 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
-                    placeholder="node@network.com"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Message Content</label>
-                <textarea 
-                  rows={4}
-                  value={formData.message}
-                  onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  className="w-full p-6 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/5 rounded-[2.5rem] outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all font-bold text-slate-900 dark:text-white placeholder:text-slate-400 resize-none"
-                  placeholder="Nội dung truyền tin..."
-                  required
-                />
-              </div>
-              <button 
-                type="submit"
-                disabled={isSending}
-                className="w-full h-20 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[2rem] font-black tracking-[0.2em] uppercase hover:scale-[0.98] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-4 group disabled:opacity-50 text-xs"
-              >
-                {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : (
-                  <>Xác nhận truyền tin <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /></>
-                )}
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-    </>
   );
 }
+
 

@@ -3,7 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, Settings2, Loader2, Maximize2, Minimize2, Trash2 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 
@@ -70,7 +70,7 @@ export function GeminiChatBox() {
       const response = await fetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: safeJsonStringify({
           model: selectedModel,
           contents: {
             parts: [{ text: historyText }]
@@ -90,7 +90,7 @@ export function GeminiChatBox() {
         { id: (Date.now() + 1).toString(), role: 'model', text: data.text || '' }
       ]);
     } catch (error: any) {
-      console.error('Gemini error:', error);
+      console.error('Gemini error:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi gọi AI: ' + (error?.message || 'Lỗi không xác định'));
       setMessages(prev => [
         ...prev,

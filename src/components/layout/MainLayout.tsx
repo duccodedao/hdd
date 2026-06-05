@@ -35,7 +35,7 @@ export default function MainLayout() {
 
       {!aiActive && (
         <Sidebar className={cn(
-          "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 h-full shrink-0",
+          "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 lg:w-60 h-full shrink-0",
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:pointer-events-none lg:overflow-hidden'
         )} />
       )}
@@ -103,15 +103,6 @@ export default function MainLayout() {
                   <Outlet />
                 </div>
                 
-                {!aiActive && (
-                  <footer className="mt-20 py-12 text-center flex flex-col items-center justify-center gap-4 px-6 opacity-40 hover:opacity-100 transition-opacity duration-700">
-                    <div className="flex justify-center gap-8 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-500">
-                      <Link to="/terms" className="hover:text-slate-900 dark:hover:text-white transition-colors">Legal</Link>
-                      <Link to="/privacy" className="hover:text-slate-900 dark:hover:text-white transition-colors">Privacy</Link>
-                    </div>
-                    <p className="text-[10px] text-slate-600 dark:text-zinc-600 font-medium">© 2026 Nucleus OS. Engineered for privacy.</p>
-                  </footer>
-                )}
               </motion.div>
             </AnimatePresence>
           </main>

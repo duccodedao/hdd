@@ -36,6 +36,7 @@ import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { cn } from '../../lib/utils';
+import AppLogo from '../../components/ui/AppLogo';
 import ReactMarkdown from 'react-markdown';
 
 interface PersonalFileManagerProps {
@@ -148,7 +149,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
         throw new Error("Không nhận dạng được định dạng dữ liệu cây thư mục");
       }
     } catch (error: any) {
-      console.error("Lỗi lấy tệp từ GitHub:", error);
+      console.error("Lỗi lấy tệp từ GitHub:", error?.message || String(error));
       toast.error(`Không thể quét repository: ${error.message || 'Lỗi mạng'}`);
     } finally {
       setLoadingFiles(false);
@@ -210,7 +211,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
         setFileContent(data.content || '');
       }
     } catch (error: any) {
-      console.error("Lỗi khi nạp tệp cụ thể:", error);
+      console.error("Lỗi khi nạp tệp cụ thể:", error?.message || String(error));
       toast.error(`Lỗi nạp tệp: ${error.message || 'Không thể tải'}`);
     } finally {
       setLoadingContent(false);
@@ -481,7 +482,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
           <div className="flex-1 overflow-y-auto max-h-[500px] lg:max-h-none scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-zinc-800 pr-1 select-none space-y-1.5">
             {loadingFiles ? (
               <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+                <AppLogo className="w-12 h-12" isLoading={true} />
                 <p className="text-xs text-slate-400 font-medium">Đang nạp cấu trúc cây tệp...</p>
               </div>
             ) : files.length === 0 ? (
@@ -686,7 +687,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
               <div className="flex-1 overflow-y-auto bg-slate-950 p-4 lg:p-6 text-sm relative scrollbar-thin scrollbar-thumb-zinc-800 font-mono text-zinc-100">
                 {loadingContent ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/80 z-20">
-                    <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+                    <AppLogo className="w-12 h-12" isLoading={true} />
                     <p className="text-xs text-zinc-400 font-medium font-mono">Loading data packet from repository...</p>
                   </div>
                 ) : isSelectedFileImage ? (

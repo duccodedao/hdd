@@ -1,27 +1,121 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity, Bookmark as BookmarkIcon, Star, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { signOut } from 'firebase/auth';
 import { useAudioStore } from '../../store/audioStore';
 import { createPortal } from 'react-dom';
+import { useBookmarkStore } from '../../store/bookmarkStore';
+import { useNotificationStore } from '../../store/notificationStore';
+import { NotificationModal } from '../notification/NotificationModal';
+import { AdminNotificationModal } from '../notification/AdminNotificationModal';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+
+const formatRelativeTime = (time: number) => {
+  try {
+    return formatDistanceToNow(new Date(time), { addSuffix: false, locale: vi })
+      .replace('khoảng ', '')
+      .replace('dưới ', '')
+      .replace('một ', '1 ')
+      .replace('vài ', '') + ' trước';
+  } catch (e) {
+    return 'Gần đây';
+  }
+};
 
 export default function Topbar() {
   const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
-  const { user, userData } = useAuthStore();
+  const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
+  const [networkSpeed, setNetworkSpeed] = useState<{ ping: number | null, downlink: number | null }>({ ping: null, downlink: null });
+
+  useEffect(() => {
+    let isMounted = true;
+    let tick = 0;
+
+    const measurePing = async () => {
+      try {
+        const start = performance.now();
+        // Use a 204 No Content endpoint that is fast and global to avoid ServiceWorker cache
+        await fetch('https://www.gstatic.com/generate_204?_=' + Date.now(), { mode: 'no-cors', cache: 'no-store' });
+        return Math.round(performance.now() - start);
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const measureSpeed = async () => {
+      try {
+        const start = performance.now();
+        // Fetch a known ~600KB file to accurately measure real download speed
+        const res = await fetch(`https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js?_=${Date.now()}`);
+        const blob = await res.blob();
+        const duration = (performance.now() - start) / 1000;
+        
+        // Convert to Mbps (Megabits per second)
+        const bits = blob.size * 8;
+        const mbps = +(bits / 1_000_000 / duration).toFixed(1);
+        return mbps;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const updateNetwork = async () => {
+      if (!isMounted) return;
+      
+      const actPing = await measurePing();
+      
+      if (actPing === null) {
+        setNetworkSpeed({ ping: null, downlink: null });
+        return;
+      }
+
+      setNetworkSpeed(prev => ({ ...prev, ping: actPing }));
+
+      // Perform a real speed test on the first load and every 6 ticks (30s)
+      if (tick % 6 === 0) {
+        const actSpeed = await measureSpeed();
+        if (actSpeed !== null && isMounted) {
+          setNetworkSpeed(prev => ({ ...prev, downlink: actSpeed }));
+        }
+      }
+      tick++;
+    };
+
+    updateNetwork();
+    const interval = setInterval(updateNetwork, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
   const [locationName, setLocationName] = useState<string>('');
-  const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
+
+  const { bookmarks, toggleBookmark } = useBookmarkStore();
+  const { notifications, readNotificationIds, markAsRead, markAllAsRead } = useNotificationStore();
+
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
+  const [showNotificationDetail, setShowNotificationDetail] = useState(false);
+  const [showAdminNotification, setShowAdminNotification] = useState(false);
+
+  const unreadNotifications = notifications.filter(n => !readNotificationIds.includes(n.id));
+  const unreadCount = unreadNotifications.length;
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { systemVersion } = useAppStore();
   const [needsUpdate, setNeedsUpdate] = useState(false);
@@ -221,20 +315,24 @@ export default function Topbar() {
                  </div>
                </div>
              )}
+             {user && (networkSpeed.ping !== null || networkSpeed.downlink !== null) && (
+               <div className="flex items-center gap-2 pl-4 border-l border-slate-200 dark:border-white/5" title={networkSpeed.downlink ? `Tốc độ tải: ${networkSpeed.downlink} Mbps` : 'Tốc độ mạng'}>
+                 <Wifi className={cn(
+                   "w-3.5 h-3.5",
+                   (networkSpeed.ping && networkSpeed.ping < 100) ? "text-emerald-500" : (networkSpeed.ping && networkSpeed.ping < 300) ? "text-amber-500" : "text-slate-400 dark:text-zinc-500"
+                 )} />
+                 <span className="text-[11px] font-medium tabular-nums text-slate-600 dark:text-zinc-400">
+                   {networkSpeed.ping !== null ? `${networkSpeed.ping} ms` : ''}
+                   {networkSpeed.ping !== null && networkSpeed.downlink !== null ? ' - ' : ''}
+                   {networkSpeed.downlink !== null ? `${networkSpeed.downlink} Mbps` : ''}
+                 </span>
+               </div>
+             )}
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-3 lg:gap-6">
-        <div className="relative hidden xl:block group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-focus-within:text-blue-500 dark:group-focus-within:text-white transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search commands..." 
-            className="w-64 h-9 pl-10 pr-4 bg-slate-100 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/5 rounded-lg text-[11px] font-medium outline-none focus:border-blue-500 dark:focus:border-white/20 focus:bg-white dark:focus:bg-zinc-900 transition-all text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600"
-          />
-        </div>
-
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Audio Player */}
           {(() => {
@@ -316,6 +414,234 @@ export default function Topbar() {
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
+
+          {/* Bookmarks Control */}
+          {user && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowBookmarks(!showBookmarks); setShowNotifications(false); setShowProfileMenu(false); }}
+                className={cn(
+                  "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
+                  showBookmarks
+                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
+                )}
+                title="Dấu trang lưu trữ"
+              >
+                <BookmarkIcon className="w-4 h-4" />
+                {bookmarks.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 bg-indigo-600 dark:bg-indigo-500 rounded-full text-[8px] font-black text-white items-center justify-center animate-pulse shadow-md">
+                    {bookmarks.length}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showBookmarks && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowBookmarks(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      className="absolute right-0 mt-2 w-72 md:w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <BookmarkIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider font-sans">
+                            Dấu trang của bạn
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                          {bookmarks.length} Mục
+                        </span>
+                      </div>
+
+                      <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.02] p-1.5 space-y-0.5 no-scrollbar">
+                        {bookmarks.length === 0 ? (
+                          <div className="py-8 px-4 text-center">
+                            <Star className="w-8 h-8 text-slate-300 dark:text-zinc-750 mx-auto stroke-1" />
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-500 mt-2 font-medium">Chưa lưu dấu trang nào.</p>
+                            <p className="text-[9px] text-slate-400 dark:text-zinc-600 mt-1 max-w-[200px] mx-auto leading-relaxed">Nhấp dấu sao tại các trang Công cụ, Tiện ích để tìm lại nhanh ở đây.</p>
+                          </div>
+                        ) : (
+                          bookmarks.map((b) => (
+                            <div
+                              key={b.id}
+                              className="group flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all text-left"
+                            >
+                              <div
+                                onClick={() => {
+                                  setShowBookmarks(false);
+                                  navigate(b.url);
+                                }}
+                                className="flex-1 min-w-0 pr-2 cursor-pointer flex items-center gap-3"
+                              >
+                                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                  <Star className="w-3.5 h-3.5 fill-current" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[11px] font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-indigo-600 dark:group-hover:text-white transition-colors">
+                                    {b.title}
+                                  </p>
+                                  <p className="text-[9px] font-mono text-zinc-400 dark:text-zinc-550 truncate uppercase tracking-wider mt-0.5">
+                                    {b.type}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleBookmark({ itemId: b.itemId, title: b.title, type: b.type, url: b.url });
+                                }}
+                                className="w-7 h-7 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Notifications Control */}
+          {user && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowNotifications(!showNotifications); setShowBookmarks(false); setShowProfileMenu(false); }}
+                className={cn(
+                  "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
+                  showNotifications
+                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
+                )}
+                title="Hộp thông báo"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 bg-rose-600 dark:bg-rose-500 rounded-full text-[8.5px] font-black text-white items-center justify-center shadow-lg animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showNotifications && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      className="absolute right-0 mt-2 w-80 md:w-96 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider font-sans">
+                            Thông báo hệ thống
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(userData?.role === 'admin' || userData?.role === 'superadmin' || isSuperAdmin) && (
+                            <button
+                              onClick={() => {
+                                setShowAdminNotification(true);
+                                setShowNotifications(false);
+                              }}
+                              className="px-2 py-1 bg-indigo-600 text-white dark:bg-indigo-500/10 dark:text-indigo-400 hover:opacity-90 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all"
+                            >
+                              + Gửi
+                            </button>
+                          )}
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={markAllAsRead}
+                              className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              Đọc tất cả
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.02]">
+                        {notifications.length === 0 ? (
+                          <div className="py-10 px-4 text-center">
+                            <Bell className="w-8 h-8 text-slate-350 dark:text-zinc-750 mx-auto stroke-1" />
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-550 mt-2 font-medium">Hộp thư thông báo trống.</p>
+                            <p className="text-[9px] text-slate-400 dark:text-zinc-650 mt-1 max-w-[210px] mx-auto leading-relaxed">Bạn sẽ nhận được các thông báo chính sách, bảo trì hoặc cập nhật quan trọng tại đây.</p>
+                          </div>
+                        ) : (
+                          notifications.map((n) => {
+                            const isRead = readNotificationIds.includes(n.id);
+                            return (
+                              <div
+                                key={n.id}
+                                onClick={async () => {
+                                  if (!isRead) await markAsRead(n.id);
+                                  setSelectedNotification(n);
+                                  setShowNotificationDetail(true);
+                                  setShowNotifications(false);
+                                }}
+                                className={cn(
+                                  "p-3.5 flex gap-3 text-left transition-all cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.02]",
+                                  !isRead && "bg-indigo-500/[0.02]"
+                                )}
+                              >
+                                <div className="relative shrink-0 mt-0.5">
+                                  <div className={cn(
+                                    "w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px]",
+                                    isRead 
+                                      ? "bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500" 
+                                      : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                  )}>
+                                    {n.senderName?.charAt(0).toUpperCase() || 'H'}
+                                  </div>
+                                  {!isRead && (
+                                    <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-zinc-900" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <p className={cn(
+                                      "text-[11px] truncate leading-tight pr-1",
+                                      isRead ? "text-slate-600 dark:text-zinc-400 font-medium" : "text-slate-900 dark:text-white font-semibold"
+                                    )}>
+                                      {n.title}
+                                    </p>
+                                    <span className="text-[8.5px] text-zinc-400 dark:text-zinc-550 font-mono shrink-0">
+                                      {formatRelativeTime(n.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 dark:text-zinc-400 line-clamp-2 mt-1 leading-normal font-sans">
+                                    {n.message}
+                                  </p>
+                                  <p className="text-[8.5px] font-mono text-zinc-400 dark:text-zinc-650 mt-1 uppercase tracking-wider">
+                                    Gửi bởi: {n.senderName || 'Hệ thống'}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           <button
             onClick={handleResetVersion}
             className={cn(
@@ -384,7 +710,18 @@ export default function Topbar() {
                       <p className="text-[9px] text-slate-500 dark:text-zinc-500 font-bold uppercase tracking-widest mt-0.5">{userData?.role || 'Member'}</p>
                     </div>
                     
-                    <div className="p-1.5">
+                    <div className="p-1.5 space-y-0.5">
+                      <button 
+                        onClick={() => {
+                          navigate('/profile');
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded-md transition-all text-[11px] font-medium"
+                      >
+                        <User className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+                        Trang cá nhân
+                      </button>
+
                       <button 
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-3 py-2 text-rose-500 dark:text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-500 dark:hover:bg-rose-500/10 rounded-md transition-all text-[11px] font-medium"
@@ -401,6 +738,7 @@ export default function Topbar() {
         ) : (
           <Link 
             to="/login"
+            state={{ from: location }}
             className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-zinc-200 text-white dark:text-black rounded-md text-[10px] font-bold uppercase tracking-widest transition-all shadow-md dark:shadow-lg active:scale-95"
           >
             Đăng nhập
@@ -451,6 +789,20 @@ export default function Topbar() {
         </AnimatePresence>,
         document.body
       )}
+
+      <NotificationModal
+        notification={selectedNotification}
+        isOpen={showNotificationDetail}
+        onClose={() => {
+          setShowNotificationDetail(false);
+          setSelectedNotification(null);
+        }}
+      />
+
+      <AdminNotificationModal
+        isOpen={showAdminNotification}
+        onClose={() => setShowAdminNotification(false)}
+      />
     </header>
   );
 }

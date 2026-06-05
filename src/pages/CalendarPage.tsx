@@ -19,6 +19,7 @@ interface CalendarEvent {
   title: string;
   date: string;
   importance: 'low' | 'medium' | 'high';
+  status?: 'completed' | 'not_completed' | 'overdue' | 'processing' | 'pending';
   description?: string;
   createdAt: number;
   syncedFromTasks?: boolean;
@@ -51,6 +52,7 @@ export default function CalendarPage() {
     day: 1,
     month: 1,
     importance: 'medium' as 'low' | 'medium' | 'high',
+    status: 'pending' as 'completed' | 'not_completed' | 'overdue' | 'processing' | 'pending',
     description: ''
   });
 
@@ -63,7 +65,8 @@ export default function CalendarPage() {
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
-    importance: 'medium' as 'low' | 'medium' | 'high'
+    importance: 'medium' as 'low' | 'medium' | 'high',
+    status: 'pending' as 'completed' | 'not_completed' | 'overdue' | 'processing' | 'pending'
   });
 
   const canEdit = isSuperAdmin || isAdmin;
@@ -74,7 +77,7 @@ export default function CalendarPage() {
       setEvents(items);
       setLoading(false);
     }, (err) => {
-      console.error("Calendar fetch error:", err);
+      console.error("Calendar fetch error:", err?.message || String(err));
       toast.error('Không thể tải dữ liệu lịch');
       setLoading(false);
     });
@@ -83,7 +86,7 @@ export default function CalendarPage() {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTasks(items);
     }, (err) => {
-      console.error("Tasks fetch error:", err);
+      console.error("Tasks fetch error:", err?.message || String(err));
     });
 
     const unsubRecurring = onSnapshot(collection(db, 'recurring_events'), (snapshot) => {
@@ -91,7 +94,7 @@ export default function CalendarPage() {
       const sorted = items.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
       setRecurringEvents(sorted);
     }, (err) => {
-      console.error("Recurring fetch error:", err);
+      console.error("Recurring fetch error:", err?.message || String(err));
     });
 
     return () => {
@@ -124,6 +127,7 @@ export default function CalendarPage() {
         day: re.day,
         month: re.month || 1,
         importance: re.importance,
+        status: re.status || 'pending',
         description: re.description || ''
       });
     } else {
@@ -134,6 +138,7 @@ export default function CalendarPage() {
         day: 1,
         month: 1,
         importance: 'medium',
+        status: 'pending',
         description: ''
       });
     }
@@ -151,6 +156,7 @@ export default function CalendarPage() {
         day: Number(recurringForm.day),
         ...(recurringForm.type === 'yearly' && { month: Number(recurringForm.month) }),
         importance: recurringForm.importance,
+        status: recurringForm.status,
         description: recurringForm.description.trim(),
       };
 
@@ -206,7 +212,7 @@ export default function CalendarPage() {
       XLSX.writeFile(wb, "Mau_Import_Lich_Dinh_Ky.xlsx");
       toast.success('Đã tải xuống file mẫu Excel!');
     } catch (err) {
-      console.error("Download template error:", err);
+      console.error("Download template error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra khi tải xuống file mẫu');
     }
   };
@@ -281,7 +287,7 @@ export default function CalendarPage() {
 
         toast.success(`Import thành công ${successCount} công việc định kỳ! (Lỗi: ${errorCount})`, { id: toastId });
       } catch (err) {
-        console.error("Excel import error:", err);
+        console.error("Excel import error:", err?.message || String(err));
         toast.error('Đã xảy ra lỗi khi đọc file Excel.', { id: toastId });
       }
     };
@@ -305,14 +311,16 @@ export default function CalendarPage() {
       setEventForm({
         title: ev.title,
         description: ev.description || '',
-        importance: ev.importance
+        importance: ev.importance,
+        status: ev.status || 'pending'
       });
     } else {
       setEditingEvent(null);
       setEventForm({
         title: '',
         description: '',
-        importance: 'medium'
+        importance: 'medium',
+        status: 'pending'
       });
     }
     setIsModalOpen(true);
@@ -328,6 +336,7 @@ export default function CalendarPage() {
           title: eventForm.title,
           description: eventForm.description,
           importance: eventForm.importance,
+          status: eventForm.status,
           date: selectedDateStr
         }, { merge: true });
         toast.success('Đã cập nhật công việc');
@@ -336,6 +345,7 @@ export default function CalendarPage() {
           title: eventForm.title,
           description: eventForm.description,
           importance: eventForm.importance,
+          status: eventForm.status,
           date: selectedDateStr,
           createdAt: Date.now()
         });
@@ -444,7 +454,7 @@ export default function CalendarPage() {
 
       toast.success(`Đồng bộ thành công! Thêm mới: ${addedCount}, Cập nhật: ${updatedCount}`, { id: toastId });
     } catch (err) {
-      console.error("Sync error:", err);
+      console.error("Sync error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra trong quá trình đồng bộ.', { id: toastId });
     } finally {
       setIsSyncing(false);
@@ -493,7 +503,7 @@ export default function CalendarPage() {
         handleOpenModal(new Date(dateStr), newEvent);
       }
     } catch (err) {
-      console.error("Sync and edit error:", err);
+      console.error("Sync and edit error:", err?.message || String(err));
       toast.error('Có lỗi xảy ra khi đồng bộ.', { id: toastId });
     } finally {
       setIsSyncing(false);
@@ -551,12 +561,29 @@ export default function CalendarPage() {
     return 'bg-white dark:bg-transparent border-slate-100 dark:border-white/5';
   };
 
+  const getStatusInfo = (status?: string) => {
+    switch (status) {
+      case 'completed': 
+        return { label: 'Hoàn thành', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30' };
+      case 'not_completed': 
+        return { label: 'Không hoàn thành', color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30' };
+      case 'overdue': 
+        return { label: 'Trễ hạn', color: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/30' };
+      case 'processing': 
+        return { label: 'Đang xử lý', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30' };
+      case 'pending': 
+      default:
+        return { label: 'Chờ xử lý', color: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-white/10 dark:text-slate-400 dark:border-white/20' };
+    }
+  };
+
   const combinedTasks = [
     ...events.map(ev => ({
       id: ev.id,
       title: ev.title,
       date: ev.date,
       importance: ev.importance,
+      status: ev.status,
       description: ev.description || '',
       source: 'Lịch làm việc',
       isEvent: true,
@@ -578,6 +605,7 @@ export default function CalendarPage() {
           title: t.title || 'Không tên',
           date: dateStr,
           importance: t.priority === 'high' ? 'high' : t.priority === 'medium' ? 'medium' : 'low',
+          status: t.status || 'pending',
           description: t.note || '',
           source: 'Tab Công việc',
           isEvent: false,
@@ -799,57 +827,80 @@ export default function CalendarPage() {
                 )}
               </div>
               
-              <div className="flex-1 overflow-x-auto no-scrollbar">
-                {getEventsForDay(selectedDay).length === 0 ? (
-                  <div className="h-full min-h-[150px] flex items-center justify-center">
-                    <p className="text-slate-500 dark:text-zinc-500 text-sm">Không có công việc nào trong ngày này.</p>
-                  </div>
-                ) : (
-                  <table className="w-full text-left border-collapse min-w-[500px]">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
-                        <th className="py-3 px-4">Tiêu đề</th>
-                        <th className="py-3 px-4 w-32">Mức độ</th>
-                        <th className="py-3 px-4">Mô tả chi tiết</th>
-                        {canEdit && <th className="py-3 px-4 text-right w-24">Thao tác</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
-                      {getEventsForDay(selectedDay).map(ev => (
-                        <tr 
-                          key={ev.id}
-                          onClick={() => canEdit && handleOpenModal(selectedDay, ev)}
-                          className={cn(
-                            "group transition-colors hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-300",
-                            canEdit && "cursor-pointer"
-                          )}
-                        >
-                          <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                            {ev.title}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className={cn(
-                              "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
-                              ev.importance === 'high' 
-                                ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30' 
-                                : ev.importance === 'medium'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
-                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-400 dark:border-indigo-500/30'
-                            )}>
-                              {ev.importance === 'high' ? 'Quan trọng' : ev.importance === 'medium' ? 'Trung bình' : 'Thấp'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 max-w-sm font-medium leading-relaxed truncate">
-                            {ev.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
-                          </td>
-                          {canEdit && (
-                            <td className="py-3.5 px-4 text-right">
+               <div className="flex-1 overflow-x-auto no-scrollbar scroll-smooth">
+                 {getEventsForDay(selectedDay).length === 0 ? (
+                   <div className="h-full min-h-[150px] flex items-center justify-center">
+                     <p className="text-slate-500 dark:text-zinc-500 text-sm">Không có công việc nào trong ngày này.</p>
+                   </div>
+                 ) : (
+                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                     <thead>
+                       <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
+                         <th className="py-3 px-4 whitespace-nowrap">Tiêu đề</th>
+                         <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
+                         <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
+                         <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
+                         {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+                       {getEventsForDay(selectedDay).map(ev => (
+                         <tr 
+                           key={ev.id}
+                           onClick={() => canEdit && handleOpenModal(selectedDay, ev)}
+                           className={cn(
+                             "group transition-colors hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-zinc-300",
+                             canEdit && "cursor-pointer"
+                           )}
+                         >
+                           <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                             {ev.title}
+                           </td>
+                           <td className="py-3.5 px-4 whitespace-nowrap">
+                             <span className={cn(
+                               "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                               ev.importance === 'high' 
+                                 ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30' 
+                                 : ev.importance === 'medium'
+                                   ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
+                                   : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-400 dark:border-indigo-500/30'
+                             )}>
+                               {ev.importance === 'high' ? 'Quan trọng' : ev.importance === 'medium' ? 'Trung bình' : 'Thấp'}
+                             </span>
+                           </td>
+                           <td className="py-3.5 px-4 whitespace-nowrap">
+                             <span className={cn(
+                               "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                               getStatusInfo(ev.status).color
+                             )}>
+                               {getStatusInfo(ev.status).label}
+                             </span>
+                           </td>
+                           <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 font-medium leading-relaxed whitespace-nowrap">
+                             {ev.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
+                           </td>
+                           {canEdit && (
+                             <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleOpenModal(selectedDay, ev); }}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
                                 title="Chỉnh sửa"
                               >
                                 <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (ev.isRecurringInstance) {
+                                    setRecurringToDelete(ev.recurringId);
+                                  } else {
+                                    setEventToDelete(ev.id);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all inline-flex items-center"
+                                title="Xóa công việc này"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </td>
                           )}
@@ -909,21 +960,22 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto no-scrollbar scroll-smooth">
               {filteredCombined.length === 0 ? (
                 <div className="h-full min-h-[250px] flex flex-col items-center justify-center">
                   <p className="text-slate-500 dark:text-zinc-500 text-sm">Không tìm thấy công việc nào phù hợp.</p>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse min-w-[1200px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
-                      <th className="py-3 px-4">Tiêu đề</th>
-                      <th className="py-3 px-4 w-36">Ngày / Thời hạn</th>
-                      <th className="py-3 px-4 w-40">Nguồn dữ liệu</th>
-                      <th className="py-3 px-4 w-32">Mức độ</th>
-                      <th className="py-3 px-4">Mô tả chi tiết</th>
-                      {canEdit && <th className="py-3 px-4 text-right w-36">Thao tác</th>}
+                      <th className="py-3 px-4 whitespace-nowrap">Tiêu đề</th>
+                      <th className="py-3 px-4 w-36 whitespace-nowrap">Ngày / Thời hạn</th>
+                      <th className="py-3 px-4 w-40 whitespace-nowrap">Nguồn dữ liệu</th>
+                      <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
+                      <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
+                      {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-36 whitespace-nowrap">Thao tác</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -948,10 +1000,10 @@ export default function CalendarPage() {
                           canEdit && "cursor-pointer"
                         )}
                       >
-                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">
                           {item.title}
                         </td>
-                        <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-zinc-400">
+                        <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-zinc-400 whitespace-nowrap">
                           {item.date ? (
                             <span className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5 text-indigo-500" />
@@ -961,7 +1013,7 @@ export default function CalendarPage() {
                             <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Chưa thiết lập</span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={cn(
                             "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold",
                             item.isEvent 
@@ -971,7 +1023,7 @@ export default function CalendarPage() {
                             {item.source}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span className={cn(
                             "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
                             item.importance === 'high' 
@@ -983,26 +1035,46 @@ export default function CalendarPage() {
                             {item.importance === 'high' ? 'Quan trọng' : item.importance === 'medium' ? 'Trung bình' : 'Thấp'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 max-w-sm font-medium leading-relaxed truncate">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                           <span className={cn(
+                             "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                             getStatusInfo(item.status).color
+                           )}>
+                             {getStatusInfo(item.status).label}
+                           </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 font-medium leading-relaxed whitespace-nowrap">
                           {item.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
                         </td>
                         {canEdit && (
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                             {item.isEvent ? (
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  try {
-                                    handleOpenModal(parseISO(item.date), item.raw); 
-                                  } catch {
-                                    handleOpenModal(new Date(item.date), item.raw);
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
-                                title="Chỉnh sửa"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center justify-end space-x-1">
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    try {
+                                      handleOpenModal(parseISO(item.date), item.raw); 
+                                    } catch {
+                                      handleOpenModal(new Date(item.date), item.raw);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setEventToDelete(item.id);
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all inline-flex items-center"
+                                  title="Xóa công việc này"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 onClick={(e) => {
@@ -1121,7 +1193,7 @@ export default function CalendarPage() {
               )}
 
               {/* Table of recurring events */}
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-auto no-scrollbar scroll-smooth">
                 {recurringEvents.length === 0 ? (
                   <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-slate-400 dark:text-zinc-600">
                     <FileSpreadsheet className="w-12 h-12 mb-3 opacity-40 text-indigo-500" />
@@ -1134,15 +1206,16 @@ export default function CalendarPage() {
                     <p className="text-sm font-medium">Không tìm thấy công việc định kỳ thuộc nhóm này.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse min-w-[550px]">
+                  <table className="w-full text-left border-collapse min-w-[1200px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-zinc-500">
-                        <th className="py-3 px-4">Tiêu đề</th>
-                        <th className="py-3 px-4 w-32">Chu kỳ</th>
-                        <th className="py-3 px-4 w-28">Áp dụng</th>
-                        <th className="py-3 px-4 w-28">Mức độ</th>
-                        <th className="py-3 px-4">Mô tả</th>
-                        {canEdit && <th className="py-3 px-4 text-right w-24">Thao tác</th>}
+                        <th className="py-3 px-4 whitespace-nowrap">Tiêu đề</th>
+                        <th className="py-3 px-4 w-32 whitespace-nowrap">Chu kỳ</th>
+                        <th className="py-3 px-4 w-28 whitespace-nowrap">Áp dụng</th>
+                        <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
+                        <th className="py-3 px-4 w-28 whitespace-nowrap">Mức độ</th>
+                        <th className="py-3 px-4 whitespace-nowrap">Mô tả</th>
+                        {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -1153,10 +1226,10 @@ export default function CalendarPage() {
                             key={re.id}
                             className="group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-zinc-300"
                           >
-                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                            <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">
                               {re.title}
                             </td>
-                            <td className="py-3.5 px-4">
+                            <td className="py-3.5 px-4 whitespace-nowrap">
                               <span className={cn(
                                 "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider",
                                 re.type === 'yearly' 
@@ -1166,10 +1239,18 @@ export default function CalendarPage() {
                                 {re.type === 'yearly' ? 'Hằng năm' : 'Hằng tháng'}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-zinc-400">
-                              {re.type === 'yearly' ? `Ngày ${re.day}/${re.month}` : `Ngày ${re.day}`}
-                            </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-zinc-400 whitespace-nowrap">
+                            {re.type === 'yearly' ? `Ngày ${re.day}/${re.month}` : `Ngày ${re.day}`}
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                              getStatusInfo(re.status).color
+                            )}>
+                              {getStatusInfo(re.status).label}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className={cn(
                               "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
                               re.importance === 'high' 
@@ -1181,11 +1262,11 @@ export default function CalendarPage() {
                               {re.importance === 'high' ? 'Quan trọng' : re.importance === 'medium' ? 'Trung bình' : 'Thấp'}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 max-w-xs truncate font-medium">
+                          <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-zinc-400 font-medium whitespace-nowrap">
                             {re.description || <span className="italic opacity-50 font-normal">Không có mô tả</span>}
                           </td>
                           {canEdit && (
-                            <td className="py-3.5 px-4 text-right space-x-1">
+                            <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={() => handleOpenRecurringModal(re)}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
@@ -1260,6 +1341,21 @@ export default function CalendarPage() {
                     <option value="high">Quan trọng cao</option>
                     <option value="medium">Trung bình</option>
                     <option value="low">Thấp</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Trạng thái công việc</label>
+                  <select 
+                    value={eventForm.status}
+                    onChange={e => setEventForm({...eventForm, status: e.target.value as any})}
+                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white appearance-none"
+                  >
+                    <option value="pending">Chờ xử lý</option>
+                    <option value="processing">Đang xử lý</option>
+                    <option value="completed">Hoàn thành</option>
+                    <option value="not_completed">Không hoàn thành</option>
+                    <option value="overdue">Trễ hạn</option>
                   </select>
                 </div>
 
@@ -1429,6 +1525,21 @@ export default function CalendarPage() {
                       <option value="high">🔥 Quan trọng cao</option>
                       <option value="medium">⚡ Trung bình</option>
                       <option value="low">🌱 Thấp</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Trạng thái mặc định</label>
+                    <select 
+                      value={recurringForm.status}
+                      onChange={e => setRecurringForm({...recurringForm, status: e.target.value as any})}
+                      className="w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white appearance-none"
+                    >
+                      <option value="pending">Chờ xử lý</option>
+                      <option value="processing">Đang xử lý</option>
+                      <option value="completed">Hoàn thành</option>
+                      <option value="not_completed">Không hoàn thành</option>
+                      <option value="overdue">Trễ hạn</option>
                     </select>
                   </div>
 

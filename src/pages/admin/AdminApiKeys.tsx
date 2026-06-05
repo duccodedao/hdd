@@ -35,7 +35,7 @@ export default function AdminApiKeys() {
         
         setApiKeys((prev) => ({ ...prev, ...fetchedData }));
       } catch (error) {
-        console.error('Failed to fetch API keys:', error);
+        console.error('Failed to fetch API keys:', error?.message || String(error));
       } finally {
         setLoading(false);
       }
@@ -51,7 +51,7 @@ export default function AdminApiKeys() {
       const keys = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setSecondaryKeys(keys);
     } catch (error) {
-      console.error('Failed to fetch secondary keys:', error);
+      console.error('Failed to fetch secondary keys:', error?.message || String(error));
       toast.error('Lỗi khi tải danh sách API Key phụ');
     } finally {
       setLoadingSecondary(false);
@@ -93,7 +93,7 @@ export default function AdminApiKeys() {
       await setDoc(doc(db, 'settings', 'apiKeys'), { geminiApiKey: apiKeys.geminiApiKey }, { merge: true });
       toast.success('Đã lưu cấu hình API Keys thành công');
     } catch (error) {
-      console.error('Failed to save API keys:', error);
+      console.error('Failed to save API keys:', error?.message || String(error));
       toast.error('Có lỗi xảy ra khi lưu API Keys');
     } finally {
       setSaving(false);
@@ -230,46 +230,46 @@ export default function AdminApiKeys() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto no-scrollbar scroll-smooth">
               {loadingSecondary ? (
                 <div className="p-20 text-center text-slate-400">Đang tải danh sách...</div>
               ) : secondaryKeys.length === 0 ? (
                 <div className="p-20 text-center flex flex-col items-center gap-4">
                   <AlertCircle className="w-12 h-12 text-slate-200" />
-                  <p className="text-slate-400 font-medium">Chưa có API Key phụ nào được nhập.</p>
+                  <p className="text-slate-400 font-medium whitespace-nowrap">Chưa có API Key phụ nào được nhập.</p>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      <th className="px-6 py-4">Người dùng</th>
-                      <th className="px-6 py-4">API Key</th>
-                      <th className="px-6 py-4">Trạng thái</th>
-                      <th className="px-6 py-4">Ngày nhập</th>
-                      <th className="px-6 py-4">Lần dùng cuối</th>
-                      <th className="px-6 py-4 text-right">Thao tác</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Người dùng</th>
+                      <th className="px-6 py-4 whitespace-nowrap">API Key</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Trạng thái</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Ngày nhập</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Lần dùng cuối</th>
+                      <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                     {secondaryKeys.map((item) => (
                       <tr key={item.id} className="group hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">
                               <Mail size={14} />
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold text-slate-900 dark:text-white break-words">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
                                 {item.email}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-mono">{item.userId}</span>
+                              <span className="text-[10px] text-slate-400 font-mono italic opacity-70">{item.userId}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
                           <div className="flex items-center gap-2">
-                             <div className="px-2 py-1 bg-slate-100 dark:bg-white/5 rounded-md font-mono text-[11px] text-slate-600 dark:text-zinc-400 break-all">
-                                {showKeys[item.id] ? item.apiKey : '•'.repeat(30)}
+                             <div className="px-2 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                                {showKeys[item.id] ? item.apiKey : '•'.repeat(24)}
                              </div>
                              <button 
                                onClick={() => {
@@ -289,7 +289,7 @@ export default function AdminApiKeys() {
                              </button>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className={cn(
                             "px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider",
                             item.status === 'active' 
@@ -299,24 +299,24 @@ export default function AdminApiKeys() {
                             {item.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                            <div className="flex flex-col">
-                              <span className="text-xs text-slate-600 dark:text-zinc-400">
+                              <span className="text-xs text-slate-600 dark:text-zinc-400 font-medium">
                                 {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString('vi-VN') : 'N/A'}
                               </span>
-                              <span className="text-[10px] text-slate-400">
+                              <span className="text-[10px] text-slate-400 opacity-70 italic">
                                 {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleTimeString('vi-VN') : ''}
                               </span>
                            </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                            <div className="flex flex-col">
-                              <span className="text-xs text-slate-600 dark:text-zinc-400">
-                                {item.lastUsedAt?.toDate ? item.lastUsedAt.toDate().toLocaleDateString('vi-VN') : 'N/A'}
+                              <span className="text-xs text-slate-600 dark:text-zinc-400 font-medium">
+                                {item.lastUsedAt?.toDate ? item.lastUsedAt.toDate().toLocaleDateString('vi-VN') : 'Chưa dùng'}
                               </span>
                            </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
                           <button 
                             onClick={() => handleDeleteSecondary(item.id)}
                             className="p-2 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-400/10 rounded-full transition-all"
