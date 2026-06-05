@@ -156,14 +156,28 @@ try {
     
     if (adminDb) {
       console.log(`Firebase Admin: Global Firestore handle acquired for DB: ${databaseId}`);
+      // Test the handle immediately to catch credential issues early
+      try {
+        await adminDb.collection("_health").limit(1).get();
+        console.log("Firebase Admin: Credential check PASSED.");
+      } catch (e: any) {
+        if (e.message.includes("credentials") || e.message.includes("auth")) {
+          console.warn("Firebase Admin: Credential check FAILED. Admin SDK will be disabled to avoid 500 errors in production.", e.message);
+          adminDb = null;
+        } else {
+          console.log("Firebase Admin: Optional handle test failed (ignoring):", e.message);
+        }
+      }
     } else {
       console.error("Critical: Could not acquire Firestore handle from Admin SDK.");
     }
   } catch (e: any) {
     console.error("Critical: Firebase Admin SDK setup failed:", e.message);
+    adminDb = null;
   }
 } catch (e: any) {
   console.error("Critical: Firebase Admin outer setup failed:", e.message);
+  adminDb = null;
 }
 
 
@@ -1293,4 +1307,3 @@ app.use(cookieParser());
     console.error("Fatal startup error:", err);
     process.exit(1);
   });
-
