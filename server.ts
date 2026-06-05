@@ -37,17 +37,25 @@ try {
   }
 } catch (e) {
   console.log("Firebase configuration file missing or unreadable, using environment or hardcoded defaults.");
+  const hardcodedProjectId = "sonlyhongduc-ca6d6";
   firebaseConfig = {
     apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyCXAxmprEv9fF-P-1lLpUzykkxG4HjDVI4",
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || "sonlyhongduc-ca6d6.firebaseapp.com",
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "sonlyhongduc-ca6d6",
-    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || "sonlyhongduc-ca6d6.firebasestorage.app",
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || `${hardcodedProjectId}.firebaseapp.com`,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || hardcodedProjectId,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || `${hardcodedProjectId}.firebasestorage.app`,
     messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "757658501532",
     appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || "1:757658501532:web:08c87ad6c041e0bc140859",
     measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || "G-GXHCCW2KMH",
     firestoreDatabaseId: process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "main"
   };
 }
+
+// Crucial: Set project ID environment variables manually to help SDKs discover it
+if (firebaseConfig.projectId) {
+  process.env.GCLOUD_PROJECT = firebaseConfig.projectId;
+  process.env.GOOGLE_CLOUD_PROJECT = firebaseConfig.projectId;
+}
+
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 
 // Initialize Firebase Admin (for privileged server-side operations)
@@ -69,6 +77,7 @@ try {
         admin.initializeApp({ projectId: firebaseConfig.projectId });
       }
     } else {
+      // If no service account, we still initialize with projectId but most ops will fail unless ADC is present
       admin.initializeApp({
         projectId: firebaseConfig.projectId
       });
@@ -89,6 +98,7 @@ try {
 } catch (e: any) {
   console.error("Critical: Failed to initialize Firebase Admin", e.message);
 }
+
 
 // Initialize Firebase Client SDK
 let firebaseApp: any;
@@ -182,6 +192,29 @@ function safeStringify(obj: any, indent = 2) {
     }
     return value;
   }, indent);
+}
+
+// Notification Helpers
+async function sendTelegramNotification(message: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || process.env.ADMIN_CHAT_ID;
+  
+  if (!botToken || !chatId) {
+    console.log("[Telegram] Notification skipped: Bot token or Admin chat ID missing.");
+    return;
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await axios.post(url, {
+      chat_id: chatId,
+      text: message,
+      parse_mode: 'HTML'
+    });
+    console.log("[Telegram] Notification sent successfully.");
+  } catch (err: any) {
+    console.error("[Telegram] Failed to send notification:", err.message);
+  }
 }
 
 const app = express();
@@ -348,6 +381,16 @@ app.use(cookieParser());
       if (!success) {
         throw new Error(lastErr?.message || "All Firestore write attempts failed");
       }
+
+      // Send notification for new order
+      const notificationMsg = `<b>🔔 ĐƠN HÀNG MỚI (BMASS)</b>\n\n` + 
+        `• <b>Mã đơn:</b> <code>${referenceCode}</code>\n` +
+        `• <b>Người tạo:</b> ${userEmail || 'Ẩn danh'}\n` +
+        `• <b>Số tiền:</b> ${Number(totalAmount).toLocaleString()}đ\n` +
+        `• <b>Loại:</b> ${type === 'deposit' ? '💳 Nạp tiền' : '🛍️ Mua sắm'}\n` +
+        `• <b>Thời gian:</b> ${dateNow.toLocaleString('vi-VN')}`;
+      
+      sendTelegramNotification(notificationMsg);
 
       res.json(invoiceData);
     } catch (error: any) {
