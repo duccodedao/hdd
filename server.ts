@@ -1053,20 +1053,36 @@ app.use(cookieParser());
           if (data && data.transactions && Array.isArray(data.transactions)) {
             console.log(`[Invoice Verify] Scanned ${data.transactions.length} recent transactions.`);
             const matchedTx = data.transactions.find((tx: any) => {
-              const content = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
-              const txCode = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase().trim();
-              const searchStr = referenceCode.toLowerCase().trim();
+              const contentRaw = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
+              const txCodeRaw = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase().trim();
+              const searchStrRaw = referenceCode.toLowerCase().trim();
               
-              // More flexible matching
-              const isMatch = content.includes(searchStr) || 
-                              txCode.includes(searchStr) || 
-                              (txCode.length >= 5 && searchStr.includes(txCode));
+              // 1. Level 1: Direct inclusion check
+              let isMatch = contentRaw.includes(searchStrRaw) || txCodeRaw.includes(searchStrRaw);
+              
+              // 2. Level 2: Normalized check (remove non-alphanumeric)
+              const normalize = (s: string) => s.replace(/[^a-z0-9]/g, '');
+              const contentNorm = normalize(contentRaw);
+              const searchStrNorm = normalize(searchStrRaw);
+              const txCodeNorm = normalize(txCodeRaw);
+              
+              if (!isMatch) {
+                isMatch = contentNorm.includes(searchStrNorm) || (txCodeNorm && searchStrNorm.includes(txCodeNorm));
+              }
+              
+              // 3. Level 3: Numeric part check (strong fallback for BmassXXXXXX)
+              // If reference is Bmass609804, numeric is 609804
+              const numericMatch = searchStrRaw.match(/\d{5,}/); // Look for 5+ digits
+              if (!isMatch && numericMatch) {
+                const numComp = numericMatch[0];
+                isMatch = contentRaw.includes(numComp) || txCodeRaw.includes(numComp);
+              }
                               
               const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
               const amountMatches = Math.abs(amountIn - expectedAmount) <= 500;
 
-              if (isMatch || content.includes(searchStr.replace(/[^0-9]/g, '')) || (txCode && searchStr.includes(txCode))) {
-                 console.log(`[Invoice Verify] Checking potential match: TxCode="${txCode}", ContentSnippet="${content.substring(0, 40)}...", Search="${searchStr}", Amount=${amountIn}, Match=${isMatch && amountMatches}`);
+              if (isMatch || contentRaw.includes(searchStrRaw.substring(searchStrRaw.length - 6))) {
+                 console.log(`[Invoice Verify] Match Check: TxCode="${txCodeRaw}", Search="${searchStrRaw}", NormSearch="${searchStrNorm}", MatchFound=${isMatch}, AmountInRange=${amountMatches}`);
               }
               return isMatch && amountMatches;
             });
@@ -1238,4 +1254,3 @@ app.use(cookieParser());
     console.error("Fatal startup error:", err);
     process.exit(1);
   });
-
