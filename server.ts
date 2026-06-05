@@ -54,6 +54,8 @@ try {
 if (firebaseConfig.projectId) {
   process.env.GCLOUD_PROJECT = firebaseConfig.projectId;
   process.env.GOOGLE_CLOUD_PROJECT = firebaseConfig.projectId;
+  // Also set FIREBASE_CONFIG as stringified JSON which some SDKs look for
+  process.env.FIREBASE_CONFIG = JSON.stringify(firebaseConfig);
 }
 
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
@@ -61,7 +63,10 @@ const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 // Initialize Firebase Admin (for privileged server-side operations)
 let adminDb: admin.firestore.Firestore | null = null;
 try {
-  if (admin.apps.length === 0) {
+  const projectId = firebaseConfig.projectId;
+  if (!projectId) {
+    console.warn("Firebase Admin: No project ID available for initialization.");
+  } else if (admin.apps.length === 0) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccountJson) {
@@ -69,34 +74,50 @@ try {
         const serviceAccount = JSON.parse(serviceAccountJson);
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          projectId: firebaseConfig.projectId
+          projectId: projectId
         });
         console.log("Firebase Admin initialized via service account environment variable");
       } catch (parseErr) {
         console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable", parseErr);
-        admin.initializeApp({ projectId: firebaseConfig.projectId });
+        admin.initializeApp({ projectId: projectId });
       }
     } else {
-      // If no service account, we still initialize with projectId but most ops will fail unless ADC is present
-      admin.initializeApp({
-        projectId: firebaseConfig.projectId
-      });
-      console.log(`Firebase Admin initialized with project ID: ${firebaseConfig.projectId}`);
+      // If no service account, we still initialize with projectId 
+      // Important: On some environments, initializeApp({projectId}) works for some ops 
+      // but firestore() might still demand credentials if not on GCP.
+      try {
+        admin.initializeApp({
+          projectId: projectId
+        });
+        console.log(`Firebase Admin initialized with project ID: ${projectId}`);
+      } catch (initErr: any) {
+        console.error("Firebase Admin initializeApp error:", initErr.message);
+      }
     }
   }
   
   // Try specifically for the configured database
   try {
     const dbId = databaseId === "(default)" ? undefined : databaseId;
+    // Note: admin.firestore() without credentials might fail later during operations if not on GCP.
+    // We catch and handle this gracefully by checking adminDb before usage or catching during usage.
     // @ts-ignore
     adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
-    console.log(`Firebase Admin Firestore initialized for database: ${databaseId || '(default)'}`);
+    
+    // Test if adminDb is actually functional (lazy detection)
+    // adminDb.listCollections() is too heavy, we'll just check if it was initialized
+    console.log(`Firebase Admin Firestore handle acquired for database: ${databaseId || '(default)'}`);
   } catch (dbErr: any) {
-    console.warn(`Admin SDK specifically failed for database '${databaseId}', falling back to default database. Error: ${dbErr.message}`);
-    adminDb = admin.firestore();
+    console.warn(`Admin SDK handle failed for database '${databaseId}'. Error: ${dbErr.message}`);
+    // Fallback to default if there was a databaseId mismatch, or null if total failure
+    try {
+      adminDb = admin.firestore();
+    } catch (finalErr) {
+      adminDb = null;
+    }
   }
 } catch (e: any) {
-  console.error("Critical: Failed to initialize Firebase Admin", e.message);
+  console.error("Critical: Failed to initialize Firebase Admin SDK", e.message);
 }
 
 
@@ -300,7 +321,7 @@ app.use(cookieParser());
   });
 
   app.post("/api/invoices/create", async (req, res) => {
-    console.log(`[Invoice Create] Request from ${req.ip}:`, safeStringify(req.body));
+    console.log(`[Invoice Create] Request from ${req.ip}. Project: ${firebaseConfig?.projectId}. DB: ${databaseId}`);
     try {
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
@@ -342,19 +363,18 @@ app.use(cookieParser());
           console.error(`[Invoice Create] Admin SDK Error:`, err.message);
           lastErr = err;
           
-          // Retry with default DB if "not found"
-          const errMsg = String(err.message || "").toLowerCase();
-          if (errMsg.includes("not found") || errMsg.includes("database") || err.code === 5) {
+          // Retry with default DB if project/db mismatch
+          if (err.message?.includes("Project Id") || err.message?.includes("not found") || err.code === 5) {
              try {
-                console.log(`[Invoice Create] Retrying with default Admin DB for ${referenceCode}`);
+                console.log(`[Invoice Create] Retrying with default Admin handle for ${referenceCode}`);
                 await admin.firestore().doc(`invoices/${referenceCode}`).set({
                   ...invoiceData,
                   createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 success = true;
-                console.log(`[Invoice Create] Success via Admin SDK (Default DB): ${referenceCode}`);
+                console.log(`[Invoice Create] Success via Default Admin SDK: ${referenceCode}`);
              } catch (innerErr: any) {
-                console.error("[Invoice Create] Admin SDK Fallback failed:", innerErr.message);
+                console.error("[Invoice Create] Default Admin SDK retry failed:", innerErr.message);
              }
           }
         }
@@ -802,9 +822,9 @@ app.use(cookieParser());
 
   // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
   app.post("/api/invoices/verify", async (req, res) => {
-    console.log(`[Invoice Verify] Request for invoiceId: ${req.body.invoiceId}`);
+    const { invoiceId, isSandboxMock } = req.body;
+    console.log(`[Invoice Verify] Start: invoiceId=${invoiceId}, Project=${firebaseConfig?.projectId}, DB=${databaseId}`);
     try {
-      const { invoiceId, isSandboxMock } = req.body;
       if (!invoiceId) {
         return res.status(400).json({ error: "Missing invoiceId" });
       }
@@ -812,37 +832,54 @@ app.use(cookieParser());
       let invoiceData;
       let invoiceExists = false;
       
-      console.log(`[Invoice Verify] Searching for invoice: ${invoiceId}`);
-
+      // 1. Try Admin SDK
       if (adminDb) {
         try {
+          console.log(`[Invoice Verify] Attempting Admin SDK lookup for: ${invoiceId}`);
           const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
           const invoiceSnap = await invoiceRefAdmin.get();
           if (invoiceSnap.exists) {
             invoiceExists = true;
             invoiceData = invoiceSnap.data();
+            console.log(`[Invoice Verify] Admin SDK Found doc: ${invoiceId}`);
+          } else {
+            console.log(`[Invoice Verify] Admin SDK doc NOT FOUND: ${invoiceId}`);
           }
         } catch (adminErr: any) {
-          console.error(`[Invoice Verify] Admin SDK lookup error:`, adminErr.message);
+          console.error(`[Invoice Verify] Admin SDK error (non-fatal):`, adminErr.message);
         }
       } 
       
+      // 2. Fallback to Client SDK
       if (!invoiceExists && db) {
         try {
+          console.log(`[Invoice Verify] Attempting Client SDK lookup for: ${invoiceId}`);
           const invoiceRef = doc(db, `invoices/${invoiceId}`);
           const invoiceSnap = await getDoc(invoiceRef);
           if (invoiceSnap.exists()) {
             invoiceExists = true;
             invoiceData = invoiceSnap.data();
+            console.log(`[Invoice Verify] Client SDK Found doc: ${invoiceId}`);
+          } else {
+             console.log(`[Invoice Verify] Client SDK doc NOT FOUND: ${invoiceId}`);
           }
         } catch (clientErr: any) {
-          console.error(`[Invoice Verify] Client SDK lookup error:`, clientErr.message);
+          console.error(`[Invoice Verify] Client SDK error:`, clientErr.message);
         }
       }
 
       if (!invoiceExists) {
-        console.warn(`[Invoice Verify] Invoice not found: ${invoiceId}`);
-        return res.status(404).json({ error: "No invoice found" });
+        console.warn(`[Invoice Verify] Invoice NOT FOUND after all attempts: ${invoiceId}`);
+        return res.status(404).json({ 
+          error: "No invoice found", 
+          debug: { 
+            invoiceId, 
+            projectId: firebaseConfig?.projectId, 
+            databaseId,
+            adminDbReady: !!adminDb,
+            clientDbReady: !!db
+          } 
+        });
       }
 
       if (invoiceData?.status === "paid") {
