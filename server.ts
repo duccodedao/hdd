@@ -78,16 +78,26 @@ try {
   const getAdminDb = (dbId?: string) => {
     try {
       const targetDb = dbId && dbId !== "(default)" ? dbId : undefined;
-      // @ts-ignore - Handle different SDK versions/bundling
-      if (typeof admin.firestore === 'function') {
-        const dbHandle = targetDb ? (admin.firestore as any)(targetDb) : admin.firestore();
-        // Check if handles the main database correctly
-        return dbHandle;
+      
+      // Use the modern getFirestore from firebase-admin/firestore if possible, 
+      // but we are using the 'admin' namespace.
+      // In firebase-admin v11+, admin.firestore(dbId) is the way.
+      if (targetDb) {
+        try {
+          // @ts-ignore
+          return admin.firestore(targetDb);
+        } catch (e) {
+          console.warn(`admin.firestore("${targetDb}") failed, trying admin.app().firestore("${targetDb}")`);
+          try {
+            // @ts-ignore
+            return admin.app().firestore(targetDb);
+          } catch (e2) {
+             console.warn(`admin.app().firestore("${targetDb}") failed too.`);
+          }
+        }
       }
-      const a = admin as any;
-      if (a.default && typeof a.default.firestore === 'function') {
-        return targetDb ? a.default.firestore(targetDb) : a.default.firestore();
-      }
+      
+      return admin.firestore();
     } catch (e) {
       console.warn("Error getting admin firestore handle:", e);
     }
@@ -666,18 +676,19 @@ app.use(cookieParser());
       }
       
       // Determine transfer amount and reference code
-      const description = String(payload.content || payload.description || "");
+      const description = String(payload.content || payload.description || "").toLowerCase();
       const amount = Number(payload.transferAmount || payload.amount || 0);
       
       // Improved reference code extraction
       let referenceCodeSearch = payload.code;
       if (!referenceCodeSearch) {
-        const match = description.match(/Bmass[0-9]+/i);
+        // Try to find BmassXXXXXX in description
+        const match = description.match(/bmass[0-9]+/i);
         if (match) referenceCodeSearch = match[0];
       }
 
       if (!referenceCodeSearch) {
-        console.log("[SePay Webhook] No reference code found in payload.");
+        console.log("[SePay Webhook] No reference code found in payload. Content:", description);
         return res.json({ success: true, message: "No reference code" });
       }
 
@@ -685,10 +696,18 @@ app.use(cookieParser());
       console.log(`[SePay Webhook] Processing transaction ${transactionId}, amount ${amount}, reference: ${referenceCodeSearch}`);
       
       if (referenceCodeSearch) {
-        // Try searching by ID directly (case sensitive as created)
-        const possibleIds = [referenceCodeSearch, referenceCodeSearch.toUpperCase(), referenceCodeSearch.toLowerCase()];
+        // Try variants: exactly as is, uppercase, lowercase, and just the numeric part if somehow ID is different
+        const variants = [
+          referenceCodeSearch, 
+          referenceCodeSearch.toUpperCase(), 
+          referenceCodeSearch.toLowerCase()
+        ];
         
-        for (const idToTry of possibleIds) {
+        // If referenceCodeSearch is "bmass123456", also try "Bmass123456" (standard format)
+        const standardFormat = referenceCodeSearch.replace(/^bmass/i, 'Bmass');
+        if (!variants.includes(standardFormat)) variants.push(standardFormat);
+
+        for (const idToTry of variants) {
           if (invoiceData) break;
           
           if (adminDb) {
@@ -995,17 +1014,27 @@ app.use(cookieParser());
 
           const data = apiResponse.data;
           if (data && data.transactions && Array.isArray(data.transactions)) {
+            console.log(`[Invoice Verify] Found ${data.transactions.length} transactions in history. Matching against: ${referenceCode}`);
             const matchedTx = data.transactions.find((tx: any) => {
               const content = String(tx.transaction_content || tx.content || tx.description || "").toUpperCase();
-              const txCode = String(tx.code || "").toUpperCase();
+              const txCode = String(tx.code || tx.transaction_code || "").toUpperCase();
               const referenceUpper = referenceCode.toUpperCase();
               
+              // Broad matching: reference in content, OR tx code matches reference, 
+              // OR reference matches some other field the API might provide
               const codeInContent = content.includes(referenceUpper);
-              const codeMatches = txCode === referenceUpper;
+              const codeMatches = txCode === referenceUpper || txCode.includes(referenceUpper);
               
-              const amount = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+              const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+              const amountOut = Number(tx.amount_out || 0);
+              const actualAmount = amountIn || amountOut; // In case the API structures it differently
+              
               // Allow a small margin for bank fees or rounding
-              const amountMatches = amount >= (expectedAmount - 500);
+              const amountMatches = actualAmount >= (expectedAmount - 500);
+
+              if (codeInContent || codeMatches) {
+                 console.log(`[Invoice Verify] FOUND Potential Match: CodeMatch=${codeMatches}, ContentMatch=${codeInContent}, Amount=${actualAmount}, MatchesAmount=${amountMatches}`);
+              }
 
               return (codeInContent || codeMatches) && amountMatches;
             });
