@@ -26,31 +26,67 @@ import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 
-// Read config explicitly to ensure resolution
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+// Read config with path resolution and environment fallback for Vercel/production
+let firebaseConfig: any;
+try {
+  const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } else {
+    throw new Error("Local config not found");
+  }
+} catch (e) {
+  console.log("Firebase configuration file missing or unreadable, checking environment variables.");
+  firebaseConfig = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID,
+    firestoreDatabaseId: process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "(default)"
+  };
+}
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 
 // Initialize Firebase Admin (for privileged server-side operations)
 let adminDb: admin.firestore.Firestore | null = null;
 try {
   if (admin.apps.length === 0) {
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId
-    });
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    
+    if (serviceAccountJson) {
+      try {
+        const serviceAccount = JSON.parse(serviceAccountJson);
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: firebaseConfig.projectId
+        });
+        console.log("Firebase Admin initialized via service account environment variable");
+      } catch (parseErr) {
+        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable", parseErr);
+        admin.initializeApp({ projectId: firebaseConfig.projectId });
+      }
+    } else {
+      admin.initializeApp({
+        projectId: firebaseConfig.projectId
+      });
+      console.log(`Firebase Admin initialized with project ID: ${firebaseConfig.projectId}`);
+    }
   }
   
   // Try specifically for the configured database
   try {
     const dbId = databaseId === "(default)" ? undefined : databaseId;
-    // @ts-ignore - admin.firestore type might not show databaseId param in some versions but it exists
+    // @ts-ignore
     adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
-    console.log(`Firebase Admin initialized successfully targeting database: ${databaseId || '(default)'}`);
+    console.log(`Firebase Admin Firestore initialized for database: ${databaseId || '(default)'}`);
   } catch (dbErr: any) {
     console.warn(`Admin SDK specifically failed for database '${databaseId}', falling back to default database. Error: ${dbErr.message}`);
     adminDb = admin.firestore();
   }
 } catch (e: any) {
-  console.error("Critical: Failed to initialize Firebase Admin basic apps", e.message);
+  console.error("Critical: Failed to initialize Firebase Admin", e.message);
 }
 
 // Initialize Firebase Client SDK
