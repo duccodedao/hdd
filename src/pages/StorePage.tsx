@@ -55,7 +55,7 @@ export default function StorePage() {
     }
   }, [user]);
 
-  const allProducts: any[] = [];
+  const allProducts: any[] = [...aiTools, ...documents];
 
   const filteredProducts = allProducts.filter(p => {
     const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase());

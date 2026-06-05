@@ -64,91 +64,47 @@ const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 let adminDb: any = null;
 try {
   const projectId = firebaseConfig?.projectId;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
   
-  // Safe helper to check for initialized apps
-  const getApps = () => {
+  if (serviceAccountJson) {
     try {
-      if (admin && admin.apps) return admin.apps;
       const a = admin as any;
-      if (a && a.default && a.default.apps) return a.default.apps;
-    } catch (e) {}
-    return [];
-  };
-
-  const currentApps = getApps();
-  let adminApp: any = null;
-  const a = admin as any;
-  const adminBase = a.default || a;
-
-  if (currentApps.length === 0) {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (serviceAccountJson) {
-      try {
+      const adminBase = a.default || a;
+      const currentApps = adminBase.apps || [];
+      let adminApp;
+      
+      if (currentApps.length === 0) {
         const serviceAccount = JSON.parse(serviceAccountJson);
         adminApp = adminBase.initializeApp({
           credential: adminBase.credential.cert(serviceAccount),
           projectId
         });
-        console.log("Firebase Admin: Initialized via service account");
-      } catch (e) {
-        adminApp = adminBase.initializeApp({ projectId });
+      } else {
+        adminApp = currentApps[0];
       }
-    } else {
-      try {
-        adminApp = adminBase.initializeApp({ projectId });
-      } catch (e) {
-        console.warn("Firebase Admin: Default init failed, may be already initialized");
+      
+      // Get firestore handle
+      if (databaseId && databaseId !== "(default)") {
+        try {
+          adminDb = adminApp.firestore(databaseId);
+        } catch (e) {
+          adminDb = adminApp.firestore();
+        }
+      } else {
+        adminDb = adminApp.firestore();
       }
+      
+      if (adminDb) {
+        console.log(`Firebase Admin: Initialized with service account. Project=${projectId}, DB=${databaseId}`);
+      }
+    } catch (e: any) {
+      console.warn("Firebase Admin: Initialization failed (using client SDK fallback):", e.message);
     }
   } else {
-    adminApp = currentApps[0];
-  }
-
-  try {
-    // Final check for adminApp if initialization logic was bypassed or failed but app exists
-    if (!adminApp) {
-      const apps = getApps();
-      if (apps.length > 0) adminApp = apps[0];
-    }
-
-    // For specific database ID, we try several common patterns in different SDK versions
-    if (databaseId && databaseId !== "(default)") {
-      try {
-        // Try adminBase first
-        if (typeof adminBase.firestore === 'function') {
-          adminDb = adminBase.firestore(databaseId);
-        } else if (adminApp && typeof adminApp.firestore === 'function') {
-          adminDb = adminApp.firestore(databaseId);
-        }
-      } catch (e) {
-        try {
-          if (adminApp && typeof adminApp.firestore === 'function') {
-            adminDb = adminApp.firestore(databaseId);
-          } else if (typeof adminBase.firestore === 'function') {
-            adminDb = adminBase.firestore(databaseId);
-          }
-        } catch (e2) {
-          // Fallback to default
-          adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                    (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
-          console.warn(`Could not bind to database "${databaseId}", using default.`);
-        }
-      }
-    } else {
-      adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
-    }
-    
-    if (adminDb) {
-      console.log(`Firebase Admin: Global Firestore handle acquired for DB: ${databaseId}`);
-    } else {
-      console.error("Critical: Could not acquire Firestore handle from Admin SDK.");
-    }
-  } catch (e: any) {
-    console.error("Critical: Firebase Admin SDK setup failed:", e.message);
+    console.log("Firebase Admin: No service account found. Privileged operations will use client SDK fallback.");
   }
 } catch (e: any) {
-  console.error("Critical: Firebase Admin outer setup failed:", e.message);
+  console.warn("Firebase Admin: Setup blocked by unexpected error:", e.message);
 }
 
 
@@ -902,11 +858,22 @@ app.use(cookieParser());
   };
 
   app.post("/api/webhooks/sepay", handleSepayWebhook);
-  app.get("/api/webhooks/sepay", handleSepayWebhook);
-  app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
-  app.get("/hooks/sepay-payment", handleSepayWebhook);
+  app.get("/api/webhooks/sepay", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
+  app.post("/hooks/sepay-payment", handleSepayWebhook); 
+  app.get("/hooks/sepay-payment", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
 
   // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
+  app.get("/api/invoices/verify", (req, res) => {
+    res.send(`
+      <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+        <h2>API Xác Thực Giao Dịch</h2>
+        <p>Đây là điểm cuối API dành cho phương thức <b>POST</b>.</p>
+        <p>Hệ thống không thể xử lý yêu cầu GET trực tiếp từ trình duyệt.</p>
+        <p>Vui lòng sử dụng chức năng "Kiểm tra thanh toán" trên giao diện Nạp tiền của Website.</p>
+        <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px;">Quay lại Trang chủ</a>
+      </div>
+    `);
+  });
   app.post("/api/invoices/verify", async (req, res) => {
     const { invoiceId, isSandboxMock } = req.body;
     console.log(`[Invoice Verify] Start: invoiceId=${invoiceId}, Project=${firebaseConfig?.projectId}, DB=${databaseId}`);
@@ -1086,16 +1053,36 @@ app.use(cookieParser());
           if (data && data.transactions && Array.isArray(data.transactions)) {
             console.log(`[Invoice Verify] Scanned ${data.transactions.length} recent transactions.`);
             const matchedTx = data.transactions.find((tx: any) => {
-              const content = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
-              const txCode = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase();
-              const searchStr = referenceCode.toLowerCase();
+              const contentRaw = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
+              const txCodeRaw = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase().trim();
+              const searchStrRaw = referenceCode.toLowerCase().trim();
               
-              const isMatch = content.includes(searchStr) || txCode.includes(searchStr);
+              // 1. Level 1: Direct inclusion check
+              let isMatch = contentRaw.includes(searchStrRaw) || txCodeRaw.includes(searchStrRaw);
+              
+              // 2. Level 2: Normalized check (remove non-alphanumeric)
+              const normalize = (s: string) => s.replace(/[^a-z0-9]/g, '');
+              const contentNorm = normalize(contentRaw);
+              const searchStrNorm = normalize(searchStrRaw);
+              const txCodeNorm = normalize(txCodeRaw);
+              
+              if (!isMatch) {
+                isMatch = contentNorm.includes(searchStrNorm) || (txCodeNorm && searchStrNorm.includes(txCodeNorm));
+              }
+              
+              // 3. Level 3: Numeric part check (strong fallback for BmassXXXXXX)
+              // If reference is Bmass609804, numeric is 609804
+              const numericMatch = searchStrRaw.match(/\d{5,}/); // Look for 5+ digits
+              if (!isMatch && numericMatch) {
+                const numComp = numericMatch[0];
+                isMatch = contentRaw.includes(numComp) || txCodeRaw.includes(numComp);
+              }
+                              
               const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
               const amountMatches = Math.abs(amountIn - expectedAmount) <= 500;
 
-              if (isMatch) {
-                 console.log(`[Invoice Verify] Potential match: "${txCode}" / "${content.substring(0, 30)}...". Amount=${amountIn}. ValidAmount=${amountMatches}`);
+              if (isMatch || contentRaw.includes(searchStrRaw.substring(searchStrRaw.length - 6))) {
+                 console.log(`[Invoice Verify] Match Check: TxCode="${txCodeRaw}", Search="${searchStrRaw}", NormSearch="${searchStrNorm}", MatchFound=${isMatch}, AmountInRange=${amountMatches}`);
               }
               return isMatch && amountMatches;
             });
@@ -1148,7 +1135,7 @@ app.use(cookieParser());
             }
           }
         } catch (apiErr: any) {
-          console.log(`SePay list API connection issue: ${apiErr?.message || apiErr}`);
+          console.log(`SePay list API connection issue or timeout: ${apiErr?.message || apiErr}`);
         }
       }
 
