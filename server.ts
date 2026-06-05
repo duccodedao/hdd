@@ -76,44 +76,32 @@ try {
           credential: admin.credential.cert(serviceAccount),
           projectId: projectId
         });
-        console.log("Firebase Admin initialized via service account environment variable");
+        console.log("Firebase Admin initialized via service account env var");
       } catch (parseErr) {
         console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable", parseErr);
         admin.initializeApp({ projectId: projectId });
       }
     } else {
-      // If no service account, we still initialize with projectId 
-      // Important: On some environments, initializeApp({projectId}) works for some ops 
-      // but firestore() might still demand credentials if not on GCP.
-      try {
-        admin.initializeApp({
-          projectId: projectId
-        });
-        console.log(`Firebase Admin initialized with project ID: ${projectId}`);
-      } catch (initErr: any) {
-        console.error("Firebase Admin initializeApp error:", initErr.message);
-      }
+      // Basic init with projectId only
+      admin.initializeApp({ projectId: projectId });
+      console.log(`Firebase Admin initialized with project ID: ${projectId}`);
     }
   }
   
-  // Try specifically for the configured database
-  try {
-    const dbId = databaseId === "(default)" ? undefined : databaseId;
-    // Note: admin.firestore() without credentials might fail later during operations if not on GCP.
-    // We catch and handle this gracefully by checking adminDb before usage or catching during usage.
-    // @ts-ignore
-    adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
-    
-    // Test if adminDb is actually functional (lazy detection)
-    // adminDb.listCollections() is too heavy, we'll just check if it was initialized
-    console.log(`Firebase Admin Firestore handle acquired for database: ${databaseId || '(default)'}`);
-  } catch (dbErr: any) {
-    console.warn(`Admin SDK handle failed for database '${databaseId}'. Error: ${dbErr.message}`);
-    // Fallback to default if there was a databaseId mismatch, or null if total failure
+  if (admin.apps.length > 0) {
     try {
-      adminDb = admin.firestore();
-    } catch (finalErr) {
-      adminDb = null;
+      const dbId = databaseId === "(default)" ? undefined : databaseId;
+      // Note: admin.firestore() without credentials might fail during operations if not on GCP.
+      // @ts-ignore
+      adminDb = dbId ? admin.firestore(dbId) : admin.firestore();
+      console.log(`Firebase Admin Firestore handle acquired for database: ${databaseId || '(default)'}`);
+    } catch (dbErr: any) {
+      console.warn(`Admin SDK handle failed for database '${databaseId}'. Fallback to default handle.`);
+      try {
+        adminDb = admin.firestore();
+      } catch (finalErr) {
+        adminDb = null;
+      }
     }
   }
 } catch (e: any) {
@@ -668,81 +656,101 @@ app.use(cookieParser());
       if (referenceCodeSearch) {
         // Find pending invoice
         if (adminDb) {
-          const snap = await adminDb.doc(`invoices/${referenceCodeSearch}`).get();
-          if (snap.exists) {
-            invoiceData = snap.data();
-          } else {
-            const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
-            if (snapUpper.exists) {
-              invoiceData = snapUpper.data();
+          try {
+            const snap = await adminDb.doc(`invoices/${referenceCodeSearch}`).get();
+            if (snap.exists) {
+              invoiceData = snap.data();
+            } else {
+              const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
+              if (snapUpper.exists) {
+                invoiceData = snapUpper.data();
+              }
             }
+          } catch (err: any) {
+            console.warn("[SePay Webhook] Admin SDK lookup failed:", err.message);
           }
-        } else {
-          let ref = doc(db, `invoices/${referenceCodeSearch}`);
-          let snap = await getDoc(ref);
-          
-          if (!snap.exists()) {
-             ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
-             snap = await getDoc(ref);
-          }
-          
-          if (snap.exists()) {
-            invoiceData = snap.data();
+        }
+        
+        if (!invoiceData) {
+          try {
+            let ref = doc(db, `invoices/${referenceCodeSearch}`);
+            let snap = await getDoc(ref);
+            
+            if (!snap.exists()) {
+               ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
+               snap = await getDoc(ref);
+            }
+            
+            if (snap.exists()) {
+              invoiceData = snap.data();
+            }
+          } catch (err: any) {
+            console.error("[SePay Webhook] Client SDK lookup failed:", err.message);
           }
         }
       }
 
+      let processed = false;
       if (adminDb) {
-        await adminDb.runTransaction(async (t) => {
-          const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
-          const logSnap = await t.get(logRefAdmin);
-          
-          if (logSnap.exists) {
-            throw new Error("Already processed");
-          }
+        try {
+          await adminDb.runTransaction(async (t) => {
+            const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
+            const logSnap = await t.get(logRefAdmin);
+            
+            if (logSnap.exists) {
+              throw new Error("Already processed");
+            }
 
-          // Mark as processed
-          t.set(logRefAdmin, {
-            payload,
-            createdAt: admin.firestore.Timestamp.now()
-          });
+            // Mark as processed
+            t.set(logRefAdmin, {
+              payload,
+              createdAt: admin.firestore.Timestamp.now()
+            });
 
-          if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
-             // Update invoice
-             const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
-             t.update(invoiceRefAdmin, {
-               status: "paid",
-               paidAt: admin.firestore.Timestamp.now(),
-               "paymentDetails.sepayTransactionId": transactionId,
-               "paymentDetails.actualAmount": amount
-             });
-
-             // Wallet update logic (if needed)
-             if (invoiceData.type === "deposit") {
-               const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
-               const userSnap = await t.get(userRef);
-               const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
-               
-               t.set(userRef, {
-                  balance: currentBalance + invoiceData.totalAmount,
-               }, { merge: true });
-
-               // Also record in deposits collection
-               const depositId = `DEP_${invoiceData.id}`;
-               t.set(adminDb!.doc(`deposits/${depositId}`), {
-                 id: depositId,
-                 invoiceId: invoiceData.id,
-                 userId: invoiceData.userId,
-                 userEmail: invoiceData.userEmail,
-                 amount: invoiceData.totalAmount,
-                 status: "completed",
-                 createdAt: admin.firestore.Timestamp.now()
+            if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+               // Update invoice
+               const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
+               t.update(invoiceRefAdmin, {
+                 status: "paid",
+                 paidAt: admin.firestore.Timestamp.now(),
+                 "paymentDetails.sepayTransactionId": transactionId,
+                 "paymentDetails.actualAmount": amount
                });
-             }
-             console.log(`Invoice ${invoiceData.id} marked as PAID via SePay transaction ${transactionId} (Admin SDK)`);
-          }
-        });
-      } else {
+
+               // Wallet update logic (if needed)
+               if (invoiceData.type === "deposit") {
+                 const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
+                 const userSnap = await t.get(userRef);
+                 const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+                 
+                 t.set(userRef, {
+                    balance: currentBalance + invoiceData.totalAmount,
+                 }, { merge: true });
+
+                 // Also record in deposits collection
+                 const depositId = `DEP_${invoiceData.id}`;
+                 t.set(adminDb!.doc(`deposits/${depositId}`), {
+                   id: depositId,
+                   invoiceId: invoiceData.id,
+                   userId: invoiceData.userId,
+                   userEmail: invoiceData.userEmail,
+                   amount: invoiceData.totalAmount,
+                   status: "completed",
+                   createdAt: admin.firestore.Timestamp.now()
+                 });
+               }
+               console.log(`Invoice ${invoiceData.id} marked as PAID via SePay transaction ${transactionId} (Admin SDK)`);
+            }
+          });
+          processed = true;
+        } catch (err: any) {
+          console.error("SePay Webhook Admin SDK Transaction Error:", err.message);
+          if (err.message === "Already processed") return res.json({ success: true });
+          // Fallback to client SDK if Admin failed due to config
+        }
+      } 
+      
+      if (!processed) {
         let invoiceRef: any = null;
         if (invoiceData) {
           invoiceRef = doc(db, `invoices/${invoiceData.id}`);
@@ -870,6 +878,8 @@ app.use(cookieParser());
 
       if (!invoiceExists) {
         console.warn(`[Invoice Verify] Invoice NOT FOUND after all attempts: ${invoiceId}`);
+        // Log additional info to help user debug
+        console.log(`[Invoice Verify] Config used: Project=${firebaseConfig?.projectId}, Database=${databaseId}`);
         return res.status(404).json({ 
           error: "No invoice found", 
           debug: { 
@@ -877,7 +887,8 @@ app.use(cookieParser());
             projectId: firebaseConfig?.projectId, 
             databaseId,
             adminDbReady: !!adminDb,
-            clientDbReady: !!db
+            clientDbReady: !!db,
+            message: "Invoice not found. Please ensure code/description in payment is exactly correct (BmassXXXXXX) and database is correctly configured."
           } 
         });
       }
