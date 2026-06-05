@@ -1,3 +1,4 @@
+
 import express from "express";
 import path from "path";
 import cors from "cors";
@@ -74,63 +75,58 @@ try {
     return [];
   };
 
-  const getAdminDb = (dbId?: string) => {
-    try {
-      const targetDb = dbId && dbId !== "(default)" ? dbId : undefined;
-      
-      // Use the modern getFirestore from firebase-admin/firestore if possible, 
-      // but we are using the 'admin' namespace.
-      // In firebase-admin v11+, admin.firestore(dbId) is the way.
-      if (targetDb) {
-        try {
-          // @ts-ignore
-          return admin.firestore(targetDb);
-        } catch (e) {
-          console.warn(`admin.firestore("${targetDb}") failed, trying admin.app().firestore("${targetDb}")`);
-          try {
-            // @ts-ignore
-            return admin.app().firestore(targetDb);
-          } catch (e2) {
-             console.warn(`admin.app().firestore("${targetDb}") failed too.`);
-          }
-        }
-      }
-      
-      return admin.firestore();
-    } catch (e) {
-      console.warn("Error getting admin firestore handle:", e);
-    }
-    return null;
-  };
+  const currentApps = getApps();
+  let adminApp: any = null;
 
-  if (getApps().length === 0) {
+  if (currentApps.length === 0) {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (serviceAccountJson) {
       try {
         const serviceAccount = JSON.parse(serviceAccountJson);
-        admin.initializeApp({
+        adminApp = admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
           projectId
         });
+        console.log("Firebase Admin: Initialized via service account");
       } catch (e) {
-        admin.initializeApp({ projectId });
+        adminApp = admin.initializeApp({ projectId });
       }
     } else {
       try {
-        admin.initializeApp({ projectId });
+        adminApp = admin.initializeApp({ projectId });
       } catch (e) {
-        // May already be initialized by environment
+        console.warn("Firebase Admin: Default init failed, may be already initialized");
       }
     }
+  } else {
+    adminApp = currentApps[0];
   }
 
-  adminDb = getAdminDb(databaseId);
-  if (!adminDb && databaseId !== "(default)") {
-    console.warn(`Falling back to default database for adminDb`);
-    adminDb = getAdminDb();
+  try {
+    // For specific database ID, we try several common patterns in different SDK versions
+    if (databaseId && databaseId !== "(default)") {
+      try {
+        // Try direct call if supported (Legacy)
+        adminDb = (admin as any).firestore(databaseId);
+      } catch (e) {
+        try {
+          // Try newer SDK approach via app.firestore()
+          adminDb = adminApp.firestore(databaseId);
+        } catch (e2) {
+          // Fallback to default and manual collection check if needed
+          adminDb = adminApp.firestore();
+          console.warn(`Could not bind to database "${databaseId}", using default.`);
+        }
+      }
+    } else {
+      adminDb = admin.firestore();
+    }
+    console.log(`Firebase Admin: Global Firestore handle acquired for DB: ${databaseId}`);
+  } catch (e: any) {
+    console.error("Critical: Firebase Admin SDK setup failed:", e.message);
   }
 } catch (e: any) {
-  console.error("Critical: Firebase Admin SDK setup failed:", e.message);
+  console.error("Critical: Firebase Admin outer setup failed:", e.message);
 }
 
 
@@ -903,15 +899,19 @@ app.use(cookieParser());
       // 1. Try Admin SDK
       if (adminDb) {
         try {
-          console.log(`[Invoice Verify] Attempting Admin SDK lookup for: ${invoiceId}`);
-          const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
-          const invoiceSnap = await invoiceRefAdmin.get();
-          if (invoiceSnap.exists) {
-            invoiceExists = true;
-            invoiceData = invoiceSnap.data();
-            console.log(`[Invoice Verify] Admin SDK Found doc: ${invoiceId}`);
-          } else {
-            console.log(`[Invoice Verify] Admin SDK doc NOT FOUND: ${invoiceId}`);
+          const variants = [invoiceId, invoiceId.toUpperCase(), invoiceId.toLowerCase()];
+          const standard = invoiceId.replace(/^bmass/i, 'Bmass');
+          if (!variants.includes(standard)) variants.push(standard);
+
+          for (const idToTry of variants) {
+            console.log(`[Invoice Verify] Admin SDK lookup attempt: ${idToTry}`);
+            const snap = await adminDb.doc(`invoices/${idToTry}`).get();
+            if (snap.exists) {
+              invoiceExists = true;
+              invoiceData = snap.data();
+              console.log(`[Invoice Verify] Admin SDK Found doc: ${idToTry}`);
+              break;
+            }
           }
         } catch (adminErr: any) {
           console.error(`[Invoice Verify] Admin SDK error (non-fatal):`, adminErr.message);
@@ -921,15 +921,19 @@ app.use(cookieParser());
       // 2. Fallback to Client SDK
       if (!invoiceExists && db) {
         try {
-          console.log(`[Invoice Verify] Attempting Client SDK lookup for: ${invoiceId}`);
-          const invoiceRef = doc(db, `invoices/${invoiceId}`);
-          const invoiceSnap = await getDoc(invoiceRef);
-          if (invoiceSnap.exists()) {
-            invoiceExists = true;
-            invoiceData = invoiceSnap.data();
-            console.log(`[Invoice Verify] Client SDK Found doc: ${invoiceId}`);
-          } else {
-             console.log(`[Invoice Verify] Client SDK doc NOT FOUND: ${invoiceId}`);
+          const variants = [invoiceId, invoiceId.toUpperCase(), invoiceId.toLowerCase()];
+          const standard = invoiceId.replace(/^bmass/i, 'Bmass');
+          if (!variants.includes(standard)) variants.push(standard);
+
+          for (const idToTry of variants) {
+            console.log(`[Invoice Verify] Client SDK lookup attempt: ${idToTry}`);
+            const snap = await getDoc(doc(db, `invoices/${idToTry}`));
+            if (snap.exists()) {
+              invoiceExists = true;
+              invoiceData = snap.data();
+              console.log(`[Invoice Verify] Client SDK Found doc: ${idToTry}`);
+              break;
+            }
           }
         } catch (clientErr: any) {
           console.error(`[Invoice Verify] Client SDK error:`, clientErr.message);
@@ -994,14 +998,14 @@ app.use(cookieParser());
         }
         
         const bankingConfig = sysSnap?.exists() ? sysSnap.data()?.bankingConfig : null;
-        const bankAccount = bankingConfig?.bankAccount || "";
+        const bankAccount = bankingConfig?.bankAccount || "00010302003";
 
         let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
         if (bankAccount) {
           url += `&account_number=${encodeURIComponent(bankAccount)}`;
         }
 
-        console.log(`Checking SePay list API for invoice ${invoiceId} (Reference: ${referenceCode})`);
+        console.log(`[Invoice Verify] Checking Account: ${bankAccount || 'All'}, Invoice: ${invoiceId}, Ref: ${referenceCode}, Amount: ${expectedAmount}`);
         
         try {
           const apiResponse = await axios.get(url, {
@@ -1032,7 +1036,7 @@ app.use(cookieParser());
               const amountMatches = actualAmount >= (expectedAmount - 500);
 
               if (codeInContent || codeMatches) {
-                 console.log(`[Invoice Verify] FOUND Potential Match: CodeMatch=${codeMatches}, ContentMatch=${codeInContent}, Amount=${actualAmount}, MatchesAmount=${amountMatches}`);
+                 console.log(`[Invoice Verify] Potential Match Detected: CodeMatch=${codeMatches}, ContentMatch=${codeInContent}, Amount=${actualAmount}, MatchesAmount=${amountMatches}`);
               }
 
               return (codeInContent || codeMatches) && amountMatches;
