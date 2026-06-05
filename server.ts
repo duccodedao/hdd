@@ -4,7 +4,7 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { initializeApp } from "firebase/app";
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { 
   getFirestore, 
   doc,
