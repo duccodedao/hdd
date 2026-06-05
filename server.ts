@@ -90,15 +90,32 @@ try {
 }
 
 // Initialize Firebase Client SDK
-const firebaseApp = initializeApp(firebaseConfig);
-let db: any;
+let firebaseApp: any;
 try {
-  db = getFirestore(firebaseApp, databaseId);
-} catch (e) {
-  console.warn(`Client SDK fail for database '${databaseId}', using default`);
-  db = getFirestore(firebaseApp);
+  if (!firebaseConfig.projectId) {
+    throw new Error("Missing Firebase Project ID in configuration.");
+  }
+  firebaseApp = initializeApp(firebaseConfig);
+  console.log(`Firebase Client App initialized successfully: ${firebaseConfig.projectId}`);
+} catch (appErr: any) {
+  console.error("Critical: Failed to initialize Firebase Client App", appErr.message);
+  // We'll try to provide a dummy app if possible or just let subsequent calls fail with clear errors
 }
-console.log(`Firebase Client initialized targeting project: ${firebaseConfig.projectId}`);
+
+let db: any;
+if (firebaseApp) {
+  try {
+    db = getFirestore(firebaseApp, databaseId === "(default)" ? undefined : databaseId);
+    console.log(`Firestore Client SDK initialized targeting database: ${databaseId}`);
+  } catch (e: any) {
+    console.warn(`Client SDK fail for database '${databaseId}', using default database. Error: ${e.message}`);
+    try {
+      db = getFirestore(firebaseApp);
+    } catch (innerE: any) {
+      console.error("Critical: All Firestore Client SDK initialization attempts failed", innerE.message);
+    }
+  }
+}
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
 // try {
@@ -249,7 +266,7 @@ app.use(cookieParser());
   });
 
   app.post("/api/invoices/create", async (req, res) => {
-    console.log("Received request to /api/invoices/create:", safeStringify(req.body));
+    console.log(`[Invoice Create] Request from ${req.ip}:`, safeStringify(req.body));
     try {
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
@@ -275,33 +292,35 @@ app.use(cookieParser());
       };
 
       let success = false;
-      let lastErr = null;
+      let lastErr: any = null;
 
       // 1. Try Admin SDK first
       if (adminDb) {
         try {
+          console.log(`[Invoice Create] Attempting Admin SDK for ${referenceCode}`);
           await adminDb.doc(`invoices/${referenceCode}`).set({
             ...invoiceData,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });
           success = true;
-          console.log(`Invoice ${referenceCode} created via Admin SDK`);
+          console.log(`[Invoice Create] Success via Admin SDK: ${referenceCode}`);
         } catch (err: any) {
-          console.error(`Admin SDK Error creating invoice ${referenceCode}:`, err.message);
+          console.error(`[Invoice Create] Admin SDK Error:`, err.message);
           lastErr = err;
           
           // Retry with default DB if "not found"
           const errMsg = String(err.message || "").toLowerCase();
           if (errMsg.includes("not found") || errMsg.includes("database") || err.code === 5) {
              try {
+                console.log(`[Invoice Create] Retrying with default Admin DB for ${referenceCode}`);
                 await admin.firestore().doc(`invoices/${referenceCode}`).set({
                   ...invoiceData,
                   createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
                 success = true;
-                console.log(`Invoice ${referenceCode} created via Admin SDK (Fallback to default DB)`);
+                console.log(`[Invoice Create] Success via Admin SDK (Default DB): ${referenceCode}`);
              } catch (innerErr: any) {
-                console.error("Admin SDK Fallback also failed:", innerErr.message);
+                console.error("[Invoice Create] Admin SDK Fallback failed:", innerErr.message);
              }
           }
         }
@@ -310,51 +329,32 @@ app.use(cookieParser());
       // 2. Fallback to Client SDK
       if (!success) {
         try {
-          console.log(`Attempting Client SDK fallback for invoice ${referenceCode}`);
+          console.log(`[Invoice Create] Attempting Client SDK for ${referenceCode}`);
+          if (!db) throw new Error("Firestore Client SDK not initialized");
           const invoiceRef = doc(db, `invoices/${referenceCode}`);
           await setDoc(invoiceRef, {
             ...invoiceData,
             createdAt: Timestamp.now()
           });
           success = true;
-          console.log(`Invoice ${referenceCode} created via Client SDK`);
+          console.log(`[Invoice Create] Success via Client SDK: ${referenceCode}`);
         } catch (err: any) {
-          console.error(`Client SDK Error creating invoice ${referenceCode}:`, err.message);
+          console.error(`[Invoice Create] Client SDK Error:`, err.message);
           lastErr = lastErr || err;
         }
       }
 
       if (!success) {
-        const finalMsg = lastErr?.message || "Lỗi không xác định khi lưu hóa đơn vào Firestore";
-        throw new Error(finalMsg);
+        throw new Error(lastErr?.message || "All Firestore write attempts failed");
       }
 
       res.json(invoiceData);
     } catch (error: any) {
-      const errDetails = {
-        message: error.message || String(error),
-        code: error.code,
-        stack: error.stack?.split("\n").slice(0, 3).join("\n")
-      };
-      
-      console.error("Detailed Create Invoice Error:", safeStringify(errDetails));
-
-      let userMsg = "Lỗi máy chủ khi tạo hóa đơn.";
-      let hint = "Vui lòng kiểm tra console logs để biết thêm chi tiết.";
-
-      const errMsg = String(error.message || "").toLowerCase();
-      if (errMsg.includes("permission_denied") || error.code === 7 || error.code === "permission-denied") {
-        userMsg = "Lỗi: Quyền truy cập Firestore bị từ chối.";
-        hint = "Hãy đảm bảo Cloud Firestore API đã được kích hoạt và Security Rules cho phép ghi vào collection 'invoices'.";
-      } else if (errMsg.includes("not_found") || errMsg.includes("database") || error.code === 5) {
-        userMsg = `Lỗi: Không tìm thấy database Firestore '${databaseId}'.`;
-        hint = "Hãy tạo database tên là 'main' trong Firebase Console hoặc đổi config về '(default)'.";
-      }
-
+      console.error("[Invoice Create] Final global error:", error.message);
       res.status(500).json({ 
-        error: userMsg,
+        error: "Lỗi máy chủ khi tạo hóa đơn.",
         details: error.message,
-        hint: hint
+        hint: "Vui lòng xem log server trên Vercel để biết thêm chi tiết."
       });
     }
   });
@@ -758,6 +758,7 @@ app.use(cookieParser());
 
   // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
   app.post("/api/invoices/verify", async (req, res) => {
+    console.log(`[Invoice Verify] Request for invoiceId: ${req.body.invoiceId}`);
     try {
       const { invoiceId, isSandboxMock } = req.body;
       if (!invoiceId) {
@@ -766,23 +767,37 @@ app.use(cookieParser());
 
       let invoiceData;
       let invoiceExists = false;
+      
+      console.log(`[Invoice Verify] Searching for invoice: ${invoiceId}`);
+
       if (adminDb) {
-        const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
-        const invoiceSnap = await invoiceRefAdmin.get();
-        if (invoiceSnap.exists) {
-          invoiceExists = true;
-          invoiceData = invoiceSnap.data();
+        try {
+          const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
+          const invoiceSnap = await invoiceRefAdmin.get();
+          if (invoiceSnap.exists) {
+            invoiceExists = true;
+            invoiceData = invoiceSnap.data();
+          }
+        } catch (adminErr: any) {
+          console.error(`[Invoice Verify] Admin SDK lookup error:`, adminErr.message);
         }
-      } else {
-        const invoiceRef = doc(db, `invoices/${invoiceId}`);
-        const invoiceSnap = await getDoc(invoiceRef);
-        if (invoiceSnap.exists()) {
-          invoiceExists = true;
-          invoiceData = invoiceSnap.data();
+      } 
+      
+      if (!invoiceExists && db) {
+        try {
+          const invoiceRef = doc(db, `invoices/${invoiceId}`);
+          const invoiceSnap = await getDoc(invoiceRef);
+          if (invoiceSnap.exists()) {
+            invoiceExists = true;
+            invoiceData = invoiceSnap.data();
+          }
+        } catch (clientErr: any) {
+          console.error(`[Invoice Verify] Client SDK lookup error:`, clientErr.message);
         }
       }
 
       if (!invoiceExists) {
+        console.warn(`[Invoice Verify] Invoice not found: ${invoiceId}`);
         return res.status(404).json({ error: "No invoice found" });
       }
 
@@ -997,12 +1012,16 @@ app.use(cookieParser());
       });
       app.use(vite.middlewares);
     } else {
-      const distPath = path.join(process.cwd(), "dist");
-      app.use(express.static(distPath));
-      // Serve index.html for all undefined GET requests (SPA catch-all)
-      app.get(/.*/, (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    // Serve index.html for all undefined GET requests (SPA catch-all)
+    app.get('*', (req, res, next) => {
+      // Don't intercept API or webhook routes
+      if (req.path.startsWith('/api/') || req.path.startsWith('/hooks/')) {
+        return next();
+      }
+      res.sendFile(path.join(distPath, "index.html"));
+    });
     }
 
     app.listen(PORT, "0.0.0.0", () => {
