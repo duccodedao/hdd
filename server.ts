@@ -26,20 +26,21 @@ import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 
+// Read config explicitly to ensure resolution
+const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
+const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
+
 // Initialize Firebase Admin (for privileged server-side operations)
 let adminDb: admin.firestore.Firestore | null = null;
 try {
   admin.initializeApp();
-  adminDb = admin.firestore();
+  adminDb = databaseId && databaseId !== "(default)" ? admin.firestore(databaseId) : admin.firestore();
 } catch (e) {
   console.error("Failed to initialize Firebase Admin", e);
 }
 
 // Initialize Firebase Client SDK
-// Read config explicitly to ensure resolution
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
 const firebaseApp = initializeApp(firebaseConfig);
-const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
 const db = getFirestore(firebaseApp, databaseId);
 console.log(`Firebase Client initialized targeting project: ${firebaseConfig.projectId}, database: ${databaseId}`);
 
@@ -181,8 +182,7 @@ app.use(cookieParser());
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = doc(db, `invoices/${referenceCode}`);
-      const invoiceData = {
+      const invoiceData: any = {
         id: referenceCode,
         userId: userId || "guest",
         userEmail: userEmail || "guest",
@@ -194,10 +194,15 @@ app.use(cookieParser());
         paymentDetails: {
           referenceCode
         },
-        createdAt: Timestamp.now(),
+        createdAt: adminDb ? admin.firestore.Timestamp.now() : Timestamp.now(),
       };
 
-      await setDoc(invoiceRef, invoiceData);
+      if (adminDb) {
+        await adminDb.doc(`invoices/${referenceCode}`).set(invoiceData);
+      } else {
+        const invoiceRef = doc(db, `invoices/${referenceCode}`);
+        await setDoc(invoiceRef, invoiceData);
+      }
       res.json(invoiceData);
     } catch (error: any) {
       console.error("Create Invoice Error details:", safeStringify({
@@ -399,25 +404,46 @@ app.use(cookieParser());
 
   async function updateWalletOnPayment(invoiceData: any) {
     if (invoiceData.type === "deposit") {
-      const userRef = doc(db, `users/${invoiceData.userId}`);
-      const userSnap = await getDoc(userRef);
-      const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
-      
-      await setDoc(userRef, {
-        balance: currentBalance + invoiceData.totalAmount,
-      }, { merge: true });
+      if (adminDb) {
+        const userRef = adminDb.doc(`users/${invoiceData.userId}`);
+        const userSnap = await userRef.get();
+        const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+        
+        await userRef.set({
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
 
-      // Also record in deposits collection for admin audit
-      const depositId = `DEP_${invoiceData.id}`;
-      await setDoc(doc(db, `deposits/${depositId}`), {
-        id: depositId,
-        invoiceId: invoiceData.id,
-        userId: invoiceData.userId,
-        userEmail: invoiceData.userEmail,
-        amount: invoiceData.totalAmount,
-        status: "completed",
-        createdAt: Timestamp.now()
-      });
+        const depositId = `DEP_${invoiceData.id}`;
+        await adminDb.doc(`deposits/${depositId}`).set({
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: admin.firestore.Timestamp.now()
+        });
+      } else {
+        const userRef = doc(db, `users/${invoiceData.userId}`);
+        const userSnap = await getDoc(userRef);
+        const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+        
+        await setDoc(userRef, {
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
+
+        // Also record in deposits collection for admin audit
+        const depositId = `DEP_${invoiceData.id}`;
+        await setDoc(doc(db, `deposits/${depositId}`), {
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: Timestamp.now()
+        });
+      }
     }
   }
 
@@ -447,78 +473,144 @@ app.use(cookieParser());
       }
       
       // Determine transfer amount and reference code
-      // 2. Prevent duplicate processing
       const description = payload.content || payload.description || "";
       const amount = Number(payload.transferAmount || payload.amount || 0);
       const referenceCodeSearch = payload.code || description.match(/Bmass[0-9]{3,12}/i)?.[0];
-      
-      let invoiceData = null;
-      let invoiceRef = null;
+
+      let invoiceData: any = null;
       
       if (referenceCodeSearch) {
         // Find pending invoice
-        let ref = doc(db, `invoices/${referenceCodeSearch}`);
-        let snap = await getDoc(ref);
-        
-        if (!snap.exists()) {
-           ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
-           snap = await getDoc(ref);
-        }
-        
-        if (snap.exists()) {
-          invoiceData = snap.data();
-          invoiceRef = ref;
+        if (adminDb) {
+          const snap = await adminDb.doc(`invoices/${referenceCodeSearch}`).get();
+          if (snap.exists) {
+            invoiceData = snap.data();
+          } else {
+            const snapUpper = await adminDb.doc(`invoices/${referenceCodeSearch.toUpperCase()}`).get();
+            if (snapUpper.exists) {
+              invoiceData = snapUpper.data();
+            }
+          }
+        } else {
+          let ref = doc(db, `invoices/${referenceCodeSearch}`);
+          let snap = await getDoc(ref);
+          
+          if (!snap.exists()) {
+             ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
+             snap = await getDoc(ref);
+          }
+          
+          if (snap.exists()) {
+            invoiceData = snap.data();
+          }
         }
       }
 
-      await runTransaction(db, async (t) => {
-        const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
-        const logSnap = await t.get(logRef);
-        
-        if (logSnap.exists()) {
-          throw new Error("Already processed");
-        }
+      if (adminDb) {
+        await adminDb.runTransaction(async (t) => {
+          const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
+          const logSnap = await t.get(logRefAdmin);
+          
+          if (logSnap.exists) {
+            throw new Error("Already processed");
+          }
 
-        // Mark as processed
-        t.set(logRef, {
-          payload,
-          createdAt: Timestamp.now()
-        });
+          // Mark as processed
+          t.set(logRefAdmin, {
+            payload,
+            createdAt: admin.firestore.Timestamp.now()
+          });
 
-        if (invoiceData && invoiceRef && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
-           // Update invoice
-           t.update(invoiceRef, {
-             status: "paid",
-             paidAt: Timestamp.now(),
-             "paymentDetails.sepayTransactionId": transactionId,
-             "paymentDetails.actualAmount": amount
-           });
-
-           // Wallet update logic (if needed)
-           if (invoiceData.type === "deposit") {
-             const userRef = doc(db, `users/${invoiceData.userId}`);
-             const userSnap = await t.get(userRef);
-             const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
-             
-             t.set(userRef, {
-                balance: currentBalance + invoiceData.totalAmount,
-             }, { merge: true });
-
-             // Also record in deposits collection
-             const depositId = `DEP_${invoiceData.id}`;
-             t.set(doc(db, `deposits/${depositId}`), {
-               id: depositId,
-               invoiceId: invoiceData.id,
-               userId: invoiceData.userId,
-               userEmail: invoiceData.userEmail,
-               amount: invoiceData.totalAmount,
-               status: "completed",
-               createdAt: Timestamp.now()
+          if (invoiceData && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+             // Update invoice
+             const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
+             t.update(invoiceRefAdmin, {
+               status: "paid",
+               paidAt: admin.firestore.Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount
              });
-           }
-           console.log(`Invoice ${invoiceRef.id} marked as PAID via SePay transaction ${transactionId}`);
+
+             // Wallet update logic (if needed)
+             if (invoiceData.type === "deposit") {
+               const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
+               const userSnap = await t.get(userRef);
+               const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+               
+               t.set(userRef, {
+                  balance: currentBalance + invoiceData.totalAmount,
+               }, { merge: true });
+
+               // Also record in deposits collection
+               const depositId = `DEP_${invoiceData.id}`;
+               t.set(adminDb!.doc(`deposits/${depositId}`), {
+                 id: depositId,
+                 invoiceId: invoiceData.id,
+                 userId: invoiceData.userId,
+                 userEmail: invoiceData.userEmail,
+                 amount: invoiceData.totalAmount,
+                 status: "completed",
+                 createdAt: admin.firestore.Timestamp.now()
+               });
+             }
+             console.log(`Invoice ${invoiceData.id} marked as PAID via SePay transaction ${transactionId} (Admin SDK)`);
+          }
+        });
+      } else {
+        let invoiceRef: any = null;
+        if (invoiceData) {
+          invoiceRef = doc(db, `invoices/${invoiceData.id}`);
         }
-      });
+
+        await runTransaction(db, async (t) => {
+          const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+          const logSnap = await t.get(logRef);
+          
+          if (logSnap.exists) {
+            throw new Error("Already processed");
+          }
+
+          // Mark as processed
+          t.set(logRef, {
+            payload,
+            createdAt: Timestamp.now()
+          });
+
+          if (invoiceData && invoiceRef && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
+             // Update invoice
+             t.update(invoiceRef, {
+               status: "paid",
+               paidAt: Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount
+             });
+
+             // Wallet update logic (if needed)
+             if (invoiceData.type === "deposit") {
+               const userRef = doc(db, `users/${invoiceData.userId}`);
+               const userSnap = await t.get(userRef);
+               const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+               
+               t.set(userRef, {
+                  balance: currentBalance + invoiceData.totalAmount,
+               }, { merge: true });
+
+               // Also record in deposits collection
+               const depositId = `DEP_${invoiceData.id}`;
+               t.set(doc(db, `deposits/${depositId}`), {
+                 id: depositId,
+                 invoiceId: invoiceData.id,
+                 userId: invoiceData.userId,
+                 userEmail: invoiceData.userEmail,
+                 amount: invoiceData.totalAmount,
+                 status: "completed",
+                 createdAt: Timestamp.now()
+               });
+             }
+             console.log(`Invoice ${invoiceRef.id} marked as PAID via SePay transaction ${transactionId}`);
+          }
+        });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -581,12 +673,21 @@ app.use(cookieParser());
 
       // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
       if (isSandboxMock) {
-        await updateDoc(doc(db, "invoices", invoiceId), {
-          status: "paid",
-          paidAt: Timestamp.now(),
-          "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
-          "paymentDetails.isSandboxMock": true
-        });
+        if (adminDb) {
+          await adminDb.doc(`invoices/${invoiceId}`).update({
+            status: "paid",
+            paidAt: admin.firestore.Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        } else {
+          await updateDoc(doc(db, "invoices", invoiceId), {
+            status: "paid",
+            paidAt: Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        }
         await updateWalletOnPayment(invoiceData);
         return res.json({ success: true, status: "paid", message: "Duyệt giao dịch mô phỏng nâng cao thành công!" });
       }
@@ -631,23 +732,31 @@ app.use(cookieParser());
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
-              const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
-              await setDoc(logRef, {
-                payload: matchedTx,
-                createdAt: Timestamp.now(),
-                manualCheck: true
-              });
 
-               if (adminDb) {
+              if (adminDb) {
+                const logRef = adminDb.doc(`webhook_logs/${String(transactionId)}`);
+                await logRef.set({
+                  payload: matchedTx,
+                  createdAt: admin.firestore.Timestamp.now(),
+                  manualCheck: true
+                });
+
                 const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
                 await invoiceRefAdmin.update({
                   status: "paid",
-                  paidAt: Timestamp.now(),
+                  paidAt: admin.firestore.Timestamp.now(),
                   "paymentDetails.sepayTransactionId": transactionId,
                   "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
                   "paymentDetails.actualSource": "sepay_api_manual_check"
                 });
               } else {
+                const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+                await setDoc(logRef, {
+                  payload: matchedTx,
+                  createdAt: Timestamp.now(),
+                  manualCheck: true
+                });
+
                 await updateDoc(doc(db, "invoices", invoiceId), {
                   status: "paid",
                   paidAt: Timestamp.now(),
