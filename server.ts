@@ -111,12 +111,19 @@ try {
       if (apps.length > 0) adminApp = apps[0];
     }
 
+    // Modern SDKs often prefer direct imports or getFirestore(app)
+    // However, with namespaced admin import, we use admin.firestore(app) or app.firestore()
+    
     // For specific database ID, we try several common patterns in different SDK versions
     if (databaseId && databaseId !== "(default)") {
       try {
         // Try adminBase first
         if (typeof adminBase.firestore === 'function') {
-          adminDb = adminBase.firestore(databaseId);
+          try {
+            adminDb = adminBase.firestore(databaseId);
+          } catch(e) {
+            if (adminApp) adminDb = adminApp.firestore(databaseId);
+          }
         } else if (adminApp && typeof adminApp.firestore === 'function') {
           adminDb = adminApp.firestore(databaseId);
         }
@@ -129,14 +136,22 @@ try {
           }
         } catch (e2) {
           // Fallback to default
-          adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                    (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
+          try {
+            adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
+                      (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
+          } catch(e3) {
+            adminDb = null;
+          }
           console.warn(`Could not bind to database "${databaseId}", using default.`);
         }
       }
     } else {
-      adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
-                (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
+      try {
+        adminDb = adminApp && typeof adminApp.firestore === 'function' ? adminApp.firestore() : 
+                  (typeof adminBase.firestore === 'function' ? adminBase.firestore() : null);
+      } catch(e) {
+        adminDb = null;
+      }
     }
     
     if (adminDb) {
@@ -902,11 +917,22 @@ app.use(cookieParser());
   };
 
   app.post("/api/webhooks/sepay", handleSepayWebhook);
-  app.get("/api/webhooks/sepay", handleSepayWebhook);
-  app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
-  app.get("/hooks/sepay-payment", handleSepayWebhook);
+  app.get("/api/webhooks/sepay", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
+  app.post("/hooks/sepay-payment", handleSepayWebhook); 
+  app.get("/hooks/sepay-payment", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
 
   // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
+  app.get("/api/invoices/verify", (req, res) => {
+    res.send(`
+      <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+        <h2>API Xác Thực Giao Dịch</h2>
+        <p>Đây là điểm cuối API dành cho phương thức <b>POST</b>.</p>
+        <p>Hệ thống không thể xử lý yêu cầu GET trực tiếp từ trình duyệt.</p>
+        <p>Vui lòng sử dụng chức năng "Kiểm tra thanh toán" trên giao diện Nạp tiền của Website.</p>
+        <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px;">Quay lại Trang chủ</a>
+      </div>
+    `);
+  });
   app.post("/api/invoices/verify", async (req, res) => {
     const { invoiceId, isSandboxMock } = req.body;
     console.log(`[Invoice Verify] Start: invoiceId=${invoiceId}, Project=${firebaseConfig?.projectId}, DB=${databaseId}`);
@@ -1267,3 +1293,4 @@ app.use(cookieParser());
     console.error("Fatal startup error:", err);
     process.exit(1);
   });
+
