@@ -299,9 +299,61 @@
         "createdAt": { "type": "number" }
       },
       "required": ["userId", "productName", "amount", "type", "createdAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "User saved/bookmarked apps and utilities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "enum": ["utility", "app", "page"] },
+        "url": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "itemId", "title", "type", "url"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or admin-sent notification to users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "target": { "enum": ["all", "user", "role"] },
+        "targetValue": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "senderName": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "target", "createdAt"]
+    },
+    "UserReadNotification": {
+      "title": "User Read Notification",
+      "description": "Marks a notification as read and records reading timestamp",
+      "type": "object",
+      "properties": {
+        "readAt": { "type": "number" }
+      },
+      "required": ["readAt"]
     }
   },
   "firestore": {
+    "bookmarks": {
+      "schema": "Bookmark",
+      "description": "User saved/bookmarked items for quick access"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Global and targeted system notification messages"
+    },
+    "users/{userId}/read_notifications": {
+      "schema": "UserReadNotification",
+      "description": "Tracks notifications read by specific users"
+    },
     "activity_feed": {
       "schema": "Activity",
       "description": "User activity log for real-time feed"

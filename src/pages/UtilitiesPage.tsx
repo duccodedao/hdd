@@ -13,10 +13,11 @@ import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
 import PersonalFileManager from './utilities/PersonalFileManager';
 import AvatarFrameManager from './utilities/AvatarFrameManager';
+import TextToSpeech from './utilities/TextToSpeech';
+import { Volume2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
-import { useBookmarkStore } from '../store/bookmarkStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { PaymentDialog } from '../components/payment/PaymentDialog';
@@ -39,18 +40,6 @@ const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.
 const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [], isHot = false }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[], isHot?: boolean }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
-  const { isBookmarked, toggleBookmark } = useBookmarkStore();
-  const bookmarked = isBookmarked(item.id);
-
-  const handleBookmarkToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleBookmark({
-      itemId: item.id,
-      title: item.title,
-      type: 'utility',
-      url: `/utilities?tab=${item.id}`
-    });
-  };
 
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
@@ -129,16 +118,8 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
       )}
       onClick={handleClick}
     >
-      {isHot && (
-         <div className="absolute inset-[-2px] rounded-[calc(1.5rem+2px)] overflow-hidden pointer-events-none z-0 bg-transparent">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250%] h-[250%] bg-[conic-gradient(from_0deg,transparent_0_240deg,#f97316_300deg,#ef4444_360deg)] animate-[spin_3s_linear_infinite] opacity-60 dark:opacity-80" />
-         </div>
-      )}
 
-      <div className={cn(
-        "premium-card flex flex-col h-full relative z-10 transition-colors",
-        isHot && "border-transparent bg-white dark:bg-zinc-900"
-      )}>
+      <div className="premium-card flex flex-col h-full relative z-10 transition-colors">
         {isMaintenanceActive && (
           <div className="absolute top-0 right-0 p-3 z-10">
              <div className={cn(
@@ -147,17 +128,6 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
              )}>
                 <Lock className="w-3.5 h-3.5" />
              </div>
-          </div>
-        )}
-
-        {isHot && (
-          <div className="absolute -top-3 -right-3 z-20">
-            <div className="relative">
-              <div className="absolute inset-0 bg-orange-500 blur-md opacity-50 animate-pulse rounded-full" />
-              <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-600 outline outline-2 outline-white dark:outline-zinc-900 rounded-full shadow-lg relative z-10 text-white">
-                 <Flame className="w-4 h-4 fill-white" />
-              </div>
-            </div>
           </div>
         )}
 
@@ -173,20 +143,6 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Bookmark star control */}
-          <button
-            type="button"
-            onClick={handleBookmarkToggle}
-            className={`p-1.5 rounded-lg active:scale-95 transition-all duration-300 z-25 ${
-              bookmarked 
-                ? 'text-amber-500 bg-amber-500/10' 
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-            }`}
-            title={bookmarked ? "Xóa khỏi dấu trang" : "Lưu vào dấu trang"}
-          >
-            <Star className={`w-3.5 h-3.5 ${bookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
-          </button>
-
           <div className="flex flex-col items-end gap-1.5">
             <div className={cn(
               "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
@@ -328,6 +284,14 @@ const nativeUtilities: UtilityItem[] = [
     icon: Scissors,
     type: 'tool',
     createdAt: Date.now() - 4500
+  },
+  {
+    id: 'text-to-speech',
+    title: 'Chuyển Văn Bản Thành Giọng Nói',
+    description: 'Chuyển văn bản thành giọng đọc tự nhiên tùy chọn vùng miền (Bắc, Trung, Nam) hỗ trợ tải file MP3.',
+    icon: Volume2,
+    type: 'tool',
+    createdAt: Date.now() + 5000
   }
 ];
 
@@ -553,6 +517,10 @@ export default function UtilitiesPage() {
  
     if (activeUtility.id === 'pdf-splitter') {
       return <PdfSplitter onBack={handleBack} />;
+    }
+
+    if (activeUtility.id === 'text-to-speech') {
+      return <TextToSpeech onBack={handleBack} />;
     }
 
     if (activeUtility.id === 'ai-scanner') {

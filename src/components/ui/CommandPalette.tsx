@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Zap, User, FileText, Settings, Shield, Star, Bell, Moon, Sun, RefreshCw, LogOut, ChevronRight, Layout } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
-import { useBookmarkStore } from '../../store/bookmarkStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
@@ -15,7 +14,6 @@ export default function CommandPalette() {
   const navigate = useNavigate();
   const { toggleDarkMode, darkMode, systemVersion } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
-  const { bookmarks } = useBookmarkStore();
   const { notifications, readNotificationIds, markAsRead } = useNotificationStore();
 
   const unreadNotifications = notifications.filter(n => !readNotificationIds.includes(n.id));
@@ -76,27 +74,6 @@ export default function CommandPalette() {
           <Command.Empty className="p-8 text-center text-xs text-slate-500 dark:text-zinc-500">
             Không tìm thấy lệnh hoặc kết quả tương xứng.
           </Command.Empty>
-
-          {/* Bookmarks dynamic list */}
-          {user && bookmarks.length > 0 && (
-            <Command.Group heading="Dấu trang lưu nhanh" className="text-[10px] font-bold text-indigo-500 p-2 uppercase tracking-widest bg-indigo-50/20 dark:bg-indigo-500/5 rounded-xl mb-2">
-              {bookmarks.map((b) => (
-                <Command.Item 
-                  key={b.id} 
-                  onSelect={() => handleAction(() => navigate(b.url))}
-                  className="flex items-center justify-between p-2.5 cursor-pointer rounded-xl text-slate-700 dark:text-zinc-300 data-[selected=true]:bg-indigo-600 data-[selected=true]:text-white transition-all text-xs"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
-                    <span className="truncate font-semibold">{b.title}</span>
-                  </div>
-                  <span className="text-[8.5px] font-mono tracking-wider uppercase opacity-55 shrink-0 px-2 py-0.5 bg-slate-100 dark:bg-white/5 rounded-md text-slate-600 dark:text-zinc-400">
-                    {b.type}
-                  </span>
-                </Command.Item>
-              ))}
-            </Command.Group>
-          )}
 
           {/* Unread system notifications */}
           {user && unreadNotifications.length > 0 && (

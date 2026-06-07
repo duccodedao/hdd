@@ -101,10 +101,8 @@ export default function Topbar() {
   const [locationName, setLocationName] = useState<string>('');
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const { bookmarks, toggleBookmark } = useBookmarkStore();
   const { notifications, readNotificationIds, markAsRead, markAllAsRead } = useNotificationStore();
 
-  const [showBookmarks, setShowBookmarks] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const [showNotificationDetail, setShowNotificationDetail] = useState(false);
@@ -415,108 +413,11 @@ export default function Topbar() {
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
-          {/* Bookmarks Control */}
-          {user && (
-            <div className="relative">
-              <button
-                onClick={() => { setShowBookmarks(!showBookmarks); setShowNotifications(false); setShowProfileMenu(false); }}
-                className={cn(
-                  "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
-                  showBookmarks
-                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
-                )}
-                title="Dấu trang lưu trữ"
-              >
-                <BookmarkIcon className="w-4 h-4" />
-                {bookmarks.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 bg-indigo-600 dark:bg-indigo-500 rounded-full text-[8px] font-black text-white items-center justify-center animate-pulse shadow-md">
-                    {bookmarks.length}
-                  </span>
-                )}
-              </button>
-
-              <AnimatePresence>
-                {showBookmarks && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowBookmarks(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      className="absolute right-0 mt-2 w-72 md:w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl z-50 overflow-hidden"
-                    >
-                      <div className="p-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <BookmarkIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider font-sans">
-                            Dấu trang của bạn
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full">
-                          {bookmarks.length} Mục
-                        </span>
-                      </div>
-
-                      <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.02] p-1.5 space-y-0.5 no-scrollbar">
-                        {bookmarks.length === 0 ? (
-                          <div className="py-8 px-4 text-center">
-                            <Star className="w-8 h-8 text-slate-300 dark:text-zinc-750 mx-auto stroke-1" />
-                            <p className="text-[11px] text-slate-500 dark:text-zinc-500 mt-2 font-medium">Chưa lưu dấu trang nào.</p>
-                            <p className="text-[9px] text-slate-400 dark:text-zinc-600 mt-1 max-w-[200px] mx-auto leading-relaxed">Nhấp dấu sao tại các trang Công cụ, Tiện ích để tìm lại nhanh ở đây.</p>
-                          </div>
-                        ) : (
-                          bookmarks.map((b) => (
-                            <div
-                              key={b.id}
-                              className="group flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all text-left"
-                            >
-                              <div
-                                onClick={() => {
-                                  setShowBookmarks(false);
-                                  navigate(b.url);
-                                }}
-                                className="flex-1 min-w-0 pr-2 cursor-pointer flex items-center gap-3"
-                              >
-                                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                                  <Star className="w-3.5 h-3.5 fill-current" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[11px] font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-indigo-600 dark:group-hover:text-white transition-colors">
-                                    {b.title}
-                                  </p>
-                                  <p className="text-[9px] font-mono text-zinc-400 dark:text-zinc-550 truncate uppercase tracking-wider mt-0.5">
-                                    {b.type}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleBookmark({ itemId: b.itemId, title: b.title, type: b.type, url: b.url });
-                                }}
-                                className="w-7 h-7 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                                title="Xóa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
           {/* Notifications Control */}
           {user && (
             <div className="relative">
               <button
-                onClick={() => { setShowNotifications(!showNotifications); setShowBookmarks(false); setShowProfileMenu(false); }}
+                onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }}
                 className={cn(
                   "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
                   showNotifications

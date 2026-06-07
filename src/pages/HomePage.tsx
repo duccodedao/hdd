@@ -1,13 +1,12 @@
 import { ArrowRight, ShieldCheck, Zap, Globe, Code } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { doc, getDoc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
 import { format } from 'date-fns';
-import { motion, useSpring, useTransform, AnimatePresence } from 'motion/react';
-import ActivityFeed from '../components/activity/ActivityFeed';
+import { motion, useSpring, useTransform } from 'motion/react';
 
 function Counter({ value }: { value: number }) {
   const spring = useSpring(0, { mass: 0.8, stiffness: 75, damping: 15 });
@@ -18,82 +17,6 @@ function Counter({ value }: { value: number }) {
   }, [value, spring]);
 
   return <motion.span>{display}</motion.span>;
-}
-
-const obfuscateEmail = (email: string) => {
-  if (!email || !email.includes('@')) return email;
-  const [name, domain] = email.split('@');
-  if (name.length <= 3) return name + '****@' + domain;
-  return name.substring(0, 3).toUpperCase() + '****@' + domain;
-};
-
-function RecentLoginsStream({ logins }: { logins: {id: string, email: string, photoURL?: string}[] }) {
-  const [items, setItems] = useState<{id: string, email: string, photoURL?: string}[]>([]);
-
-  useEffect(() => {
-    if (logins.length > 0) {
-      setItems(logins);
-    }
-  }, [logins]);
-
-  useEffect(() => {
-    if (items.length <= 1) return;
-    const interval = setInterval(() => {
-      setItems(prev => {
-        const newItems = [...prev];
-        const first = newItems.shift();
-        if (first) newItems.push(first);
-        return newItems;
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [items.length]);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="relative h-[120px] w-full overflow-hidden" style={{ WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }}>
-      <AnimatePresence mode="popLayout">
-        {items.slice(0, 3).map((item, index) => {
-           const isTop = index === 0;
-           return (
-             <motion.div
-               layout
-               key={item.id}
-               initial={{ opacity: 0, y: 40, scale: 0.9 }}
-               animate={{ 
-                 opacity: isTop ? 1 : Math.max(0.15, 0.8 - (index * 0.2)), 
-                 y: 0,
-                 scale: isTop ? 1 : 1 - (index * 0.05),
-                 zIndex: 10 - index
-               }}
-               exit={{ opacity: 0, y: -40, scale: 1.08, filter: "blur(4px)" }}
-               transition={{ type: "spring", stiffness: 400, damping: 40, mass: 0.8 }}
-               className={`flex items-center gap-3 py-2 px-4 rounded-xl border mb-2 transition-colors duration-500 relative ${
-                 isTop 
-                   ? 'bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] shadow-indigo-500/10' 
-                   : 'bg-transparent border-transparent'
-               }`}
-             >
-               {item.photoURL ? (
-                 <img src={item.photoURL} alt="Avatar" className={`w-5 h-5 rounded-full object-cover shrink-0 ${isTop ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-transparent' : 'opacity-60'}`} />
-               ) : (
-                 <div className={`w-2 h-2 rounded-full shrink-0 ${isTop ? 'bg-indigo-400 animate-pulse' : 'bg-transparent'}`} />
-               )}
-               <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center -mt-0.5 sm:mt-0">
-                 <span className={`font-mono text-xs sm:text-sm tracking-tight truncate ${isTop ? 'text-indigo-600 dark:text-indigo-300 font-bold' : 'text-slate-500'}`}>
-                   {obfuscateEmail(item.email)}
-                 </span>
-                 <span className={`text-[10px] sm:text-xs sm:ml-2 truncate ${isTop ? 'text-indigo-500/80 dark:text-indigo-400/80 font-medium' : 'text-slate-600'}`}>
-                   <span className="hidden sm:inline">| </span>Đã đăng nhập thành công.
-                 </span>
-               </div>
-             </motion.div>
-           );
-        })}
-      </AnimatePresence>
-    </div>
-  );
 }
 
 export default function HomePage() {
@@ -117,7 +40,6 @@ export default function HomePage() {
   const { user } = useAuthStore();
   const { stampConfig, webLogo } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
-  const [recentLogins, setRecentLogins] = useState<{id: string, email: string, photoURL?: string}[]>([]);
   const [partners, setPartners] = useState<{ id: string, name: string, logoUrl: string }[]>([]);
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
@@ -135,7 +57,7 @@ export default function HomePage() {
           setAboutConfig(prev => ({ ...prev, ...snap.data() }));
         }
       } catch (e) {
-         console.warn(e?.message || "Unknown error");
+         console.warn(e || "Unknown error");
       }
     };
     fetchAbout();
@@ -146,8 +68,6 @@ export default function HomePage() {
     const monthId = `month_${format(now, 'yyyy-MM')}`;
     const yearId = `year_${format(now, 'yyyy')}`;
 
-    const statIds = ['total', todayId, monthId, yearId];
-    
     // Site Stats real-time listener
     const unsubStats = onSnapshot(collection(db, 'site_visitation_stats'), (snapshot) => {
       const stats: any = { today: 0, month: 0, year: 0, total: 0 };
@@ -164,43 +84,6 @@ export default function HomePage() {
       console.error("HomePage stats listener error:", err?.message || "Unknown error");
     });
 
-    const unsubLogins = onSnapshot(query(collection(db, 'users'), orderBy('lastLoginAt', 'desc'), limit(15)), (snapshot) => {
-      const users: {id: string, email: string, photoURL?: string}[] = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const email = data.email;
-        const role = data.role;
-        const photoURL = data.photoURL;
-        // Do not display Admin or Manager accounts
-        if (email && role !== 'admin' && role !== 'manager' && email !== 'sonlyhongduc@gmail.com') {
-          users.push({ id: doc.id, email, photoURL });
-        }
-      });
-      
-      // Setup 10 fake emails
-      const fakeEmails = [
-        "nguyenanhminh@gmail.com",
-        "trunghieu1998@gmail.com",
-        "lethuyduong@gmail.com",
-        "hoangnamhai@gmail.com",
-        "phamthimai@gmail.com",
-        "dangquangvinh@gmail.com",
-        "hoaison_92@gmail.com",
-        "trinhngocdiep@gmail.com",
-        "vulamanh@gmail.com",
-        "ngodung_88@gmail.com"
-      ].map((email, index) => ({ 
-        id: `fake-${index}`, 
-        email,
-        photoURL: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`
-      }));
-      
-      // Merge and ensure we have items for the stream
-      setRecentLogins([...users, ...fakeEmails]);
-    }, (error) => {
-      console.warn("Logins stream blocked due to local guest rules:", error?.message);
-    });
-
     const unsubPartners = onSnapshot(collection(db, 'partners'), (snapshot) => {
       setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
     }, (error) => {
@@ -209,7 +92,6 @@ export default function HomePage() {
 
     return () => {
       unsubStats();
-      unsubLogins();
       unsubPartners();
     };
   }, [user]);
@@ -261,7 +143,7 @@ export default function HomePage() {
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
            className="w-full max-w-4xl mx-auto mt-0 md:-mt-2"
-        >
+         >
           <div className="glass-card p-6 md:p-12 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 md:p-12 opacity-[0.02] -rotate-12 translate-x-10 -translate-y-10 group-hover:opacity-5 transition-opacity">
                <ShieldCheck className="w-64 h-64 md:w-96 md:h-96 text-indigo-900" />
@@ -333,20 +215,6 @@ export default function HomePage() {
                     </span>
                   </div>
                 </div>
-                
-                {/* Recent Logins Stream */}
-                {user && (
-                  <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5">
-                    <h3 className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Hoạt động trực tuyến
-                    </h3>
-                    <ActivityFeed />
-                    <div className="mt-4">
-                      <RecentLoginsStream logins={recentLogins} />
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>

@@ -21,10 +21,6 @@ import AdminPartners from './AdminPartners';
 import AdminOverview from './AdminOverview';
 import AdminAiTools from './AdminAiTools';
 import AdminSecuritySessions from './AdminSecuritySessions';
-import AdminRevenueStats from './AdminRevenueStats';
-import AdminDepositHistory from './AdminDepositHistory';
-import AdminUserPurchases from './AdminUserPurchases';
-import AdminShopSetup from './AdminShopSetup';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -37,7 +33,7 @@ export default function AdminDashboard() {
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'revenue_stats' | 'all_transactions' | 'purchase_history' | 'shop_setup'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -1263,25 +1259,6 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleAdjustBalance = async (user: UserData) => {
-    if (!isSuperAdmin) return toast.error('Quyền truy cập bị từ chối.');
-    const amountStr = window.prompt(`Cộng/Trừ tiền cho ${user.displayName} (vd: 50000 để cộng, -20000 để trừ):`, '0');
-    if (amountStr === null || amountStr === '') return;
-    
-    const amount = parseInt(amountStr);
-    if (isNaN(amount)) return toast.error('Số tiền không hợp lệ');
-
-    try {
-      const currentBalance = user.balance || 0;
-      await updateDoc(doc(db, 'users', user.uid), {
-        balance: currentBalance + amount
-      });
-      toast.success(`Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount).toLocaleString()}đ thành công!`);
-    } catch (e) {
-      toast.error('Lỗi khi cập nhật số dư');
-    }
-  };
-
   const toggleBlockedDevice = async (type: 'ios' | 'android') => {
     const newBlocked = {
       ...blockedDevices,
@@ -1405,72 +1382,213 @@ export default function AdminDashboard() {
 
   const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'];
 
+  // Categorized Tab Groups for UI/UX 5.0 Redesign
+  const tabGroups = [
+    {
+      id: 'finance',
+      title: 'Thương mại & Quỹ tài chính',
+      shortTitle: 'Thương mại',
+      icon: Landmark,
+      color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+      items: [
+        { id: 'dashboard', label: 'Bảng tổng quan', icon: Activity },
+      ]
+    },
+    {
+      id: 'security',
+      title: 'Quản lý Người dùng & An ninh',
+      shortTitle: 'An ninh',
+      icon: Shield,
+      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+      items: [
+        { id: 'users', label: 'Tài khoản người dùng', icon: Users },
+        { id: 'banned', label: 'Bộ lọc IP Banned', icon: ShieldAlert },
+        { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
+        { id: 'partners', label: 'Đối tác liên kết', icon: Users },
+      ]
+    },
+    {
+      id: 'data',
+      title: 'Dữ liệu số & Tiện ích ứng dụng',
+      shortTitle: 'Tiện ích',
+      icon: FolderOpen,
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+      items: [
+        { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
+        { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
+        { id: 'forms', label: 'Folders & Biểu mẫu', icon: Files },
+        { id: 'utilities', label: 'Cộng cụ Tiện ích', icon: Wrench },
+        { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
+      ]
+    },
+    {
+      id: 'system',
+      title: 'Hạ tầng hệ thống số',
+      shortTitle: 'Hệ thống',
+      icon: Server,
+      color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
+      items: [
+        { id: 'system', label: 'Hệ thống cốt lõi', icon: Settings },
+        { id: 'apikeys', label: 'Khóa API Keys', icon: Code },
+        { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
+        { id: 'versions', label: 'Phiên bản máy chủ', icon: RefreshCcw },
+        { id: 'about', label: 'Cấu hình Giới thiệu', icon: Info },
+        { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
+      ]
+    }
+  ];
+
+  // Helper check active tab category map
+  const activeGroupIdx = tabGroups.findIndex(g => g.items.some(item => item.id === activeTab));
+  const [mobileCategoryIdx, setMobileCategoryIdx] = useState(activeGroupIdx !== -1 ? activeGroupIdx : 0);
+
+  // Sync category selection on activeTab changes
+  useEffect(() => {
+    const idx = tabGroups.findIndex(g => g.items.some(item => item.id === activeTab));
+    if (idx !== -1) {
+      setMobileCategoryIdx(idx);
+    }
+  }, [activeTab]);
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-[80vh] bg-transparent">
-      {/* Sidebar Navigation */}
-      <div className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-4 lg:p-6 flex flex-col gap-4 lg:gap-8 bg-transparent">
-        <h1 className="text-xl font-bold text-slate-950 dark:text-white flex items-center gap-2">
-            <Shield className="w-7 h-7 text-amber-500" />
-            Quản trị Hệ thống
-        </h1>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-transparent">
+      {/* Sidebar Navigation - UI/UX 5.0 Glassmorphism */}
+      <div className="w-full lg:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-white/5 p-4 lg:p-6 flex flex-col gap-4 lg:gap-6 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md">
         
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
-          {[
-            { id: 'dashboard', label: 'Tổng quan', icon: Activity },
-            { id: 'revenue_stats', label: 'Thống kê Doanh thu', icon: LineChart },
-            { id: 'all_transactions', label: 'Lịch sử Nạp - Rút', icon: Landmark },
-            { id: 'purchase_history', label: 'Lịch sử Mua hàng', icon: ShoppingBag },
-            { id: 'shop_setup', label: 'Shop Setup', icon: Settings },
-            { id: 'system', label: 'Hệ thống', icon: Settings },
-            { id: 'users', label: 'Người dùng', icon: Users },
-            { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
-            { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
-            { id: 'forms', label: 'Folders/Form', icon: Files },
-            { id: 'utilities', label: 'Tiện ích', icon: Wrench },
-            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
-            { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
-            { id: 'partners', label: 'Đối tác', icon: Users },
-            { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
-            { id: 'apikeys', label: 'API Keys', icon: Code },
-            { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
-            { id: 'about', label: 'About Setup', icon: Info },
-            { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
-          ].map(tab => {
-            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
-            return (
-              <button 
-                key={tab.id} 
-                onClick={() => setActiveTab(tab.id as any)} 
+        {/* Sidebar Title */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">
+                Quản lý hệ thống
+              </h1>
+              <span className="text-[10px] text-slate-400 font-bold tracking-widest mt-1 block">ADMIN CONSOLE v5.0</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="hidden lg:block w-full h-[1px] bg-slate-200/50 dark:bg-white/5" />
+
+        {/* MOBILE VIEW CATEGORIES SLIDER */}
+        <div className="lg:hidden">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Phân mục quản trị</p>
+          <div className="flex gap-2 overflow-x-auto pb-2 scroll-smooth no-scrollbar">
+            {tabGroups.map((group, grpIdx) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setMobileCategoryIdx(grpIdx)}
                 className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink relative overflow-hidden",
-                  activeTab === tab.id 
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 font-bold" 
-                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white",
-                  isUnapprovedSecurityTab && "animate-pulse border border-red-500/50 bg-red-500/10 dark:bg-red-500/15 text-red-500 dark:text-red-400 font-bold shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                  "px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border flex items-center gap-1.5",
+                  mobileCategoryIdx === grpIdx
+                    ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10"
+                    : "bg-slate-50 dark:bg-zinc-900 border-slate-200/30 dark:border-white/5 text-slate-500"
                 )}
               >
-                  <div className="flex items-center gap-3">
-                    <tab.icon className={cn("w-5 h-5", isUnapprovedSecurityTab ? "text-red-500 animate-bounce" : "")} />
-                    <span className="whitespace-nowrap">{tab.label}</span>
-                  </div>
-                  {isUnapprovedSecurityTab && (
-                    <span className="relative flex h-2 w-2 mr-1">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                  )}
+                <group.icon className="w-3.5 h-3.5" />
+                <span>{group.shortTitle}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* MOBILE NAVIGATION GRID (Triggered by active mobileCategoryIdx) */}
+        <nav className="lg:hidden grid grid-cols-2 gap-2 p-2 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-200/50 dark:border-white/5">
+          {tabGroups[mobileCategoryIdx].items.map(tab => {
+            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-3 rounded-xl text-[11px] font-bold transition-all relative overflow-hidden",
+                  isActive
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-white/10 shadow-sm"
+                    : "text-slate-500 hover:text-slate-950 dark:hover:text-white",
+                  isUnapprovedSecurityTab && "animate-pulse bg-red-500/10 text-red-500 border border-red-500"
+                )}
+              >
+                <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{tab.label}</span>
+                {isUnapprovedSecurityTab && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-550 animate-ping absolute right-2 top-2" />
+                )}
               </button>
             );
           })}
         </nav>
+
+        {/* DESKTOP VIEW SIDEBAR (Categorized Stack) */}
+        <div className="hidden lg:flex flex-col gap-5 overflow-y-auto no-scrollbar max-h-[80vh] pr-1">
+          {tabGroups.map((group) => (
+            <div key={group.id} className="space-y-1.5">
+              {/* Group Banner Header */}
+              <div className="flex items-center gap-2 px-2.5 py-1 w-full bg-slate-100/50 dark:bg-zinc-900/50 rounded-xl border border-slate-200/20 dark:border-white/5">
+                <group.icon className="w-3.5 h-3.5 text-indigo-500/80" />
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
+                  {group.title}
+                </span>
+              </div>
+              
+              {/* Group Buttons Stack */}
+              <div className="space-y-0.5 pl-1.5 border-l-2 border-slate-100 dark:border-white/5 ml-4">
+                {group.items.map((tab) => {
+                  const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button 
+                      key={tab.id} 
+                      type="button"
+                      onClick={() => setActiveTab(tab.id as any)} 
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 relative overflow-hidden group/btn cursor-pointer",
+                        isActive 
+                          ? "bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400" 
+                          : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <tab.icon className={cn(
+                          "w-4 h-4 transition-transform duration-300 group-hover/btn:scale-110",
+                          isActive ? "text-indigo-500 dark:text-indigo-400" : "text-slate-400 group-hover/btn:text-slate-700 dark:group-hover/btn:text-white"
+                        )} />
+                        <span className="whitespace-nowrap">{tab.label}</span>
+                      </div>
+                      
+                      {isUnapprovedSecurityTab && (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
-        <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools', revenue_stats: 'Thống kê Doanh thu & Tài chính', all_transactions: 'Lịch sử Nạp & Rút', purchase_history: 'Lịch sử Mua hàng', shop_setup: 'Shop Setup'}[activeTab as any] }` }
-        </h1>
+      {/* Main Content Pane */}
+      <div className="flex-1 p-3 md:p-6 lg:p-8 overflow-x-auto w-full transition-all duration-300">
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/50 dark:border-white/5 pb-4">
+          <div className="space-y-1">
+            <h1 className="text-xl md:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight capitalize">
+              { activeTab === 'dashboard' ? 'Tổng quan hệ thống' : `Quản trị ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống Cơ cốt', versions: 'Phiên bản máy chủ', partners: 'Đối tác liên kết', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders Biểu mẫu', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools Công nghệ'}[activeTab as any] }` }
+            </h1>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+              Khối xử lý: {activeTab} • Trạng thái sẵn sàng
+            </p>
+          </div>
+        </div>
 
         {activeTab === 'dashboard' && (
            <AdminOverview 
@@ -1484,21 +1602,7 @@ export default function AdminDashboard() {
            />
         )}
 
-        {activeTab === 'revenue_stats' && (
-          <AdminRevenueStats />
-        )}
 
-        {activeTab === 'all_transactions' && (
-          <AdminDepositHistory />
-        )}
-
-        {activeTab === 'purchase_history' && (
-          <AdminUserPurchases />
-        )}
-
-        {activeTab === 'shop_setup' && (
-          <AdminShopSetup />
-        )}
 
 
       {activeTab === 'about' && (
@@ -1847,7 +1951,6 @@ export default function AdminDashboard() {
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số dư Ví</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
@@ -1873,18 +1976,6 @@ export default function AdminDashboard() {
                             <div className="font-semibold text-slate-900 dark:text-white">{u.displayName}</div>
                             <div className="text-xs text-slate-500 max-w-[150px] truncate">{u.email}</div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
-                        <div className="flex items-center gap-2">
-                           <span className="font-black text-indigo-600 dark:text-indigo-400">{(u.balance || 0).toLocaleString()}đ</span>
-                           <button 
-                             onClick={() => handleAdjustBalance(u)}
-                             className="p-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md text-indigo-500 transition-colors"
-                             title="Điều chỉnh số dư"
-                           >
-                             <Plus size={14} />
-                           </button>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

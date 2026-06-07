@@ -262,6 +262,138 @@ app.use(cookieParser());
     }
   });
 
+  // Text-To-Speech Export Endpoint (Updated to support premium Gemini regional voices with fallback)
+  app.post("/api/tts/export", async (req, res) => {
+    try {
+      const { text, slow, accent, gender, useAiPremium } = req.body;
+      if (!text || typeof text !== "string") {
+        return res.status(400).json({ error: "Văn bản không hợp lệ" });
+      }
+
+      // Limit length to 5000 characters for safety
+      const trimmedText = text.trim().substring(0, 5000);
+      if (!trimmedText) {
+        return res.status(400).json({ error: "Văn bản không được để trống" });
+      }
+
+      // If premium generative voice is requested (default is true), use Gemini TTS Preview
+      if (useAiPremium !== false) {
+        try {
+          const ai = await getAiClient();
+          const voiceName = gender === "male" ? "Fenrir" : "Kore";
+          
+          let regionalPrompt = "";
+          if (accent === "nam") {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Nam (Sài Gòn/Nam Bộ) cực kỳ dịu dàng, ngọt ngào, truyền cảm, tự nhiên như người bản xứ. Không được phát âm sai từ ngữ nào:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Nam (Sài Gòn/Nam Bộ) cực kỳ trầm ấm, nam tính, rõ ràng, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          } else if (accent === "trung") {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Trung Việt Nam (giọng Huế/Đà Nẵng thanh tao) cực kỳ dịu dàng, ngọt ngào, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Trung Việt Nam (giọng Huế/Đà Nẵng trầm ấm) cực kỳ trầm tốt, rõ chữ, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          } else {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Bắc Việt Nam (giọng Hà Nội chuẩn) cực kỳ thanh lịch, rõ từ, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Bắc Việt Nam (giọng Hà Nội chuẩn) cực kỳ trầm ấm, đĩnh đạc, rõ ràng, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          }
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [{ parts: [{ text: regionalPrompt }] }],
+            config: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName }
+                }
+              }
+            }
+          });
+
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          
+          if (base64Audio) {
+            const pcmBuffer = Buffer.from(base64Audio, "base64");
+            
+            // Generate standard 44-byte WAV header for 24kHz, 16-bit, mono PCM
+            const writeWavHeader = (sampleRate: number, numChannels: number, bitsPerSample: number, dataLength: number): Buffer => {
+              const b = Buffer.alloc(44);
+              b.write("RIFF", 0);
+              b.writeUInt32LE(36 + dataLength, 4);
+              b.write("WAVE", 8);
+              b.write("fmt ", 12);
+              b.writeUInt32LE(16, 16);
+              b.writeUInt16LE(1, 20); // PCM
+              b.writeUInt16LE(numChannels, 22);
+              b.writeUInt32LE(sampleRate, 24);
+              b.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+              b.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+              b.writeUInt16LE(bitsPerSample, 34);
+              b.write("data", 36);
+              b.writeUInt32LE(dataLength, 40);
+              return b;
+            };
+
+            const wavHeader = writeWavHeader(24000, 1, 16, pcmBuffer.length);
+            const finalBuffer = Buffer.concat([wavHeader, pcmBuffer]);
+            
+            res.setHeader("Content-Type", "audio/wav");
+            res.setHeader("Content-Disposition", `attachment; filename="bmass-tts-premium-${Date.now()}.wav"`);
+            return res.send(finalBuffer);
+          }
+        } catch (geminiError: any) {
+          console.error("Gemini Premium TTS Error, falling back to Google Translate proxy:", geminiError);
+        }
+      }
+
+      // Fallback: Google Translate TTS Proxy
+      // Split text into chunks of <= 200 characters to prevent Google Translate 400 bad request error
+      const chunks: string[] = [];
+      let currentChunk = "";
+      const words = trimmedText.split(/\s+/);
+      
+      for (const word of words) {
+        if ((currentChunk + " " + word).length <= 200) {
+          currentChunk += (currentChunk ? " " : "") + word;
+        } else {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = word;
+        }
+      }
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+
+      const audioBuffers: Buffer[] = [];
+      const speedParam = slow ? "0.3" : "1";
+
+      for (const chunk of chunks) {
+        const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(chunk)}&ttsspeed=${speedParam}`;
+        const chunkRes = await axios.get(googleTTSUrl, {
+          responseType: "arraybuffer",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+          }
+        });
+        audioBuffers.push(Buffer.from(chunkRes.data));
+      }
+
+      const finalBuffer = Buffer.concat(audioBuffers);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="bmass-tts-${Date.now()}.mp3"`);
+      res.send(finalBuffer);
+    } catch (error: any) {
+      console.error("TTS Proxy API Error:", error);
+      res.status(500).json({
+        error: "Thất bại khi xuất file giọng nói",
+        message: error.message || "Unknown error"
+      });
+    }
+  });
+
   // Endpoint to create an invoice (for deposits too)
   // Diagnostic endpoint to check Firestore connectivity
   app.get("/api/diag/firestore", async (req, res) => {

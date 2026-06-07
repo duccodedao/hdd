@@ -45,6 +45,18 @@ service cloud.firestore {
     match /users/{userId}/private/security {
       allow read, write: if isOwner(userId) || isSuperAdmin();
     }
+    match /users/{userId}/read_notifications/{notifId} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+    match /bookmarks/{id} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
     match /wallets/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow write: if isSuperAdmin();
