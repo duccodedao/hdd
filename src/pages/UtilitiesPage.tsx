@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star, Search, X } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
@@ -14,7 +14,9 @@ import DocumentVault from './utilities/DocumentVault';
 import PersonalFileManager from './utilities/PersonalFileManager';
 import AvatarFrameManager from './utilities/AvatarFrameManager';
 import TextToSpeech from './utilities/TextToSpeech';
-import { Volume2 } from 'lucide-react';
+import FindNearby from './utilities/FindNearby';
+import DocumentTemplates from './utilities/DocumentTemplates';
+import { Volume2, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
@@ -222,6 +224,14 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
 
 const nativeUtilities: UtilityItem[] = [
   {
+    id: 'find-nearby',
+    title: 'Tìm Quanh Đây',
+    description: 'Bản đồ tìm kiếm thực tế và kết nối người dùng xung quanh bạn theo vị trí chia sẻ thời gian thực.',
+    icon: Globe,
+    type: 'tool',
+    createdAt: Date.now() + 6000
+  },
+  {
     id: 'avatar-frame',
     title: 'Khung Ảnh Đại Diện',
     description: 'Thiết kế lồng ghép khung ảnh đại diện (avatar frame) chuyên nghiệp cho các chiến dịch.',
@@ -299,6 +309,7 @@ export default function UtilitiesPage() {
   const { sessionId, utilityId } = useParams();
   const navigate = useNavigate();
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -450,6 +461,15 @@ export default function UtilitiesPage() {
     return true;
   });
 
+  const filteredItems = allItems.filter(item => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q)
+    );
+  });
+
   const topHotIds = React.useMemo(() => {
     return allItems
       .map(item => ({ id: item.id, visits: utilityStats[item.id] || 0 }))
@@ -491,8 +511,16 @@ export default function UtilitiesPage() {
       );
     }
 
+    if (activeUtility.id === 'find-nearby') {
+      return <FindNearby onBack={handleBack} />;
+    }
+
     if (activeUtility.id === 'avatar-frame') {
       return <AvatarFrameManager onBack={handleBack} />;
+    }
+
+    if (activeUtility.id === 'document-templates') {
+      return <DocumentTemplates onBack={handleBack} />;
     }
 
     if (activeUtility.id === 'file-manager') {
@@ -609,24 +637,70 @@ export default function UtilitiesPage() {
               )}
             </div>
           </div>
+
+          {/* Utility Search Bar */}
+          <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-200/50 dark:border-white/[0.02]">
+            <div className="relative max-w-md w-full bg-slate-50 dark:bg-black/20 border border-slate-250 dark:border-white/5 rounded-2xl flex items-center shadow-sm hover:shadow focus-within:ring-2 focus-within:ring-indigo-500/20 transition duration-300">
+              <div className="pl-4 text-slate-400 dark:text-zinc-500 shrink-0">
+                <Search className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm nhanh tiện ích (PDF, Word, AI Scanner, Speech, Bản đồ...)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-3 pr-10 py-3 bg-transparent text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-550 outline-none rounded-2xl"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 p-1 rounded-full hover:bg-slate-105 text-slate-450 hover:text-slate-600 dark:hover:text-white transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {searchQuery && (
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 bg-slate-100/50 dark:bg-white/[0.02] px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 flex items-center gap-1.5 animate-in fade-in">
+                Tìm thấy <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{filteredItems.length}</strong> kết quả phù hợp
+              </span>
+            )}
+          </div>
         </header>
 
         <section>
           <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
-              {allItems.map((item, idx) => (
-                <UtilityCard 
-                  key={item.id} 
-                  item={item} 
-                  idx={idx} 
-                  onSelect={handleSelect} 
-                  systemTools={systemTools} 
-                  visits={utilityStats[item.id] || 0}
-                  realUsers={realUsers}
-                  isHot={topHotIds.includes(item.id)}
-                />
-              ))}
-            </div>
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50/50 dark:bg-black/15 rounded-[2rem] border border-dashed border-slate-250 dark:border-white/5 p-8 max-w-md mx-auto animate-in fade-in zoom-in-95">
+                <Box className="w-12 h-12 text-slate-350 dark:text-zinc-750 mx-auto stroke-1 mb-3" />
+                <p className="text-sm font-bold text-slate-700 dark:text-zinc-450">Không tìm thấy tiện ích nào khớp</p>
+                <p className="text-xs text-slate-450 dark:text-zinc-550 mt-1 px-4 leading-relaxed">Hệ thống không tìm thấy công cụ nào trùng khớp với từ khóa "{searchQuery}" của bạn.</p>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition shadow-sm"
+                >
+                  Đặt lại bộ lọc
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
+                {filteredItems.map((item, idx) => (
+                  <UtilityCard 
+                    key={item.id} 
+                    item={item} 
+                    idx={idx} 
+                    onSelect={handleSelect} 
+                    systemTools={systemTools} 
+                    visits={utilityStats[item.id] || 0}
+                    realUsers={realUsers}
+                    isHot={topHotIds.includes(item.id)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { useConfirmStore } from '../../store/confirmStore';
 
 export default function AdminApiKeys() {
-  const { isSuperAdmin } = useAuthStore();
+  const { isSuperAdmin, userData } = useAuthStore();
   const { openConfirm } = useConfirmStore();
   const [activeTab, setActiveTab] = useState<'system' | 'secondary'>('system');
   const [loading, setLoading] = useState(true);
@@ -65,6 +65,10 @@ export default function AdminApiKeys() {
   }, [activeTab]);
 
   const handleDeleteSecondary = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa API Key phụ',
       message: 'Bạn có chắc chắn muốn xóa API Key này không?',
@@ -83,6 +87,10 @@ export default function AdminApiKeys() {
   };
 
   const handleSave = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!isSuperAdmin) {
       toast.error('Chỉ Super Admin mới có quyền cấu hình API Keys.');
       return;
@@ -247,7 +255,7 @@ export default function AdminApiKeys() {
                       <th className="px-6 py-4 whitespace-nowrap">Trạng thái</th>
                       <th className="px-6 py-4 whitespace-nowrap">Ngày nhập</th>
                       <th className="px-6 py-4 whitespace-nowrap">Lần dùng cuối</th>
-                      <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -266,7 +274,7 @@ export default function AdminApiKeys() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
+                        <td className="px-6 py-4 whitespace-nowrap bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
                           <div className="flex items-center gap-2">
                              <div className="px-2 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md font-mono text-[11px] text-slate-600 dark:text-zinc-400">
                                 {showKeys[item.id] ? item.apiKey : '•'.repeat(24)}
@@ -316,7 +324,7 @@ export default function AdminApiKeys() {
                               </span>
                            </div>
                         </td>
-                        <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
                           <button 
                             onClick={() => handleDeleteSecondary(item.id)}
                             className="p-2 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-400/10 rounded-full transition-all"

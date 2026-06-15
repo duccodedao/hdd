@@ -18,7 +18,7 @@ export interface UserData {
   displayName: string;
   photoURL: string;
   phoneNumber?: string;
-  role: 'user' | 'admin' | 'superadmin';
+  role: 'user' | 'admin' | 'superadmin' | 'review';
   status: 'active' | 'banned';
   isBanned?: boolean;
   onboardingCompleted?: boolean;
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
   setUserData: (data) => set({ 
     userData: data,
-    isAdmin: data?.role === 'admin' || data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'sonlyhongduc1@ghn.vn',
+    isAdmin: data?.role === 'admin' || data?.role === 'superadmin' || data?.role === 'review' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'sonlyhongduc1@ghn.vn',
     isSuperAdmin: data?.role === 'superadmin' || data?.email === 'sonlyhongduc@gmail.com' || data?.email === 'sonlyhongduc1@ghn.vn'
   }),
   setLoading: (loading) => set({ loading }),

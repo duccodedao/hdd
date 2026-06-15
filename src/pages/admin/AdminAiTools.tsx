@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -7,6 +8,7 @@ import { useConfirmStore } from '../../store/confirmStore';
 import * as XLSX from 'xlsx';
 
 export default function AdminAiTools() {
+  const { userData } = useAuthStore();
   const [tools, setTools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,6 +60,10 @@ export default function AdminAiTools() {
   };
 
   const handleBulkDelete = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (selectedIds.length === 0) return;
     openConfirm({
       title: 'Xóa hàng loạt AI Tools?',
@@ -82,6 +88,10 @@ export default function AdminAiTools() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     e.preventDefault();
     if (!formData.name.trim() || !formData.url.trim()) {
       toast.error("Tên và đường dẫn không được để trống");
@@ -132,6 +142,10 @@ export default function AdminAiTools() {
   };
 
   const handleDelete = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa AI Tool',
       message: 'Bạn có chắc chắn muốn xóa công cụ này?',
@@ -194,6 +208,10 @@ export default function AdminAiTools() {
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -349,7 +367,7 @@ export default function AdminAiTools() {
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Tên AI</th>
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Mô tả giới thiệu</th>
               <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Liên kết nguồn</th>
-              <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
+              <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
@@ -372,7 +390,7 @@ export default function AdminAiTools() {
                 <td className="p-4 align-middle text-slate-900 dark:text-stone-100 whitespace-nowrap font-bold">{tool.name}</td>
                 <td className="p-4 align-middle text-xs text-slate-500 dark:text-slate-455 line-clamp-2 mt-4">{tool.description}</td>
                 <td className="p-4 align-middle text-xs whitespace-nowrap text-blue-500 truncate max-w-xs "><a href={tool.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{tool.url}</a></td>
-                <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
+                <td className="whitespace-nowrap p-4 align-middle text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <button onClick={() => handleEdit(tool)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all">
                       <Edit2 className="w-4 h-4" />
@@ -386,7 +404,7 @@ export default function AdminAiTools() {
             ))}
             {tools.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Bạn chưa thêm công cụ AI nào.</td>
+                <td colSpan={8} className="whitespace-nowrap p-12 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Bạn chưa thêm công cụ AI nào.</td>
               </tr>
             )}
           </tbody>

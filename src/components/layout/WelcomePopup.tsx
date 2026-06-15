@@ -4,8 +4,10 @@ import { db } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Megaphone, X, Check } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function WelcomePopup() {
+  const { userData } = useAuthStore();
   const [config, setConfig] = useState({
     popupActive: false,
     popupTitle: '',
@@ -14,6 +16,8 @@ export default function WelcomePopup() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+
+  if (userData?.role === 'review') return null;
 
   useEffect(() => {
     // 1. Listen to the system config real-time

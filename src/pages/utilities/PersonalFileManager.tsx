@@ -750,7 +750,7 @@ export default function PersonalFileManager({ onBack }: PersonalFileManagerProps
                 <Terminal size={40} className="stroke-[1.5]" />
               </div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 font-display">Chưa Chọn Tệp Tin</h3>
-              <p className="text-sm text-slate-550 dark:text-zinc-400 max-w-sm">
+              <p className="text-sm text-slate-500 dark:text-zinc-400 max-w-sm">
                 Nhấp chuột vào bất kỳ tệp tin nào ở khung cây thư mục trái để kích hoạt màn hình xem trước và các công cụ thực thi.
               </p>
             </div>

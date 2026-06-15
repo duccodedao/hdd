@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import React, { useState, useEffect } from 'react';
@@ -35,6 +36,7 @@ interface UploadItem {
 }
 
 export default function AdminDocumentVault() {
+  const { userData } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'upload' | 'category' | 'files' | 'trash'>('upload');
   
   // GH Config State
@@ -82,6 +84,10 @@ export default function AdminDocumentVault() {
   };
 
   const updateDocCategory = async (docId: string, newCategoryId: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     let categoryIdToSave = newCategoryId;
     let categoryNameToSave = 'Khác';
 
@@ -105,6 +111,10 @@ export default function AdminDocumentVault() {
   
   // Upload State
   const updateDocVip = async (docId: string, isVip: boolean, vipCode: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     await updateDoc(doc(db, 'documents', docId), {
       isVip,
       vipCode
@@ -170,6 +180,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     e.preventDefault();
     if (!newCatName) return;
     try {
@@ -188,6 +202,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const q = query(collection(db, 'documents'), where('categoryId', '==', id));
     const snap = await getDocs(q);
     const khacCat = categories.find(c => c.name === 'Khác');
@@ -218,6 +236,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleBulkDelete = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm(
       "Xóa hàng loạt", 
       `Bạn có chắc chắn muốn chuyển ${selectedIds.length} tài liệu vào thùng rác?`, 
@@ -269,6 +291,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleToggleHidden = async (docObj: AdminDocument) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const action = docObj.hidden ? "Hiện" : "Ẩn";
     openConfirm(`${action} tài liệu`, `Bạn có chắc chắn muốn ${action.toLowerCase()} tài liệu "${docObj.name}"?`, async () => {
       try {
@@ -281,6 +307,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleDeleteFile = async (docObj: AdminDocument) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm("Xóa tài liệu", `Bạn có chắc chắn muốn chuyển tài liệu "${docObj.name}" vào thùng rác?`, async () => {
       try {
         await updateDoc(doc(db, 'documents', docObj.id), { 
@@ -295,6 +325,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleRestoreFile = async (docObj: AdminDocument) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm("Khôi phục tài liệu", `Bạn có chắc chắn muốn khôi phục tài liệu "${docObj.name}"?`, async () => {
       try {
         await updateDoc(doc(db, 'documents', docObj.id), { 
@@ -309,6 +343,10 @@ export default function AdminDocumentVault() {
   };
 
   const handlePermanentDelete = (docObj: AdminDocument) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm("Xóa vĩnh viễn", `Bạn có chắc chắn muốn xóa vĩnh viễn tài liệu "${docObj.name}"? Thao tác này không thể hoàn tác.`, async () => {
       try {
         await deleteDoc(doc(db, 'documents', docObj.id));
@@ -320,6 +358,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleBulkPermanentDelete = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const deletedDocs = documents.filter(d => d.isDeleted);
     if (deletedDocs.length === 0) return;
 
@@ -352,6 +394,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleUpdateDocument = async (id: string, updates: Partial<AdminDocument>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'documents', id), {
         ...updates,
@@ -366,6 +412,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -492,6 +542,10 @@ export default function AdminDocumentVault() {
   };
 
   const handleUpload = async (e: React.FormEvent) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     e.preventDefault();
     const itemsToUpload = uploadItems.filter(item => item.status === 'pending' || item.status === 'error');
     
@@ -716,7 +770,7 @@ export default function AdminDocumentVault() {
 
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày tạo</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ghi chú</th>
-                   <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -776,7 +830,7 @@ export default function AdminDocumentVault() {
                           {docItem.note || "---"}
                         </p>
                      </td>
-                     <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
+                     <td className="px-6 py-4 text-right whitespace-nowrap">
                        <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setEditingDoc(docItem)} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all" title="Sửa thông tin">
                             <Edit2 className="w-4 h-4" />
@@ -847,7 +901,7 @@ export default function AdminDocumentVault() {
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên gốc</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày xóa</th>
-                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -877,7 +931,7 @@ export default function AdminDocumentVault() {
                            {docItem.deletedAt ? new Date(docItem.deletedAt?.seconds * 1000).toLocaleString() : 'N/A'}
                          </span>
                        </td>
-                       <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
+                       <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex gap-2 justify-end">
                             <button 
                                onClick={() => handleRestoreFile(docItem)}
@@ -1146,6 +1200,11 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
   });
 
   const handleSubmit = (e: React.FormEvent) => {
+    const { userData } = useAuthStore.getState();
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     e.preventDefault();
     onConfirm(doc.id, {
       ...formData,

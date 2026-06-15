@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Users, Shield, User, Loader2 } from 'lucide-react';
 import { db, auth } from '../../lib/firebase';
@@ -107,7 +108,7 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/50 dark:bg-zinc-950/70 backdrop-blur-sm">
@@ -118,10 +119,10 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
             initial={{ opacity: 0, scale: 0.95, y: -15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -15 }}
-            className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col z-10"
+            className="relative w-full max-w-md max-h-[calc(100vh-2rem)] bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col z-10"
           >
             {/* Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/20">
+            <div className="p-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/20 shrink-0">
               <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                 <Send className="w-4 h-4 active:scale-95 transition-transform" />
                 <h3 className="font-display font-medium text-sm text-slate-800 dark:text-white uppercase tracking-wider">
@@ -138,7 +139,7 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[450px]">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               {/* Target Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
@@ -184,31 +185,53 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
                 </div>
               </div>
 
+              {/* Target Description */}
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-black/10 px-3.5 py-2.5 rounded-xl border border-slate-200/55 dark:border-white/[0.03] leading-relaxed">
+                {target === 'all' && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping shrink-0" />
+                    <strong>Cộng đồng:</strong> Thông báo sẽ được chuyển tiếp công khai tới toàn bộ thành viên hệ thống.
+                  </span>
+                )}
+                {target === 'role' && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <strong>Phân quyền:</strong> Chỉ người dùng có chức danh phù hợp mới có quyền truy xuất đọc thư.
+                  </span>
+                )}
+                {target === 'user' && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                    <strong>Bảo mật:</strong> Gửi đích danh trực tiếp, chỉ tài khoản được chỉ định mới thấy được.
+                  </span>
+                )}
+              </div>
+
               {/* Dynamic Target Values */}
               {target === 'role' && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-550 uppercase tracking-widest">
                     Chọn vai trò người nhận
                   </label>
                   <select
                     value={targetValue}
                     onChange={(e) => setTargetValue(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                    className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
                   >
-                    <option value="" className="text-slate-550 dark:bg-zinc-900">-- Chọn vai trò nhận thông báo --</option>
-                    <option value="admin" className="text-slate-800 dark:bg-zinc-900">Quản lý viên (Admin)</option>
-                    <option value="user" className="text-slate-800 dark:bg-zinc-900">Thành viên thường (User)</option>
+                    <option value="" className="text-slate-550 bg-white dark:bg-zinc-900 dark:text-zinc-400">-- Chọn vai trò nhận thông báo --</option>
+                    <option value="admin" className="text-slate-900 bg-white dark:bg-zinc-900 dark:text-zinc-200">Quản lý viên (Admin)</option>
+                    <option value="user" className="text-slate-900 bg-white dark:bg-zinc-900 dark:text-zinc-200">Thành viên thường (User)</option>
                   </select>
                 </div>
               )}
 
               {target === 'user' && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-zinc-550 uppercase tracking-widest">
                     Chọn tài khoản nhận
                   </label>
                   {loadingUsers ? (
-                    <div className="flex items-center gap-2 justify-center py-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 justify-center py-2 text-xs text-slate-550">
                       <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
                       <span>Đang tải danh sách tài khoản...</span>
                     </div>
@@ -216,11 +239,11 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
                     <select
                       value={targetValue}
                       onChange={(e) => setTargetValue(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                      className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
                     >
-                      <option value="" className="text-slate-550 dark:bg-zinc-900">-- Chọn người dùng --</option>
+                      <option value="" className="text-slate-550 bg-white dark:bg-zinc-900 dark:text-zinc-400">-- Chọn người dùng --</option>
                       {users.map(u => (
-                        <option key={u.uid} value={u.uid} className="text-slate-800 dark:bg-zinc-900">
+                        <option key={u.uid} value={u.uid} className="text-slate-900 bg-white dark:bg-zinc-900 dark:text-zinc-200">
                           {u.displayName || 'Tên ẩn danh'} ({u.email}) - [{u.role}]
                         </option>
                       ))}
@@ -288,7 +311,8 @@ export default function AdminNotificationModal({ isOpen, onClose }: AdminNotific
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 export { AdminNotificationModal };

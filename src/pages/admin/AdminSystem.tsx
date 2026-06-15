@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -29,6 +30,7 @@ interface CollectionStatus {
 }
 
 export default function AdminSystem() {
+  const { userData } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [customCollectionName, setCustomCollectionName] = useState('');
   const { openConfirm } = useConfirmStore();
@@ -101,6 +103,10 @@ export default function AdminSystem() {
 
   // Add customized collection name on the fly
   const handleAddCustomCollection = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const trimmed = customCollectionName.trim();
     if (!trimmed) return;
     
@@ -131,6 +137,10 @@ export default function AdminSystem() {
 
   // Remove a collection from the active list
   const handleRemoveCollection = (name: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     setCollections(prev => prev.filter(c => c.name !== name));
     toast.success(`Đã bỏ bộ sưu tập ${name} khỏi danh sách cấu trúc`);
   };
@@ -243,6 +253,10 @@ export default function AdminSystem() {
 
   // Comprehensive and dynamically inclusive schema restoration
   const executeImport = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!importFile) return;
 
     openConfirm({

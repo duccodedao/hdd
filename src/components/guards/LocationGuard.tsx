@@ -42,8 +42,15 @@ export default function LocationGuard({ children }: LocationGuardProps) {
   };
 
   useEffect(() => {
-    checkLocation();
-  }, [user?.uid]);
+    if (userData?.location?.lat && userData?.location?.lng) {
+      setPermission('granted');
+      setLocation({ lat: userData.location.lat, lng: userData.location.lng });
+    } else if (user) {
+      checkLocation();
+    } else {
+      setPermission('loading');
+    }
+  }, [user?.uid, userData?.location?.lat, userData?.location?.lng]);
 
   useEffect(() => {
     let mounted = true;

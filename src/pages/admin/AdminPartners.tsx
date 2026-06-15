@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -8,6 +9,7 @@ import { githubService } from '../../services/githubService';
 import { useConfirmStore } from '../../store/confirmStore';
 
 export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
+  const { userData } = useAuthStore();
   const [partners, setPartners] = useState<{ id: string, logoUrl: string, name: string }[]>([]);
   const [newPartnerName, setNewPartnerName] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -21,6 +23,10 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -65,6 +71,10 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
   };
 
   const deletePartner = (id: string, name: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa đối tác',
       message: `Bạn có chắc chắn muốn xóa đối tác "${name}" không? Thao tác này không thể hoàn tác.`,

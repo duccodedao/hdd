@@ -394,6 +394,182 @@ app.use(cookieParser());
     }
   });
 
+  // VnExpress RSS to JSON API Proxy
+  app.get("/api/vnexpress-news", async (req, res) => {
+    const category = typeof req.query.category === "string" ? req.query.category.trim() : "tin-moi-nhat";
+    const VNEXPRESS_FEEDS: Record<string, string> = {
+      "tin-moi-nhat": "https://vnexpress.net/rss/tin-moi-nhat.rss",
+      "the-gioi": "https://vnexpress.net/rss/the-gioi.rss",
+      "thoi-su": "https://vnexpress.net/rss/thoi-su.rss",
+      "kinh-doanh": "https://vnexpress.net/rss/kinh-doanh.rss",
+      "giai-tri": "https://vnexpress.net/rss/giai-tri.rss",
+      "the-thao": "https://vnexpress.net/rss/the-thao.rss",
+      "phap-luat": "https://vnexpress.net/rss/phap-luat.rss",
+      "giao-duc": "https://vnexpress.net/rss/giao-duc.rss",
+      "suc-khoe": "https://vnexpress.net/rss/suc-khoe.rss",
+      "doi-song": "https://vnexpress.net/rss/gia-dinh.rss",
+      "du-lich": "https://vnexpress.net/rss/du-lich.rss",
+      "khoa-hoc": "https://vnexpress.net/rss/khoa-hoc.rss",
+      "so-hoa": "https://vnexpress.net/rss/so-hoa.rss",
+      "xe": "https://vnexpress.net/rss/oto-xe-may.rss"
+    };
+
+    const targetUrl = VNEXPRESS_FEEDS[category] || VNEXPRESS_FEEDS["tin-moi-nhat"];
+    try {
+      const response = await axios.get(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/rss+xml, application/xml, text/xml, */*"
+        },
+        timeout: 10000
+      });
+
+      const xmlText = response.data;
+      const items: any[] = [];
+      const itemMatches = xmlText.matchAll(/<item>([\s\S]*?)<\/item>/g);
+
+      for (const match of itemMatches) {
+        const itemContent = match[1];
+
+        // Extract Title
+        let title = "";
+        const titleMatch = itemContent.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+        if (titleMatch) {
+          title = titleMatch[1].trim();
+        }
+
+        // Extract Link
+        let link = "";
+        const linkMatch = itemContent.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/);
+        if (linkMatch) {
+          link = linkMatch[1].trim();
+        }
+
+        // Extract PubDate
+        let pubDate = "";
+        const pubDateMatch = itemContent.match(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/);
+        if (pubDateMatch) {
+          pubDate = pubDateMatch[1].trim();
+        }
+
+        // Extract Description/Summary
+        let descriptionText = "";
+        const descMatch = itemContent.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/);
+        if (descMatch) {
+          descriptionText = descMatch[1].trim();
+        }
+
+        // Extract Image
+        let image = "";
+        const imgMatch = descriptionText.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (imgMatch) {
+          image = imgMatch[1];
+        }
+
+        // Clean Summary (strip images, anchor wrappers and tags)
+        const cleanSummary = descriptionText
+          .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, "")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/gi, " ")
+          .trim();
+
+        if (title) {
+          items.push({
+            title,
+            link,
+            pubDate,
+            summary: cleanSummary || title,
+            image
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        category,
+        count: items.length,
+        items
+      });
+    } catch (err: any) {
+      console.error("VnExpress Fetch RSS Error:", err);
+      res.status(500).json({
+        success: false,
+        error: "Thất bại khi lấy tin tức VnExpress",
+        message: err.message
+      });
+    }
+  });
+
+  // Scrapes the full content of any VnExpress article
+  app.get("/api/scrape-article", async (req, res) => {
+    const urlString = typeof req.query.url === "string" ? req.query.url.trim() : "";
+    if (!urlString) {
+      return res.status(400).json({ success: false, error: "Missing article URL" });
+    }
+
+    if (!urlString.includes("vnexpress.net") && !urlString.includes("vnecdn.net")) {
+      return res.status(400).json({ success: false, error: "Only VnExpress articles are supported" });
+    }
+
+    try {
+      const response = await axios.get(urlString, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        },
+        timeout: 10000
+      });
+
+      const html = response.data;
+      
+      // Extract paragraphs inside <p class="Normal"> ... </p>
+      const normalParagraphMatches = html.matchAll(/<p class="Normal">([\s\S]*?)<\/p>/gi);
+      const paragraphs: string[] = [];
+
+      for (const m of normalParagraphMatches) {
+        let content = m[1];
+        // strip any inner html tags
+        content = content.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
+        if (content) {
+          paragraphs.push(content);
+        }
+      }
+
+      // If normal paragraphs weren't found, try secondary tags
+      if (paragraphs.length === 0) {
+        const secondaryMatches = html.matchAll(/<span class="lead">([\s\S]*?)<\/span>/gi);
+        for (const m of secondaryMatches) {
+          let content = m[1].replace(/<[^>]+>/g, "").trim();
+          if (content) paragraphs.push(content);
+        }
+      }
+
+      // Get image links inside article view
+      const imgTags = html.matchAll(/<picture[\s\S]*?<img[^>]+(?:data-)?src="([^"]+)"[^>]*>/gi);
+      const images: string[] = [];
+      for (const im of imgTags) {
+        const src = im[1];
+        if (src && src.includes("http") && !src.includes("icon") && !images.includes(src)) {
+          images.push(src);
+        }
+      }
+
+      res.json({
+        success: true,
+        paragraphs,
+        images: images.slice(0, 5),
+        count: paragraphs.length
+      });
+    } catch (e: any) {
+      console.error("VnExpress Scraper Error:", e);
+      res.status(500).json({
+        success: false,
+        error: "Thất bại khi bóc tách chi tiết bản tin",
+        message: e.message
+      });
+    }
+  });
+
   // Endpoint to create an invoice (for deposits too)
   // Diagnostic endpoint to check Firestore connectivity
   app.get("/api/diag/firestore", async (req, res) => {

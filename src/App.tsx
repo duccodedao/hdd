@@ -66,6 +66,7 @@ import FloatingAdminButton from './components/layout/FloatingAdminButton';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 import HomePage from './pages/HomePage';
+import PortalPage from './pages/PortalPage';
 
 import { useAudioStore } from './store/audioStore';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
@@ -600,7 +601,40 @@ export default function App() {
       <CookieConsentComponent />
       <CommandPalette />
       <AuthActionRedirector />
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        containerStyle={{
+          display: userData?.role === 'review' ? 'none' : 'block'
+        }}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#0a0f1d',
+            color: '#f8fafc',
+            borderRadius: '1.25rem',
+            padding: '12px 20px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)',
+            fontSize: '13px',
+            fontWeight: '550',
+            fontFamily: '"Inter", sans-serif',
+            backdropFilter: 'blur(8px)',
+            maxWidth: '380px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#0a0f1d',
+            }
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#0a0f1d',
+            }
+          }
+        }}
+      />
       <ConfirmModal />
       <AccessGuard>
         <ErrorBoundary>
@@ -633,6 +667,8 @@ export default function App() {
               <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
               <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/portal" element={<PortalPage />} />
+              <Route path="/profile" element={<TabGuard tabKey="profile"><Profile /></TabGuard>} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
@@ -640,7 +676,7 @@ export default function App() {
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
-              <Route path="/admin/*" element={isSuperAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
+              <Route path="/admin/*" element={isSuperAdmin || userData?.role === 'review' ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
               
               <Route path="/blocked" element={<BlockedPage />} />
             </Route>

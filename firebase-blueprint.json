@@ -339,6 +339,58 @@
         "readAt": { "type": "number" }
       },
       "required": ["readAt"]
+    },
+    "SharedLocation": {
+      "title": "Shared Location",
+      "description": "User shared location in real-time for Find Nearby utility",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "displayName", "email", "latitude", "longitude", "updatedAt"]
+    },
+    "NearbyFriendship": {
+      "title": "Nearby Friendship",
+      "description": "Friendship and request status between users for Find Nearby utility",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "status": { "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "senderId", "receiverId", "status", "createdAt", "updatedAt"]
+    },
+    "PortalPost": {
+      "title": "Portal Post",
+      "description": "Posts, announcements, and information articles on the portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "background": { "type": "string" },
+        "views": { "type": "number" },
+        "shares": { "type": "number" },
+        "likes": { "type": "number" },
+        "likedBy": { "type": "array", "items": { "type": "string" } },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "summary", "content", "category", "background", "authorId", "authorName", "createdAt"]
     }
   },
   "firestore": {
@@ -433,6 +485,18 @@
     "word_covers": {
       "schema": "WordCover",
       "description": "Metadata for Word cover page templates"
+    },
+    "shared_locations": {
+      "schema": "SharedLocation",
+      "description": "Real-time user locations for Find Nearby utility"
+    },
+    "nearby_friendships": {
+      "schema": "NearbyFriendship",
+      "description": "Friendships and requests for masking/unmasking PII in Find Nearby"
+    },
+    "portal_posts": {
+      "schema": "PortalPost",
+      "description": "Official announcements, informational posts, and articles"
     }
   }
 }

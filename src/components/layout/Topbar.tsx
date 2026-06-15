@@ -2,7 +2,8 @@ import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, Map
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -99,6 +100,94 @@ export default function Topbar() {
     };
   }, []);
   const [locationName, setLocationName] = useState<string>('');
+  const [resettingLocation, setResettingLocation] = useState(false);
+
+  const handleResetLocation = async () => {
+    if (resettingLocation) return;
+    setResettingLocation(true);
+    const toastId = toast.loading('Đang cập nhật vị trí thiết bị...');
+    
+    if (!navigator.geolocation) {
+      toast.error('Trình duyệt không hỗ trợ xác định vị trí hiện tại.', { id: toastId });
+      setResettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          
+          // Fetch reverse address
+          const gRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, 
+            { headers: { 'Accept-Language': 'vi' } }
+          );
+          const gData = await gRes.json();
+          let address = 'Việt Nam';
+          
+          if (gData?.address) {
+            const addr = gData.address;
+            const parts = [];
+            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+            const district = addr.city_district || addr.county || addr.district || addr.town;
+            const city = addr.city || addr.state || addr.province;
+            if (ward) parts.push(ward);
+            if (district) parts.push(district);
+            if (city) parts.push(city);
+            address = parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Việt Nam');
+          } else if (gData?.display_name) {
+            address = gData.display_name;
+          }
+
+          if (user?.uid) {
+            // Update Firestore so it propagates globally and updates other listeners
+            await setDoc(doc(db, 'users', user.uid), {
+              location: {
+                lat: latitude,
+                lng: longitude,
+                address: address,
+                updatedAt: Date.now()
+              }
+            }, { merge: true });
+          } else {
+            // Unauthenticated user - fall back to local state
+            setLocationName(address);
+          }
+
+          // Trigger weather reload manually as well
+          const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+          const wData = await wRes.json();
+          if (wData?.current_weather) {
+            const getWeatherDescription = (code: number) => {
+              const descriptions: { [key: number]: string } = {
+                0: 'Trời quang', 1: 'Có mây', 2: 'Nhiều mây', 3: 'U ám', 45: 'Sương mù', 
+                61: 'Có mưa', 63: 'Có mưa', 65: 'Mưa lớn', 71: 'Có tuyết', 95: 'Có bão'
+              };
+              return descriptions[code] || 'Trời quang';
+            };
+            setWeather({
+              temp: Math.round(wData.current_weather.temperature),
+              code: wData.current_weather.weathercode,
+              description: getWeatherDescription(wData.current_weather.weathercode)
+            });
+          }
+
+          toast.success('Đã làm mới vị trí & thời tiết thành công!', { id: toastId });
+        } catch (err: any) {
+          toast.error('Lỗi khi lưu vị trí: ' + (err.message || String(err)), { id: toastId });
+        } finally {
+          setResettingLocation(false);
+        }
+      },
+      (err) => {
+        toast.error('Bạn đã từ chối quyền truy cập vị trí hoặc có lỗi định vị.', { id: toastId });
+        setResettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const [initialLoad, setInitialLoad] = useState(true);
 
   const { notifications, readNotificationIds, markAsRead, markAllAsRead } = useNotificationStore();
@@ -224,39 +313,63 @@ export default function Topbar() {
       return descriptions[code] || 'Trời quang';
     };
 
-    if ("geolocation" in navigator) {
+    const fetchWeatherAndAddress = async (latitude: number, longitude: number) => {
+      try {
+        const [wRes, gRes] = await Promise.all([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
+        ]);
+        const wData = await wRes.json();
+        const gData = await gRes.json();
+        if (wData?.current_weather) {
+          setWeather({
+            temp: Math.round(wData.current_weather.temperature),
+            code: wData.current_weather.weathercode,
+            description: getWeatherDescription(wData.current_weather.weathercode)
+          });
+        }
+        if (gData?.address) {
+          const addr = gData.address;
+          const parts = [];
+          const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+          const district = addr.city_district || addr.county || addr.district || addr.town;
+          const city = addr.city || addr.state || addr.province;
+          if (ward) parts.push(ward);
+          if (district) parts.push(district);
+          if (city) parts.push(city);
+          
+          setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
+        }
+      } catch {}
+    };
+
+    if (userData?.location?.lat && userData?.location?.lng) {
+      if (userData.location.address) {
+        setLocationName(userData.location.address);
+        // Only fetch weather and let coordinates populate weather stats
+        (async () => {
+          try {
+            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userData.location!.lat}&longitude=${userData.location!.lng}&current_weather=true`);
+            const wData = await wRes.json();
+            if (wData?.current_weather) {
+              setWeather({
+                temp: Math.round(wData.current_weather.temperature),
+                code: wData.current_weather.weathercode,
+                description: getWeatherDescription(wData.current_weather.weathercode)
+              });
+            }
+          } catch {}
+        })();
+      } else {
+        fetchWeatherAndAddress(userData.location.lat, userData.location.lng);
+      }
+    } else if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const { latitude, longitude } = pos.coords;
-        try {
-          const [wRes, gRes] = await Promise.all([
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
-          ]);
-          const wData = await wRes.json();
-          const gData = await gRes.json();
-          if (wData?.current_weather) {
-            setWeather({
-              temp: Math.round(wData.current_weather.temperature),
-              code: wData.current_weather.weathercode,
-              description: getWeatherDescription(wData.current_weather.weathercode)
-            });
-          }
-          if (gData?.address) {
-            const addr = gData.address;
-            const parts = [];
-            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
-            const district = addr.city_district || addr.county || addr.district || addr.town;
-            const city = addr.city || addr.state || addr.province;
-            if (ward) parts.push(ward);
-            if (district) parts.push(district);
-            if (city) parts.push(city);
-            
-            setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
-          }
-        } catch {}
+        fetchWeatherAndAddress(latitude, longitude);
       }, () => setLocationName('Việt Nam'));
     }
-  }, []);
+  }, [userData?.location?.lat, userData?.location?.lng, userData?.location?.address]);
 
   const getWeatherIcon = (code: number) => {
     if (code === 0 || code === 1) return <Sun className="w-3.5 h-3.5 text-amber-400" />;
@@ -298,11 +411,21 @@ export default function Topbar() {
           </div>
 
           <div className="flex items-center gap-4 text-slate-500 dark:text-zinc-500">
-             <div className="flex items-center gap-2 group cursor-help">
-               <MapPin className="w-3.5 h-3.5 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
-               <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
-                 {locationName || 'Đang định vị...'}
-               </span>
+             <div className="flex items-center gap-2 group">
+               <div className="flex items-center gap-1.5 cursor-help">
+                 <MapPin className="w-3.5 h-3.5 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
+                 <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+                   {locationName || 'Đang định vị...'}
+                 </span>
+               </div>
+               <button
+                 onClick={handleResetLocation}
+                 disabled={resettingLocation}
+                 className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-md text-slate-400 hover:text-indigo-600 active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 ml-1 shrink-0"
+                 title="Cập nhật lại vị trí hiện tại"
+               >
+                 <RefreshCw className={cn("w-3 h-3 text-slate-400 hover:text-indigo-500", resettingLocation && "animate-spin")} />
+               </button>
              </div>
              {weather && (
                <div className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-white/5">

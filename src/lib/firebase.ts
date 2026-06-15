@@ -8,7 +8,7 @@ import configFromFile from "../../firebase-applet-config.json";
 
 const config: any = configFromFile || {};
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || config.apiKey || "AIzaSyCXAxmprEv9fF-P-1lLpUzykkxG4HjDVI4",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain || "sonlyhongduc-ca6d6.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || config.projectId || "sonlyhongduc-ca6d6",

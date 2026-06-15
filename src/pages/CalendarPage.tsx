@@ -840,7 +840,7 @@ export default function CalendarPage() {
                          <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
                          <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                          <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
-                         {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
+                         {canEdit && <th className="py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -880,7 +880,7 @@ export default function CalendarPage() {
                              {ev.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
                            </td>
                            {canEdit && (
-                             <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                             <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleOpenModal(selectedDay, ev); }}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
@@ -975,7 +975,7 @@ export default function CalendarPage() {
                       <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
                       <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                       <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
-                      {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-36 whitespace-nowrap">Thao tác</th>}
+                      {canEdit && <th className="py-3 px-4 text-right w-36 whitespace-nowrap">Thao tác</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -1047,7 +1047,7 @@ export default function CalendarPage() {
                           {item.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
                         </td>
                         {canEdit && (
-                          <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                             {item.isEvent ? (
                               <div className="flex items-center justify-end space-x-1">
                                 <button 
@@ -1215,7 +1215,7 @@ export default function CalendarPage() {
                         <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                         <th className="py-3 px-4 w-28 whitespace-nowrap">Mức độ</th>
                         <th className="py-3 px-4 whitespace-nowrap">Mô tả</th>
-                        {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
+                        {canEdit && <th className="py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -1266,7 +1266,7 @@ export default function CalendarPage() {
                             {re.description || <span className="italic opacity-50 font-normal">Không có mô tả</span>}
                           </td>
                           {canEdit && (
-                            <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                            <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={() => handleOpenRecurringModal(re)}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
