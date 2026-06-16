@@ -159,33 +159,34 @@
       },
       "required": ["name", "imageUrl", "active"]
     },
-    "HrmEmployee": {
-      "title": "Hrm Employee",
-      "description": "Official store employee personnel record details",
+    "Contact": {
+      "title": "Contact",
+      "description": "Administrative contact directory (UBND, Medical, Collaborators)",
       "type": "object",
       "properties": {
         "fullName": { "type": "string" },
-        "birthDate": { "type": "string" },
-        "gender": { "type": "string" },
-        "idCard": { "type": "string" },
         "phone": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["fullName", "birthDate", "gender", "idCard", "phone"]
-    },
-    "HrmCollaborator": {
-      "title": "Hrm Collaborator",
-      "description": "Official store collaborator personnel record details",
-      "type": "object",
-      "properties": {
-        "fullName": { "type": "string" },
-        "birthDate": { "type": "string" },
-        "gender": { "type": "string" },
+        "position": { "type": "string" },
         "region": { "type": "string" },
-        "phone": { "type": "string" },
-        "createdAt": { "type": "number" }
+        "category": { "enum": ["ubnd", "tram_y_te", "ctv_y_te", "ctv_dan_so"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
       },
-      "required": ["fullName", "birthDate", "gender", "region", "phone"]
+      "required": ["fullName", "phone", "category"]
+    },
+    "HrmPopulation": {
+      "title": "Hrm Population",
+      "description": "Population distribution data by age range and gender",
+      "type": "object",
+      "properties": {
+        "fromAge": { "type": "number" },
+        "toAge": { "type": "number" },
+        "maleCount": { "type": "number" },
+        "femaleCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["fromAge", "toAge", "maleCount", "femaleCount"]
     },
     "GitHubConfig": {
       "title": "GitHub Config",
@@ -299,9 +300,113 @@
         "createdAt": { "type": "number" }
       },
       "required": ["userId", "productName", "amount", "type", "createdAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "User saved/bookmarked apps and utilities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "enum": ["utility", "app", "page"] },
+        "url": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "itemId", "title", "type", "url"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or admin-sent notification to users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "target": { "enum": ["all", "user", "role"] },
+        "targetValue": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "senderName": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "target", "createdAt"]
+    },
+    "UserReadNotification": {
+      "title": "User Read Notification",
+      "description": "Marks a notification as read and records reading timestamp",
+      "type": "object",
+      "properties": {
+        "readAt": { "type": "number" }
+      },
+      "required": ["readAt"]
+    },
+    "SharedLocation": {
+      "title": "Shared Location",
+      "description": "User shared location in real-time for Find Nearby utility",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "displayName", "email", "latitude", "longitude", "updatedAt"]
+    },
+    "NearbyFriendship": {
+      "title": "Nearby Friendship",
+      "description": "Friendship and request status between users for Find Nearby utility",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "status": { "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "senderId", "receiverId", "status", "createdAt", "updatedAt"]
+    },
+    "PortalPost": {
+      "title": "Portal Post",
+      "description": "Posts, announcements, and information articles on the portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "background": { "type": "string" },
+        "views": { "type": "number" },
+        "shares": { "type": "number" },
+        "likes": { "type": "number" },
+        "likedBy": { "type": "array", "items": { "type": "string" } },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "summary", "content", "category", "background", "authorId", "authorName", "createdAt"]
     }
   },
   "firestore": {
+    "bookmarks": {
+      "schema": "Bookmark",
+      "description": "User saved/bookmarked items for quick access"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Global and targeted system notification messages"
+    },
+    "users/{userId}/read_notifications": {
+      "schema": "UserReadNotification",
+      "description": "Tracks notifications read by specific users"
+    },
     "activity_feed": {
       "schema": "Activity",
       "description": "User activity log for real-time feed"
@@ -366,13 +471,13 @@
       "schema": "AvatarFrame",
       "description": "Store all custom avatar frames and campaign transparent overlays"
     },
-    "hrm_employees": {
-      "schema": "HrmEmployee",
-      "description": "Official store employee personnel record details"
+    "contacts": {
+      "schema": "Contact",
+      "description": "Administrative contact directory"
     },
-    "hrm_collaborators": {
-      "schema": "HrmCollaborator",
-      "description": "Official store collaborator personnel record details"
+    "hrm_population": {
+      "schema": "HrmPopulation",
+      "description": "Population distribution data by age range and gender"
     },
     "recurring_events": {
       "schema": "RecurringEvent",
@@ -381,6 +486,18 @@
     "word_covers": {
       "schema": "WordCover",
       "description": "Metadata for Word cover page templates"
+    },
+    "shared_locations": {
+      "schema": "SharedLocation",
+      "description": "Real-time user locations for Find Nearby utility"
+    },
+    "nearby_friendships": {
+      "schema": "NearbyFriendship",
+      "description": "Friendships and requests for masking/unmasking PII in Find Nearby"
+    },
+    "portal_posts": {
+      "schema": "PortalPost",
+      "description": "Official announcements, informational posts, and articles"
     }
   }
 }

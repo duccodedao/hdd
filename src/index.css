@@ -8,7 +8,7 @@
   
   --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", var(--font-sans);
-  --font-serif: "Fraunces", serif;
+  --font-serif: "Times New Roman", Times, "Liberation Serif", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --animate-blob: blob 15s infinite alternate;

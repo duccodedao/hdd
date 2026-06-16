@@ -42,8 +42,15 @@ export default function LocationGuard({ children }: LocationGuardProps) {
   };
 
   useEffect(() => {
-    checkLocation();
-  }, [user?.uid]);
+    if (userData?.location?.lat && userData?.location?.lng) {
+      setPermission('granted');
+      setLocation({ lat: userData.location.lat, lng: userData.location.lng });
+    } else if (user) {
+      checkLocation();
+    } else {
+      setPermission('loading');
+    }
+  }, [user?.uid, userData?.location?.lat, userData?.location?.lng]);
 
   useEffect(() => {
     let mounted = true;
@@ -112,7 +119,7 @@ export default function LocationGuard({ children }: LocationGuardProps) {
     return () => { mounted = false; };
   }, [user, userData, location]);
 
-  if (permission === 'granted') return <>{children}</>;
+  if (userData?.role === 'review' || permission === 'granted') return <>{children}</>;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-md flex items-center justify-center p-6">

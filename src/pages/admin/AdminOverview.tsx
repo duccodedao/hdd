@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Activity, Globe, LineChart, Users, AppWindow, Files, ShieldAlert, Code, FolderOpen } from 'lucide-react';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { useAuthStore } from '../../store/authStore';
 // import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 interface AdminOverviewProps {
@@ -31,8 +32,21 @@ export default function AdminOverview({ siteStats, users, allUtilities, activity
     utilities: 0
   });
   
+  const { userData } = useAuthStore();
+  
   useEffect(() => {
     const fetchCounts = async () => {
+      if (userData?.role === 'review') {
+        setCounts({
+          forms: 0,
+          blockedIps: 0,
+          apiKeys: 0,
+          documents: 0,
+          partners: 0,
+          utilities: 0
+        });
+        return;
+      }
       try {
         const [formsSnap, blockedSnap, apiKeysSnap, docsSnap, partnersSnap, utilsSnap] = await Promise.all([
           getCountFromServer(collection(db, 'forms')),

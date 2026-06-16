@@ -43,6 +43,17 @@ interface AppState {
   setWebLogo: (logo: string) => void;
   hasUnapprovedSessions: boolean;
   setHasUnapprovedSessions: (val: boolean) => void;
+  affiliateAds: {
+    active: boolean;
+    logoUrl: string;
+    projectName: string;
+    description: string;
+    linkRef: string;
+    codeRef: string;
+  } | null;
+  setAffiliateAds: (ads: any) => void;
+  snoozeAdUntil: number | null;
+  setSnoozeAdUntil: (time: number | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -50,6 +61,10 @@ export const useAppStore = create<AppState>((set) => ({
   setWebLogo: (logo) => set({ webLogo: logo }),
   hasUnapprovedSessions: false,
   setHasUnapprovedSessions: (val) => set({ hasUnapprovedSessions: val }),
+  affiliateAds: null,
+  setAffiliateAds: (ads) => set({ affiliateAds: ads }),
+  snoozeAdUntil: null,
+  setSnoozeAdUntil: (time) => set({ snoozeAdUntil: time }),
   sidebarOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (isOpen) => set({ sidebarOpen: isOpen }),

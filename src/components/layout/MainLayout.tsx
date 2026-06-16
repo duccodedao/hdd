@@ -7,19 +7,38 @@ import { cn } from '../../lib/utils';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import PwaBanner from '../pwa/PwaBanner';
-import { AlertCircle, ArrowUpRight } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, ChevronsRight } from 'lucide-react';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 
 import NotificationMarquee from './NotificationMarquee';
 import WelcomePopup from './WelcomePopup';
+import AffiliateBanner from './AffiliateBanner';
+import LoadingBar from './LoadingBar';
 
 export default function MainLayout() {
-  const { sidebarOpen, toggleSidebar, aiActive, quotaExceeded, setQuotaExceeded } = useAppStore();
+  const { sidebarOpen, toggleSidebar, aiActive, quotaExceeded, setQuotaExceeded, setAffiliateAds } = useAppStore();
   const { user } = useAuthStore();
   const location = useLocation();
 
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'affiliate_ads'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.active) {
+            setAffiliateAds(data);
+        } else {
+            setAffiliateAds(null);
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [setAffiliateAds]);
+
   return (
     <div className="flex h-screen overflow-hidden relative font-sans bg-transparent">
-      
+      <LoadingBar />
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && !aiActive && (
@@ -38,6 +57,15 @@ export default function MainLayout() {
           "fixed inset-y-0 left-0 z-50 transform lg:static transition-all duration-500 w-64 lg:w-60 h-full shrink-0",
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:pointer-events-none lg:overflow-hidden'
         )} />
+      )}
+
+      {!sidebarOpen && !aiActive && (
+        <button
+          onClick={toggleSidebar}
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-40 p-2 pl-1 pr-3 bg-slate-800/80 text-white rounded-r-full shadow-lg animate-pulse hover:bg-slate-700 transition-colors"
+        >
+          <ChevronsRight size={24} />
+        </button>
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 z-10 h-screen">
@@ -77,6 +105,7 @@ export default function MainLayout() {
               <Topbar />
               <NotificationMarquee />
               <WelcomePopup />
+              <AffiliateBanner />
             </>
           )}
           

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star } from 'lucide-react';
+import { LayoutList, ExternalLink, Lightbulb, Code2, ChevronRight, ArrowRight, FileImage, FileText, FilePlus, FileArchive, Scissors, Scan, Zap, Box, AppWindow, Lock, MessageSquare, Bot, FolderOpen, Laptop, Image as ImageIcon, Eye, Flame, ArrowDownUp, Layout, Star, Search, X } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
@@ -13,10 +13,13 @@ import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
 import PersonalFileManager from './utilities/PersonalFileManager';
 import AvatarFrameManager from './utilities/AvatarFrameManager';
+import TextToSpeech from './utilities/TextToSpeech';
+import FindNearby from './utilities/FindNearby';
+import DocumentTemplates from './utilities/DocumentTemplates';
+import { Volume2, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
-import { useBookmarkStore } from '../store/bookmarkStore';
 import toast from 'react-hot-toast';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import { PaymentDialog } from '../components/payment/PaymentDialog';
@@ -39,18 +42,6 @@ const RANDOM_AVATARS = Array.from({ length: 20 }, (_, i) => `https://i.pravatar.
 const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [], isHot = false }: { item: UtilityItem, idx: number, onSelect: (item: UtilityItem) => void, systemTools: any, visits?: number, realUsers?: any[], isHot?: boolean }) => {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
   const { isAdmin, isSuperAdmin } = useAuthStore();
-  const { isBookmarked, toggleBookmark } = useBookmarkStore();
-  const bookmarked = isBookmarked(item.id);
-
-  const handleBookmarkToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleBookmark({
-      itemId: item.id,
-      title: item.title,
-      type: 'utility',
-      url: `/utilities?tab=${item.id}`
-    });
-  };
 
   const isMaintenanceActive = maintenanceTabs[`utility_${item.id}`];
   const isBlocked = isMaintenanceActive && !isSuperAdmin;
@@ -129,16 +120,8 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
       )}
       onClick={handleClick}
     >
-      {isHot && (
-         <div className="absolute inset-[-2px] rounded-[calc(1.5rem+2px)] overflow-hidden pointer-events-none z-0 bg-transparent">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250%] h-[250%] bg-[conic-gradient(from_0deg,transparent_0_240deg,#f97316_300deg,#ef4444_360deg)] animate-[spin_3s_linear_infinite] opacity-60 dark:opacity-80" />
-         </div>
-      )}
 
-      <div className={cn(
-        "premium-card flex flex-col h-full relative z-10 transition-colors",
-        isHot && "border-transparent bg-white dark:bg-zinc-900"
-      )}>
+      <div className="premium-card flex flex-col h-full relative z-10 transition-colors">
         {isMaintenanceActive && (
           <div className="absolute top-0 right-0 p-3 z-10">
              <div className={cn(
@@ -147,17 +130,6 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
              )}>
                 <Lock className="w-3.5 h-3.5" />
              </div>
-          </div>
-        )}
-
-        {isHot && (
-          <div className="absolute -top-3 -right-3 z-20">
-            <div className="relative">
-              <div className="absolute inset-0 bg-orange-500 blur-md opacity-50 animate-pulse rounded-full" />
-              <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-600 outline outline-2 outline-white dark:outline-zinc-900 rounded-full shadow-lg relative z-10 text-white">
-                 <Flame className="w-4 h-4 fill-white" />
-              </div>
-            </div>
           </div>
         )}
 
@@ -173,20 +145,6 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Bookmark star control */}
-          <button
-            type="button"
-            onClick={handleBookmarkToggle}
-            className={`p-1.5 rounded-lg active:scale-95 transition-all duration-300 z-25 ${
-              bookmarked 
-                ? 'text-amber-500 bg-amber-500/10' 
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-            }`}
-            title={bookmarked ? "Xóa khỏi dấu trang" : "Lưu vào dấu trang"}
-          >
-            <Star className={`w-3.5 h-3.5 ${bookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
-          </button>
-
           <div className="flex flex-col items-end gap-1.5">
             <div className={cn(
               "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
@@ -266,6 +224,14 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
 
 const nativeUtilities: UtilityItem[] = [
   {
+    id: 'find-nearby',
+    title: 'Tìm Quanh Đây',
+    description: 'Bản đồ tìm kiếm thực tế và kết nối người dùng xung quanh bạn theo vị trí chia sẻ thời gian thực.',
+    icon: Globe,
+    type: 'tool',
+    createdAt: Date.now() + 6000
+  },
+  {
     id: 'avatar-frame',
     title: 'Khung Ảnh Đại Diện',
     description: 'Thiết kế lồng ghép khung ảnh đại diện (avatar frame) chuyên nghiệp cho các chiến dịch.',
@@ -328,6 +294,14 @@ const nativeUtilities: UtilityItem[] = [
     icon: Scissors,
     type: 'tool',
     createdAt: Date.now() - 4500
+  },
+  {
+    id: 'text-to-speech',
+    title: 'Chuyển Văn Bản Thành Giọng Nói',
+    description: 'Chuyển văn bản thành giọng đọc tự nhiên tùy chọn vùng miền (Bắc, Trung, Nam) hỗ trợ tải file MP3.',
+    icon: Volume2,
+    type: 'tool',
+    createdAt: Date.now() + 5000
   }
 ];
 
@@ -335,6 +309,9 @@ export default function UtilitiesPage() {
   const { sessionId, utilityId } = useParams();
   const navigate = useNavigate();
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'pdf' | 'ai-creative' | 'system-community'>('all');
+  const [sortOrder, setSortOrder] = useState<'default' | 'popular' | 'alphabetical' | 'newest'>('default');
   const [loading, setLoading] = useState(true);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -401,6 +378,11 @@ export default function UtilitiesPage() {
   };
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilityStats({});
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'utility_stats'), (snapshot) => {
       const stats: { [key: string]: number } = {};
       snapshot.forEach((doc) => {
@@ -427,6 +409,11 @@ export default function UtilitiesPage() {
   }, []);
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilities([]);
+      setRealUsers([]);
+      return;
+    }
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const dbUtils = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem));
@@ -448,8 +435,9 @@ export default function UtilitiesPage() {
       // Filter out ONLY embedded tools from DB (ones that ARE NOT native tool overrides)
       const embeddedTools = dbUtils.filter(dbu => !nativeUtilities.some(nu => nu.id === dbu.id));
       
-      // Combined list: Overridden natives first, then embedded tools
-      setUtilities([...overriddenNative, ...embeddedTools]);
+      // Combined list: Overridden natives first, then embedded tools, filtering out 'document-templates'
+      const combined = [...overriddenNative, ...embeddedTools].filter(item => item.id !== 'document-templates');
+      setUtilities(combined);
       setLoading(false);
     }, (err) => {
       console.error("UtilitiesPage utilities listener error:", err?.message || String(err));
@@ -477,6 +465,17 @@ export default function UtilitiesPage() {
 
   const { maintenanceTabs } = useAppStore();
 
+  const getUtilityCategory = (item: UtilityItem) => {
+    const id = item.id;
+    if (['image-to-pdf', 'pdf-to-word', 'pdf-merger', 'pdf-splitter'].includes(id)) {
+      return 'pdf';
+    }
+    if (['ai-scanner', 'text-to-speech', 'avatar-frame'].includes(id)) {
+      return 'ai-creative';
+    }
+    return 'system-community';
+  };
+
   const allItems = utilities.filter(item => {
     const config = systemTools[item.id];
     const isInternal = config?.internal || (item as any).internalOnly;
@@ -485,6 +484,37 @@ export default function UtilitiesPage() {
     }
     return true;
   });
+
+  const filteredItems = allItems.filter(item => {
+    if (selectedCategory !== 'all') {
+      const cat = getUtilityCategory(item);
+      if (cat !== selectedCategory) return false;
+    }
+    
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q)
+    );
+  });
+
+  const sortedItems = React.useMemo(() => {
+    const items = [...filteredItems];
+    if (sortOrder === 'default') {
+      return items;
+    }
+    if (sortOrder === 'popular') {
+      return items.sort((a, b) => (utilityStats[b.id] || 0) - (utilityStats[a.id] || 0));
+    }
+    if (sortOrder === 'alphabetical') {
+      return items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'vi'));
+    }
+    if (sortOrder === 'newest') {
+      return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+    return items;
+  }, [filteredItems, sortOrder, utilityStats]);
 
   const topHotIds = React.useMemo(() => {
     return allItems
@@ -527,8 +557,16 @@ export default function UtilitiesPage() {
       );
     }
 
+    if (activeUtility.id === 'find-nearby') {
+      return <FindNearby onBack={handleBack} />;
+    }
+
     if (activeUtility.id === 'avatar-frame') {
       return <AvatarFrameManager onBack={handleBack} />;
+    }
+
+    if (activeUtility.id === 'document-templates') {
+      return <DocumentTemplates onBack={handleBack} />;
     }
 
     if (activeUtility.id === 'file-manager') {
@@ -553,6 +591,10 @@ export default function UtilitiesPage() {
  
     if (activeUtility.id === 'pdf-splitter') {
       return <PdfSplitter onBack={handleBack} />;
+    }
+
+    if (activeUtility.id === 'text-to-speech') {
+      return <TextToSpeech onBack={handleBack} />;
     }
 
     if (activeUtility.id === 'ai-scanner') {
@@ -641,26 +683,146 @@ export default function UtilitiesPage() {
               )}
             </div>
           </div>
-        </header>
 
-        <section>
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
-              {allItems.map((item, idx) => (
-                <UtilityCard 
-                  key={item.id} 
-                  item={item} 
-                  idx={idx} 
-                  onSelect={handleSelect} 
-                  systemTools={systemTools} 
-                  visits={utilityStats[item.id] || 0}
-                  realUsers={realUsers}
-                  isHot={topHotIds.includes(item.id)}
-                />
-              ))}
+          {/* Utility Controls Bar */}
+          <div className="pt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-t border-slate-200/50 dark:border-white/[0.02]">
+            {/* Search Input */}
+            <div className="relative max-w-md w-full bg-slate-50 dark:bg-black/20 border border-slate-250 dark:border-white/5 rounded-2xl flex items-center shadow-sm hover:shadow focus-within:ring-2 focus-within:ring-indigo-500/20 transition duration-300">
+              <div className="pl-4 text-slate-400 dark:text-zinc-500 shrink-0">
+                <Search className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm nhanh tiện ích (PDF, Word, AI Scanner, Speech, Bản đồ...)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-3 pr-10 py-3 bg-transparent text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-550 outline-none rounded-2xl"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 p-1 rounded-full hover:bg-slate-100 text-slate-450 hover:text-slate-650 dark:hover:text-white transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Premium Category Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/70 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('all')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'all'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Tất cả ({totalTools})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('pdf')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'pdf'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Xử lý PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('ai-creative')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'ai-creative'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Sáng tạo & AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('system-community')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'system-community'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Hệ thống & Bản đồ
+              </button>
+            </div>
+
+            {/* Sorting Dropdown Select */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sắp xếp:</span>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+                className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-zinc-200 px-3 py-2.5 rounded-2xl shadow-sm focus:outline-none cursor-pointer hover:border-slate-300 dark:hover:border-white/20 transition-all"
+              >
+                <option value="default">Mặc định hệ thống</option>
+                <option value="popular font-bold">Lượt truy cập (Phổ biến nhất)</option>
+                <option value="alphabetical">Tên tiện ích (A-Z)</option>
+                <option value="newest">Mới cập nhật</option>
+              </select>
             </div>
           </div>
-        </section>
+
+          {searchQuery && (
+            <div className="flex justify-start pt-1">
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 bg-slate-100/50 dark:bg-white/[0.02] px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 flex items-center gap-1.5 animate-in fade-in">
+                Tìm thấy <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{sortedItems.length}</strong> kết quả phù hợp
+              </span>
+            </div>
+          )}
+        </header>
+ 
+         <section>
+           <div>
+             {sortedItems.length === 0 ? (
+               <div className="text-center py-20 bg-slate-50/50 dark:bg-black/15 rounded-[2rem] border border-dashed border-slate-250 dark:border-white/5 p-8 max-w-md mx-auto animate-in fade-in zoom-in-95">
+                 <Box className="w-12 h-12 text-slate-350 dark:text-zinc-750 mx-auto stroke-1 mb-3" />
+                 <p className="text-sm font-bold text-slate-700 dark:text-zinc-450">Không tìm thấy tiện ích nào khớp</p>
+                 <p className="text-xs text-slate-450 dark:text-zinc-550 mt-1 px-4 leading-relaxed">Hệ thống không tìm thấy công cụ nào trùng khớp với các tiêu chí tìm kiếm hoặc phân loại của bạn.</p>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     setSearchQuery('');
+                     setSelectedCategory('all');
+                     setSortOrder('default');
+                   }}
+                   className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition shadow-sm cursor-pointer"
+                 >
+                   Cài đặt lại toàn bộ bộ lọc
+                 </button>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
+                 {sortedItems.map((item, idx) => (
+                   <UtilityCard 
+                     key={item.id} 
+                     item={item} 
+                     idx={idx} 
+                     onSelect={handleSelect} 
+                     systemTools={systemTools} 
+                     visits={utilityStats[item.id] || 0}
+                     realUsers={realUsers}
+                     isHot={topHotIds.includes(item.id)}
+                   />
+                 ))}
+               </div>
+             )}
+           </div>
+         </section>
       </div>
 
       <PaymentDialog 

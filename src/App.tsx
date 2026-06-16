@@ -35,14 +35,14 @@ import ComingSoon from './pages/ComingSoon';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import GuidePage from './pages/GuidePage';
-import WalletPage from './pages/WalletPage';
-import StorePage from './pages/StorePage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
 import AiTools from './pages/AiTools';
 import CalendarPage from './pages/CalendarPage';
-import HrmPage from './pages/HrmPage';
+import ContactsPage from './pages/ContactsPage';
+import PopulationPage from './pages/PopulationPage';
+import NcdPage from './pages/NcdPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -68,6 +68,7 @@ import FloatingAdminButton from './components/layout/FloatingAdminButton';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 import HomePage from './pages/HomePage';
+import PortalPage from './pages/PortalPage';
 
 import { useAudioStore } from './store/audioStore';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
@@ -140,7 +141,7 @@ export default function App() {
   useEffect(() => {
     if (!user || !userData) return;
     
-    const isUserAdmin = userData.role === 'admin' || userData.role === 'superadmin' || isAdmin;
+    const isUserAdmin = (userData.role === 'admin' || userData.role === 'superadmin' || isAdmin) && userData.role !== 'review';
     if (!isUserAdmin) return;
     
     let isSubscribed = true;
@@ -149,6 +150,7 @@ export default function App() {
     let unsubscribeUsers: (() => void) | null = null;
     let unsubscribeBlockedIps: (() => void) | null = null;
     let unsubscribeAdminSessions: (() => void) | null = null;
+    let unsubscribeInvoices: (() => void) | null = null;
     
     const listenerStartTime = Date.now();
     
@@ -208,7 +210,7 @@ export default function App() {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'admin_sessions');
         });
-
+ 
         // 3. Listen to users collection for new registrations
         unsubscribeUsers = onSnapshot(collection(db, 'users'), (snap) => {
           if (!isSubscribed) return;
@@ -232,7 +234,7 @@ export default function App() {
         }, (error) => {
           handleFirestoreError(error, OperationType.LIST, 'users');
         });
-
+ 
         // 4. Listen to blockedIps for new IP bannings (indicates detected threats/suspicious activity)
         unsubscribeBlockedIps = onSnapshot(collection(db, 'blockedIps'), (snap) => {
           if (!isSubscribed) return;
@@ -262,7 +264,7 @@ export default function App() {
         }, (error) => {
           handleFirestoreError(error, OperationType.LIST, 'blockedIps');
         });
-
+ 
         // 5. Listen to admin_sessions to highlight suspicious admin entry configurations
         unsubscribeAdminSessions = onSnapshot(collection(db, 'admin_sessions'), (snap) => {
           if (!isSubscribed) return;
@@ -313,6 +315,44 @@ export default function App() {
         }, (error) => {
           handleFirestoreError(error, OperationType.LIST, 'admin_sessions');
         });
+
+        // 6. Listen to invoices to notify admin about new orders
+        unsubscribeInvoices = onSnapshot(collection(db, 'invoices'), (snap) => {
+          if (!isSubscribed) return;
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              const createdAtMs = data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt instanceof Date ? data.createdAt.getTime() : (typeof data.createdAt === 'number' ? data.createdAt : 0));
+              
+              if (createdAtMs > listenerStartTime) {
+                toast.success(
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                      💳 ĐƠN HÀNG MỚI!
+                    </span>
+                    <span className="text-xs text-slate-800 dark:text-zinc-200">
+                      Đơn: <strong className="font-mono bg-indigo-500/10 px-1 py-0.5 rounded text-indigo-500">{change.doc.id}</strong>
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Số tiền: {Number(data.totalAmount || 0).toLocaleString()}đ
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                        {data.type === 'deposit' ? '💳 Nạp tiền' : '🛍️ Mua sắm'}
+                      </span>
+                      <span className="text-[10px] text-emerald-500 font-bold uppercase">
+                        {data.status || 'pending'}
+                      </span>
+                    </div>
+                  </div>,
+                  { duration: 8000, position: 'top-right' }
+                );
+              }
+            }
+          });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'invoices');
+        });
       } catch (err) {
         console.error("Error setting up security sessions:", err);
       }
@@ -327,6 +367,7 @@ export default function App() {
       if (unsubscribeUsers) unsubscribeUsers();
       if (unsubscribeBlockedIps) unsubscribeBlockedIps();
       if (unsubscribeAdminSessions) unsubscribeAdminSessions();
+      if (unsubscribeInvoices) unsubscribeInvoices();
     };
   }, [user, userData, isAdmin]);
 
@@ -504,7 +545,7 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  if (isUserAdmin && !pinVerified) {
+  if (isUserAdmin && !pinVerified && userData?.role !== 'review') {
     return (
       <AdminPinLockScreen 
         expectedPin={expectedPin} 
@@ -516,7 +557,7 @@ export default function App() {
     );
   }
 
-  if (maintenanceMode && !isSuperAdmin) {
+  if (maintenanceMode && !isSuperAdmin && userData?.role !== 'review') {
     return <MaintenancePage />;
   }
 
@@ -562,7 +603,55 @@ export default function App() {
       <CookieConsentComponent />
       <CommandPalette />
       <AuthActionRedirector />
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        containerStyle={{
+          display: userData?.role === 'review' ? 'none' : 'block',
+          top: 30,
+          right: 30,
+        }}
+        gutter={12}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'rgba(10, 15, 30, 0.85)',
+            color: '#f8fafc',
+            borderRadius: '1.25rem',
+            padding: '14px 22px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.15)',
+            fontSize: '13px',
+            fontWeight: '600',
+            fontFamily: '"Inter", sans-serif',
+            backdropFilter: 'blur(12px)',
+            maxWidth: '400px',
+            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+          },
+          success: {
+            style: {
+              borderLeft: '4px solid #10b981',
+              boxShadow: '0 15px 35px rgba(16, 185, 129, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+            },
+            iconTheme: {
+              primary: '#10b981',
+              secondary: 'rgba(16, 185, 129, 0.1)',
+            }
+          },
+          error: {
+            style: {
+              borderLeft: '4px solid #ef4444',
+              boxShadow: '0 15px 35px rgba(239, 68, 68, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+            },
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: 'rgba(239, 68, 68, 0.1)',
+            }
+          }
+        }}
+      />
       <ConfirmModal />
       <AccessGuard>
         <ErrorBoundary>
@@ -592,11 +681,13 @@ export default function App() {
               <Route path="/ai-tools" element={<TabGuard tabKey="ai_tools"><AiTools /></TabGuard>} />
               <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
-              <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
+              <Route path="/danh-ba" element={<TabGuard tabKey="contacts"><ContactsPage /></TabGuard>} />
+              <Route path="/dan-so" element={<TabGuard tabKey="hrm"><PopulationPage /></TabGuard>} />
+              <Route path="/benh-khong-lay-nhiem" element={<TabGuard tabKey="hrm"><NcdPage /></TabGuard>} />
               <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
-              <Route path="/wallet" element={<RequireAuth><WalletPage /></RequireAuth>} />
-              <Route path="/store" element={<StorePage />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/portal" element={<PortalPage />} />
+              <Route path="/profile" element={<TabGuard tabKey="profile"><Profile /></TabGuard>} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
@@ -604,7 +695,7 @@ export default function App() {
               <Route path="/releases" element={<ReleaseNotesPage />} />
               
               {/* Admin Routes */}
-              <Route path="/admin/*" element={isSuperAdmin ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
+              <Route path="/admin/*" element={isSuperAdmin || userData?.role === 'review' ? <AdminDashboard /> : <Navigate to="/admin-login" />} />
               
               <Route path="/blocked" element={<BlockedPage />} />
             </Route>

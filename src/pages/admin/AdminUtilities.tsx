@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -6,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useConfirmStore } from '../../store/confirmStore';
 
 export default function AdminUtilities() {
+  const { userData } = useAuthStore();
   const [utilities, setUtilities] = useState<any[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -19,6 +21,11 @@ export default function AdminUtilities() {
   const { openConfirm } = useConfirmStore();
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilities([]);
+      setSystemTools({});
+      return;
+    }
     // Utilities listener
     const qUtils = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubUtils = onSnapshot(qUtils, (snapshot) => {
@@ -100,6 +107,10 @@ export default function AdminUtilities() {
   };
 
   const toggleSystemTool = async (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     try {
       const current = systemTools[id] || { public: true, internal: false };
       const currentlyPublic = current.public !== false;
@@ -133,6 +144,10 @@ export default function AdminUtilities() {
   };
 
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     e.preventDefault();
     if (!title || !description) return toast.error('Vui lòng nhập đầy đủ thông tin');
     try {
@@ -170,6 +185,10 @@ export default function AdminUtilities() {
   };
 
   const handleDelete = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa tiện ích',
       message: 'Bạn có chắc chắn muốn xóa tiện ích/web nhúng này?',
@@ -279,10 +298,7 @@ export default function AdminUtilities() {
               <colgroup>
                 <col className="w-12 text-center" />
                 <col className="w-56" />
-                <col className="w-72" />
-                <col className="w-32" />
-                <col className="w-32" />
-                <col className="w-64" />
+                <col className="w-auto" />
                 <col className="w-32 text-right" />
               </colgroup>
               <thead className="bg-slate-50/50 dark:bg-white/[0.02]">
@@ -298,10 +314,7 @@ export default function AdminUtilities() {
                   </th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Tên hiển thị</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Mô tả giới thiệu</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá gốc</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá bán</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Đường dẫn nguồn</th>
-                  <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -321,12 +334,7 @@ export default function AdminUtilities() {
                       </div>
                     </td>
                     <td className="p-4 align-middle text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-2">{u.description}</td>
-                    <td className="p-4 align-middle font-mono text-xs text-slate-600 dark:text-slate-500">{u.price?.toLocaleString() || 0}</td>
-                    <td className="p-4 align-middle font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold">{u.salePrice?.toLocaleString() || 0}</td>
-                    <td className="p-4 align-middle text-blue-500 text-xs truncate max-w-xs">
-                      <a href={u.embedUrl} target="_blank" rel="noreferrer" className="hover:underline">{u.embedUrl}</a>
-                    </td>
-                    <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
+                    <td className="whitespace-nowrap p-4 align-middle text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => startEdit(u)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all" title="Cập nhật"><Edit className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(u.id)} className="p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>

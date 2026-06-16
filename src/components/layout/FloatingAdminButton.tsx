@@ -7,13 +7,13 @@ import { useAppStore } from '../../store/appStore';
 import { cn } from '../../lib/utils';
 
 export default function FloatingAdminButton() {
-  const { isSuperAdmin } = useAuthStore();
+  const { isSuperAdmin, isAdmin, userData } = useAuthStore();
   const { hasUnapprovedSessions } = useAppStore();
   const location = useLocation();
 
   const isAdminPage = location.pathname.startsWith('/admin');
 
-  if (!isSuperAdmin) return null;
+  if (!isSuperAdmin && !isAdmin && userData?.role !== 'review') return null;
 
   return (
     <motion.div

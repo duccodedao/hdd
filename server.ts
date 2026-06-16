@@ -26,22 +26,115 @@ import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 
-// Initialize Firebase Admin (for privileged server-side operations)
-let adminDb: admin.firestore.Firestore | null = null;
+// Read config with path resolution and environment fallback for Vercel/production
+let firebaseConfig: any;
 try {
-  admin.initializeApp();
-  adminDb = admin.firestore();
+  const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } else {
+    throw new Error("Local config not found");
+  }
 } catch (e) {
-  console.error("Failed to initialize Firebase Admin", e);
+  console.log("Firebase configuration file missing or unreadable, using environment or hardcoded defaults.");
+  const hardcodedProjectId = "sonlyhongduc-ca6d6";
+  firebaseConfig = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyCXAxmprEv9fF-P-1lLpUzykkxG4HjDVI4",
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || `${hardcodedProjectId}.firebaseapp.com`,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || hardcodedProjectId,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || `${hardcodedProjectId}.firebasestorage.app`,
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "757658501532",
+    appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || "1:757658501532:web:08c87ad6c041e0bc140859",
+    measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || "G-GXHCCW2KMH",
+    firestoreDatabaseId: process.env.VITE_FIREBASE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "main"
+  };
 }
 
-// Initialize Firebase Client SDK
-// Read config explicitly to ensure resolution
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
-const firebaseApp = initializeApp(firebaseConfig);
+// Crucial: Set project ID environment variables manually to help SDKs discover it
+if (firebaseConfig.projectId) {
+  process.env.GCLOUD_PROJECT = firebaseConfig.projectId;
+  process.env.GOOGLE_CLOUD_PROJECT = firebaseConfig.projectId;
+  // Also set FIREBASE_CONFIG as stringified JSON which some SDKs look for
+  process.env.FIREBASE_CONFIG = JSON.stringify(firebaseConfig);
+}
+
 const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
-const db = getFirestore(firebaseApp, databaseId);
-console.log(`Firebase Client initialized targeting project: ${firebaseConfig.projectId}, database: ${databaseId}`);
+
+// Initialize Firebase Admin (for privileged server-side operations)
+let adminDb: any = null;
+try {
+  const projectId = firebaseConfig?.projectId;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+  
+  if (serviceAccountJson) {
+    try {
+      const a = admin as any;
+      const adminBase = a.default || a;
+      const currentApps = adminBase.apps || [];
+      let adminApp;
+      
+      if (currentApps.length === 0) {
+        const serviceAccount = JSON.parse(serviceAccountJson);
+        adminApp = adminBase.initializeApp({
+          credential: adminBase.credential.cert(serviceAccount),
+          projectId
+        });
+      } else {
+        adminApp = currentApps[0];
+      }
+      
+      // Get firestore handle
+      if (databaseId && databaseId !== "(default)") {
+        try {
+          adminDb = adminApp.firestore(databaseId);
+        } catch (e) {
+          adminDb = adminApp.firestore();
+        }
+      } else {
+        adminDb = adminApp.firestore();
+      }
+      
+      if (adminDb) {
+        console.log(`Firebase Admin: Initialized with service account. Project=${projectId}, DB=${databaseId}`);
+      }
+    } catch (e: any) {
+      console.warn("Firebase Admin: Initialization failed (using client SDK fallback):", e.message);
+    }
+  } else {
+    console.log("Firebase Admin: No service account found. Privileged operations will use client SDK fallback.");
+  }
+} catch (e: any) {
+  console.warn("Firebase Admin: Setup blocked by unexpected error:", e.message);
+}
+
+
+// Initialize Firebase Client SDK
+let firebaseApp: any = null;
+try {
+  if (!firebaseConfig || !firebaseConfig.projectId) {
+    console.error("Firebase configuration is missing or invalid. Check your setup.");
+  } else {
+    firebaseApp = initializeApp(firebaseConfig);
+    console.log(`Firebase Client App initialized successfully: ${firebaseConfig.projectId}`);
+  }
+} catch (appErr: any) {
+  console.error("Critical: Failed to initialize Firebase Client App", appErr.message);
+}
+
+let db: any = null;
+if (firebaseApp) {
+  try {
+    db = getFirestore(firebaseApp, databaseId === "(default)" ? undefined : databaseId);
+    console.log(`Firestore Client SDK initialized targeting database: ${databaseId}`);
+  } catch (e: any) {
+    console.warn(`Client SDK fail for database '${databaseId}', using default database. Error: ${e.message}`);
+    try {
+      db = getFirestore(firebaseApp);
+    } catch (innerE: any) {
+      console.error("Critical: All Firestore Client SDK initialization attempts failed", innerE.message);
+    }
+  }
+}
 
 // Automatically sync and initialize system banking config to live MB BANK 00010302003
 // try {
@@ -109,6 +202,29 @@ function safeStringify(obj: any, indent = 2) {
   }, indent);
 }
 
+// Notification Helpers
+async function sendTelegramNotification(message: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID || process.env.ADMIN_CHAT_ID;
+  
+  if (!botToken || !chatId) {
+    console.log("[Telegram] Notification skipped: Bot token or Admin chat ID missing.");
+    return;
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    await axios.post(url, {
+      chat_id: chatId,
+      text: message,
+      parse_mode: 'HTML'
+    });
+    console.log("[Telegram] Notification sent successfully.");
+  } catch (err: any) {
+    console.error("[Telegram] Failed to send notification:", err.message);
+  }
+}
+
 const app = express();
 
 app.use(cors());
@@ -146,88 +262,481 @@ app.use(cookieParser());
     }
   });
 
-  // Endpoint to create an invoice (for deposits too)
-  // Diagnostic endpoint to check Firestore connectivity
-  app.get("/api/diag/firestore", async (req, res) => {
+  // Text-To-Speech Export Endpoint (Updated to support premium Gemini regional voices with fallback)
+  app.post("/api/tts/export", async (req, res) => {
     try {
-      const testRef = doc(db, "system/health_check");
-      await setDoc(testRef, {
-        lastCheck: Timestamp.now(),
-        serverNode: process.env.K_SERVICE || "local",
-        sdk: "client"
-      }, { merge: true });
+      const { text, slow, accent, gender, useAiPremium } = req.body;
+      if (!text || typeof text !== "string") {
+        return res.status(400).json({ error: "Văn bản không hợp lệ" });
+      }
+
+      // Limit length to 5000 characters for safety
+      const trimmedText = text.trim().substring(0, 5000);
+      if (!trimmedText) {
+        return res.status(400).json({ error: "Văn bản không được để trống" });
+      }
+
+      // If premium generative voice is requested (default is true), use Gemini TTS Preview
+      if (useAiPremium !== false) {
+        try {
+          const ai = await getAiClient();
+          const voiceName = gender === "male" ? "Fenrir" : "Kore";
+          
+          let regionalPrompt = "";
+          if (accent === "nam") {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Nam (Sài Gòn/Nam Bộ) cực kỳ dịu dàng, ngọt ngào, truyền cảm, tự nhiên như người bản xứ. Không được phát âm sai từ ngữ nào:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Nam (Sài Gòn/Nam Bộ) cực kỳ trầm ấm, nam tính, rõ ràng, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          } else if (accent === "trung") {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Trung Việt Nam (giọng Huế/Đà Nẵng thanh tao) cực kỳ dịu dàng, ngọt ngào, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Trung Việt Nam (giọng Huế/Đà Nẵng trầm ấm) cực kỳ trầm tốt, rõ chữ, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          } else {
+            regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nữ miền Bắc Việt Nam (giọng Hà Nội chuẩn) cực kỳ thanh lịch, rõ từ, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            if (gender === "male") {
+              regionalPrompt = `Hãy nói đoạn văn sau bằng tiếng Việt với giọng nam miền Bắc Việt Nam (giọng Hà Nội chuẩn) cực kỳ trầm ấm, đĩnh đạc, rõ ràng, truyền cảm và tự nhiên như người bản xứ:\n\n"${trimmedText}"`;
+            }
+          }
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [{ parts: [{ text: regionalPrompt }] }],
+            config: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName }
+                }
+              }
+            }
+          });
+
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          
+          if (base64Audio) {
+            const pcmBuffer = Buffer.from(base64Audio, "base64");
+            
+            // Generate standard 44-byte WAV header for 24kHz, 16-bit, mono PCM
+            const writeWavHeader = (sampleRate: number, numChannels: number, bitsPerSample: number, dataLength: number): Buffer => {
+              const b = Buffer.alloc(44);
+              b.write("RIFF", 0);
+              b.writeUInt32LE(36 + dataLength, 4);
+              b.write("WAVE", 8);
+              b.write("fmt ", 12);
+              b.writeUInt32LE(16, 16);
+              b.writeUInt16LE(1, 20); // PCM
+              b.writeUInt16LE(numChannels, 22);
+              b.writeUInt32LE(sampleRate, 24);
+              b.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+              b.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+              b.writeUInt16LE(bitsPerSample, 34);
+              b.write("data", 36);
+              b.writeUInt32LE(dataLength, 40);
+              return b;
+            };
+
+            const wavHeader = writeWavHeader(24000, 1, 16, pcmBuffer.length);
+            const finalBuffer = Buffer.concat([wavHeader, pcmBuffer]);
+            
+            res.setHeader("Content-Type", "audio/wav");
+            res.setHeader("Content-Disposition", `attachment; filename="bmass-tts-premium-${Date.now()}.wav"`);
+            return res.send(finalBuffer);
+          }
+        } catch (geminiError: any) {
+          console.error("Gemini Premium TTS Error, falling back to Google Translate proxy:", geminiError);
+        }
+      }
+
+      // Fallback: Google Translate TTS Proxy
+      // Split text into chunks of <= 200 characters to prevent Google Translate 400 bad request error
+      const chunks: string[] = [];
+      let currentChunk = "";
+      const words = trimmedText.split(/\s+/);
       
-      const snap = await getDoc(testRef);
-      res.json({ 
-        status: "ok", 
-        databaseId: firebaseConfig.firestoreDatabaseId || "(default)",
-        projectId: firebaseConfig.projectId,
-        data: snap.data() 
-      });
+      for (const word of words) {
+        if ((currentChunk + " " + word).length <= 200) {
+          currentChunk += (currentChunk ? " " : "") + word;
+        } else {
+          if (currentChunk) chunks.push(currentChunk);
+          currentChunk = word;
+        }
+      }
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+
+      const audioBuffers: Buffer[] = [];
+      const speedParam = slow ? "0.3" : "1";
+
+      for (const chunk of chunks) {
+        const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(chunk)}&ttsspeed=${speedParam}`;
+        const chunkRes = await axios.get(googleTTSUrl, {
+          responseType: "arraybuffer",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
+          }
+        });
+        audioBuffers.push(Buffer.from(chunkRes.data));
+      }
+
+      const finalBuffer = Buffer.concat(audioBuffers);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="bmass-tts-${Date.now()}.mp3"`);
+      res.send(finalBuffer);
     } catch (error: any) {
-      console.error("Firestore Diagnostic Error:", error);
-      res.status(500).json({ 
-        error: error.message, 
-        code: error.code,
-        details: error.details,
-        stack: error.stack,
-        hint: `Nếu gặp lỗi PERMISSION_DENIED (API not used/disabled), hãy truy cập link sau để kích hoạt API cho project ${firebaseConfig.projectId}: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${firebaseConfig.projectId}. Ngoài ra hãy kiểm tra xem database '${databaseId}' đã được tạo chưa.`
+      console.error("TTS Proxy API Error:", error);
+      res.status(500).json({
+        error: "Thất bại khi xuất file giọng nói",
+        message: error.message || "Unknown error"
       });
     }
   });
 
-  app.post("/api/invoices/create", async (req, res) => {
+  // VnExpress RSS to JSON API Proxy
+  app.get("/api/vnexpress-news", async (req, res) => {
+    const category = typeof req.query.category === "string" ? req.query.category.trim() : "tin-moi-nhat";
+    const VNEXPRESS_FEEDS: Record<string, string> = {
+      "tin-moi-nhat": "https://vnexpress.net/rss/tin-moi-nhat.rss",
+      "the-gioi": "https://vnexpress.net/rss/the-gioi.rss",
+      "thoi-su": "https://vnexpress.net/rss/thoi-su.rss",
+      "kinh-doanh": "https://vnexpress.net/rss/kinh-doanh.rss",
+      "giai-tri": "https://vnexpress.net/rss/giai-tri.rss",
+      "the-thao": "https://vnexpress.net/rss/the-thao.rss",
+      "phap-luat": "https://vnexpress.net/rss/phap-luat.rss",
+      "giao-duc": "https://vnexpress.net/rss/giao-duc.rss",
+      "suc-khoe": "https://vnexpress.net/rss/suc-khoe.rss",
+      "doi-song": "https://vnexpress.net/rss/gia-dinh.rss",
+      "du-lich": "https://vnexpress.net/rss/du-lich.rss",
+      "khoa-hoc": "https://vnexpress.net/rss/khoa-hoc.rss",
+      "so-hoa": "https://vnexpress.net/rss/so-hoa.rss",
+      "xe": "https://vnexpress.net/rss/oto-xe-may.rss"
+    };
+
+    const targetUrl = VNEXPRESS_FEEDS[category] || VNEXPRESS_FEEDS["tin-moi-nhat"];
     try {
+      const response = await axios.get(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/rss+xml, application/xml, text/xml, */*"
+        },
+        timeout: 10000
+      });
+
+      const xmlText = response.data;
+      const items: any[] = [];
+      const itemMatches = xmlText.matchAll(/<item>([\s\S]*?)<\/item>/g);
+
+      for (const match of itemMatches) {
+        const itemContent = match[1];
+
+        // Extract Title
+        let title = "";
+        const titleMatch = itemContent.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+        if (titleMatch) {
+          title = titleMatch[1].trim();
+        }
+
+        // Extract Link
+        let link = "";
+        const linkMatch = itemContent.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/);
+        if (linkMatch) {
+          link = linkMatch[1].trim();
+        }
+
+        // Extract PubDate
+        let pubDate = "";
+        const pubDateMatch = itemContent.match(/<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/pubDate>/);
+        if (pubDateMatch) {
+          pubDate = pubDateMatch[1].trim();
+        }
+
+        // Extract Description/Summary
+        let descriptionText = "";
+        const descMatch = itemContent.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/);
+        if (descMatch) {
+          descriptionText = descMatch[1].trim();
+        }
+
+        // Extract Image
+        let image = "";
+        const imgMatch = descriptionText.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (imgMatch) {
+          image = imgMatch[1];
+        }
+
+        // Clean Summary (strip images, anchor wrappers and tags)
+        const cleanSummary = descriptionText
+          .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, "")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/gi, " ")
+          .trim();
+
+        if (title) {
+          items.push({
+            title,
+            link,
+            pubDate,
+            summary: cleanSummary || title,
+            image
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        category,
+        count: items.length,
+        items
+      });
+    } catch (err: any) {
+      console.error("VnExpress Fetch RSS Error:", err);
+      res.status(500).json({
+        success: false,
+        error: "Thất bại khi lấy tin tức VnExpress",
+        message: err.message
+      });
+    }
+  });
+
+  // Scrapes the full content of any VnExpress article
+  app.get("/api/scrape-article", async (req, res) => {
+    const urlString = typeof req.query.url === "string" ? req.query.url.trim() : "";
+    if (!urlString) {
+      return res.status(400).json({ success: false, error: "Missing article URL" });
+    }
+
+    if (!urlString.includes("vnexpress.net") && !urlString.includes("vnecdn.net")) {
+      return res.status(400).json({ success: false, error: "Only VnExpress articles are supported" });
+    }
+
+    try {
+      const response = await axios.get(urlString, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        },
+        timeout: 10000
+      });
+
+      const html = response.data;
+      
+      // Extract paragraphs inside <p class="Normal"> ... </p>
+      const normalParagraphMatches = html.matchAll(/<p class="Normal">([\s\S]*?)<\/p>/gi);
+      const paragraphs: string[] = [];
+
+      for (const m of normalParagraphMatches) {
+        let content = m[1];
+        // strip any inner html tags
+        content = content.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
+        if (content) {
+          paragraphs.push(content);
+        }
+      }
+
+      // If normal paragraphs weren't found, try secondary tags
+      if (paragraphs.length === 0) {
+        const secondaryMatches = html.matchAll(/<span class="lead">([\s\S]*?)<\/span>/gi);
+        for (const m of secondaryMatches) {
+          let content = m[1].replace(/<[^>]+>/g, "").trim();
+          if (content) paragraphs.push(content);
+        }
+      }
+
+      // Get image links inside article view
+      const imgTags = html.matchAll(/<picture[\s\S]*?<img[^>]+(?:data-)?src="([^"]+)"[^>]*>/gi);
+      const images: string[] = [];
+      for (const im of imgTags) {
+        const src = im[1];
+        if (src && src.includes("http") && !src.includes("icon") && !images.includes(src)) {
+          images.push(src);
+        }
+      }
+
+      res.json({
+        success: true,
+        paragraphs,
+        images: images.slice(0, 5),
+        count: paragraphs.length
+      });
+    } catch (e: any) {
+      console.error("VnExpress Scraper Error:", e);
+      res.status(500).json({
+        success: false,
+        error: "Thất bại khi bóc tách chi tiết bản tin",
+        message: e.message
+      });
+    }
+  });
+
+  // Scrapes the Ministry of Health website for documents.
+  app.get("/api/health-docs", async (req, res) => {
+    try {
+      // In a real scenario, we would parse MOH home page or specific document page.
+      // For now, to prevent timeouts or crashes that cause "Unexpected end of JSON input",
+      // we return an empty list if any error occurs or just return empty by default
+      // while the scraper is being perfected.
+      
+      // OPTIONAL: We could try to fetch but with very short timeout and immediate fallback
+      // const response = await axios.get("https://moh.gov.vn", { timeout: 3000 });
+      
+      res.json({
+        success: true,
+        items: [] 
+      });
+    } catch (e: any) {
+      console.warn("MOH Scraper notice:", e.message || e);
+      res.json({ success: true, items: [] });
+    }
+  });
+
+  // Diagnostic endpoint to check Firestore connectivity
+  app.get("/api/diag/firestore", async (req, res) => {
+    const results: any = {};
+    
+    // 1. Check Admin SDK (Preferred)
+    if (adminDb) {
+      try {
+        const testRefAdmin = adminDb.doc("system/health_check_admin");
+        await testRefAdmin.set({
+          lastCheck: admin.firestore.Timestamp.now(),
+          serverNode: process.env.K_SERVICE || "local",
+          sdk: "admin",
+          databaseId
+        }, { merge: true });
+        results.adminSdk = { status: "ok", message: "Admin SDK connected successfully" };
+      } catch (err: any) {
+        results.adminSdk = { status: "error", message: err.message, code: err.code };
+      }
+    } else {
+      results.adminSdk = { status: "missing", message: "Admin SDK not initialized" };
+    }
+
+    // 2. Check Client SDK (Fallback)
+    try {
+      const testRef = doc(db, "system/health_check_client");
+      await setDoc(testRef, {
+        lastCheck: Timestamp.now(),
+        serverNode: process.env.K_SERVICE || "local",
+        sdk: "client",
+        databaseId
+      }, { merge: true });
+      results.clientSdk = { status: "ok", message: "Client SDK connected (might fail if rules apply)" };
+    } catch (err: any) {
+      results.clientSdk = { status: "error", message: err.message, code: err.code };
+    }
+
+    res.json({ 
+      status: results.adminSdk?.status === "ok" ? "ok" : "warning",
+      databaseId,
+      projectId: firebaseConfig.projectId,
+      results
+    });
+  });
+
+  app.post("/api/invoices/create", async (req, res) => {
+    console.log(`[Invoice Create] Request from ${req.ip}. Project: ${firebaseConfig?.projectId}. DB: ${databaseId}`);
+    try {
+      if (!db && !adminDb) {
+        throw new Error("Cơ sở dữ liệu chưa được khởi tạo. Vui lòng kiểm tra cấu hình Firebase.");
+      }
       const { userId, userEmail, items, totalAmount, type } = req.body;
       
+      if (!totalAmount || Number(totalAmount) <= 0) {
+        return res.status(400).json({ error: "Số tiền không hợp lệ (phải lớn hơn 0)." });
+      }
+
       const referenceCode = `Bmass${Math.floor(100000 + Math.random() * 900000)}`;
-      const invoiceRef = doc(db, `invoices/${referenceCode}`);
-      const invoiceData = {
+      const dateNow = new Date();
+      const invoiceData: any = {
         id: referenceCode,
         userId: userId || "guest",
         userEmail: userEmail || "guest",
         items: items || [],
-        totalAmount: totalAmount || 0,
+        totalAmount: Number(totalAmount),
         status: "pending",
-        type: type || "purchase", // 'purchase' or 'deposit'
+        type: type || "purchase",
         paymentMethod: "bank_transfer",
         paymentDetails: {
           referenceCode
         },
-        createdAt: Timestamp.now(),
+        createdAt: dateNow,
       };
 
-      await setDoc(invoiceRef, invoiceData);
-      res.json(invoiceData);
-    } catch (error: any) {
-      console.error("Create Invoice Error details:", safeStringify({
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        stack: error.stack
-      }));
+      let success = false;
+      let lastErr: any = null;
 
-      let errorMessage = "Failed to create invoice: " + (error.message || error);
-      let hint = "";
-
-      if (error.message?.includes("PERMISSION_DENIED") || error.code === 7 || error.code === "permission-denied") {
-        const projId = firebaseConfig.projectId;
-        errorMessage = "Lỗi: Quyền truy cập Firestore bị từ chối (PERMISSION_DENIED).";
-        
-        if (error.message?.includes("API not used") || error.message?.includes("disabled")) {
-          hint = `Cloud Firestore API chưa được kích hoạt. Hãy truy cập link này để kích hoạt: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${projId}`;
-        } else {
-          hint = `Có thể do Security Rules chặn truy xuất hoặc do API chưa được kích hoạt cho Project ID: ${projId}.`;
+      // 1. Try Admin SDK first
+      if (adminDb) {
+        try {
+          console.log(`[Invoice Create] Attempting Admin SDK for ${referenceCode}`);
+          await adminDb.doc(`invoices/${referenceCode}`).set({
+            ...invoiceData,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          success = true;
+          console.log(`[Invoice Create] Success via Admin SDK: ${referenceCode}`);
+        } catch (err: any) {
+          console.error(`[Invoice Create] Admin SDK Error:`, err.message);
+          lastErr = err;
+          
+          // Retry with default DB if project/db mismatch
+          if (err.message?.includes("Project Id") || err.message?.includes("not found") || err.code === 5) {
+             try {
+                console.log(`[Invoice Create] Retrying with default Admin handle for ${referenceCode}`);
+                await admin.firestore().doc(`invoices/${referenceCode}`).set({
+                  ...invoiceData,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                success = true;
+                console.log(`[Invoice Create] Success via Default Admin SDK: ${referenceCode}`);
+             } catch (innerErr: any) {
+                console.error("[Invoice Create] Default Admin SDK retry failed:", innerErr.message);
+             }
+          }
         }
-      } else if (error.message?.includes("NOT_FOUND") || error.message?.includes("database") || error.code === 5 || error.code === "not-found") {
-        errorMessage = `Lỗi: Không tìm thấy database '${databaseId}'.`;
-        hint = `Vui lòng kiểm tra xem bạn đã tạo database tên là '${databaseId}' trong Firestore console chưa. Nếu chỉ dùng database mặc định, hãy xóa 'firestoreDatabaseId' trong cài đặt hoặc đổi thành '(default)'.`;
       }
 
+      // 2. Fallback to Client SDK
+      if (!success) {
+        try {
+          console.log(`[Invoice Create] Attempting Client SDK for ${referenceCode}`);
+          if (!db) throw new Error("Firestore Client SDK not initialized");
+          const invoiceRef = doc(db, `invoices/${referenceCode}`);
+          await setDoc(invoiceRef, {
+            ...invoiceData,
+            createdAt: Timestamp.now()
+          });
+          success = true;
+          console.log(`[Invoice Create] Success via Client SDK: ${referenceCode}`);
+        } catch (err: any) {
+          console.error(`[Invoice Create] Client SDK Error:`, err.message);
+          lastErr = lastErr || err;
+        }
+      }
+
+      if (!success) {
+        throw new Error(lastErr?.message || "All Firestore write attempts failed");
+      }
+
+      // Send notification for new order
+      const notificationMsg = `<b>🔔 ĐƠN HÀNG MỚI (BMASS)</b>\n\n` + 
+        `• <b>Mã đơn:</b> <code>${referenceCode}</code>\n` +
+        `• <b>Người tạo:</b> ${userEmail || 'Ẩn danh'}\n` +
+        `• <b>Số tiền:</b> ${Number(totalAmount).toLocaleString()}đ\n` +
+        `• <b>Loại:</b> ${type === 'deposit' ? '💳 Nạp tiền' : '🛍️ Mua sắm'}\n` +
+        `• <b>Thời gian:</b> ${dateNow.toLocaleString('vi-VN')}`;
+      
+      sendTelegramNotification(notificationMsg);
+
+      res.json(invoiceData);
+    } catch (error: any) {
+      console.error("[Invoice Create] Final global error:", error.message);
       res.status(500).json({ 
-        error: errorMessage,
-        hint: hint,
-        details: error.message
+        error: "Lỗi máy chủ khi tạo hóa đơn.",
+        details: error.message,
+        hint: "Vui lòng xem log server trên Vercel để biết thêm chi tiết."
       });
     }
   });
@@ -399,25 +908,46 @@ app.use(cookieParser());
 
   async function updateWalletOnPayment(invoiceData: any) {
     if (invoiceData.type === "deposit") {
-      const userRef = doc(db, `users/${invoiceData.userId}`);
-      const userSnap = await getDoc(userRef);
-      const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
-      
-      await setDoc(userRef, {
-        balance: currentBalance + invoiceData.totalAmount,
-      }, { merge: true });
+      if (adminDb) {
+        const userRef = adminDb.doc(`users/${invoiceData.userId}`);
+        const userSnap = await userRef.get();
+        const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+        
+        await userRef.set({
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
 
-      // Also record in deposits collection for admin audit
-      const depositId = `DEP_${invoiceData.id}`;
-      await setDoc(doc(db, `deposits/${depositId}`), {
-        id: depositId,
-        invoiceId: invoiceData.id,
-        userId: invoiceData.userId,
-        userEmail: invoiceData.userEmail,
-        amount: invoiceData.totalAmount,
-        status: "completed",
-        createdAt: Timestamp.now()
-      });
+        const depositId = `DEP_${invoiceData.id}`;
+        await adminDb.doc(`deposits/${depositId}`).set({
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: admin.firestore.Timestamp.now()
+        });
+      } else {
+        const userRef = doc(db, `users/${invoiceData.userId}`);
+        const userSnap = await getDoc(userRef);
+        const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+        
+        await setDoc(userRef, {
+          balance: currentBalance + invoiceData.totalAmount,
+        }, { merge: true });
+
+        // Also record in deposits collection for admin audit
+        const depositId = `DEP_${invoiceData.id}`;
+        await setDoc(doc(db, `deposits/${depositId}`), {
+          id: depositId,
+          invoiceId: invoiceData.id,
+          userId: invoiceData.userId,
+          userEmail: invoiceData.userEmail,
+          amount: invoiceData.totalAmount,
+          status: "completed",
+          createdAt: Timestamp.now()
+        });
+      }
     }
   }
 
@@ -447,80 +977,198 @@ app.use(cookieParser());
       }
       
       // Determine transfer amount and reference code
-      // 2. Prevent duplicate processing
-      const description = payload.content || payload.description || "";
+      const description = String(payload.content || payload.description || "").toLowerCase();
       const amount = Number(payload.transferAmount || payload.amount || 0);
-      const referenceCodeSearch = payload.code || description.match(/Bmass[0-9]{3,12}/i)?.[0];
       
-      let invoiceData = null;
-      let invoiceRef = null;
+      // Improved reference code extraction
+      let referenceCodeSearch = payload.code;
+      if (!referenceCodeSearch) {
+        // Try to find BmassXXXXXX in description
+        const match = description.match(/bmass[0-9]+/i);
+        if (match) referenceCodeSearch = match[0];
+      }
+
+      if (!referenceCodeSearch) {
+        console.log("[SePay Webhook] No reference code found in payload. Content:", description);
+        return res.json({ success: true, message: "No reference code" });
+      }
+
+      let invoiceData: any = null;
+      console.log(`[SePay Webhook] Processing transaction ${transactionId}, amount ${amount}, reference: ${referenceCodeSearch}`);
       
       if (referenceCodeSearch) {
-        // Find pending invoice
-        let ref = doc(db, `invoices/${referenceCodeSearch}`);
-        let snap = await getDoc(ref);
+        // Try variants: exactly as is, uppercase, lowercase, and just the numeric part if somehow ID is different
+        const variants = [
+          referenceCodeSearch, 
+          referenceCodeSearch.toUpperCase(), 
+          referenceCodeSearch.toLowerCase()
+        ];
         
-        if (!snap.exists()) {
-           ref = doc(db, `invoices/${referenceCodeSearch.toUpperCase()}`);
-           snap = await getDoc(ref);
-        }
-        
-        if (snap.exists()) {
-          invoiceData = snap.data();
-          invoiceRef = ref;
+        // If referenceCodeSearch is "bmass123456", also try "Bmass123456" (standard format)
+        const standardFormat = referenceCodeSearch.replace(/^bmass/i, 'Bmass');
+        if (!variants.includes(standardFormat)) variants.push(standardFormat);
+
+        for (const idToTry of variants) {
+          if (invoiceData) break;
+          
+          if (adminDb) {
+            try {
+              const snap = await adminDb.doc(`invoices/${idToTry}`).get();
+              if (snap.exists) {
+                invoiceData = snap.data();
+                console.log(`[SePay Webhook] Found invoice via Admin SDK: ${idToTry}`);
+              }
+            } catch (err: any) {
+              console.warn(`[SePay Webhook] Admin SDK lookup failed for ${idToTry}:`, err.message);
+            }
+          }
+          
+          if (!invoiceData && db) {
+            try {
+              const snap = await getDoc(doc(db, `invoices/${idToTry}`));
+              if (snap.exists()) {
+                invoiceData = snap.data();
+                console.log(`[SePay Webhook] Found invoice via Client SDK: ${idToTry}`);
+              }
+            } catch (err: any) {
+              console.error(`[SePay Webhook] Client SDK lookup failed for ${idToTry}:`, err.message);
+            }
+          }
         }
       }
 
-      await runTransaction(db, async (t) => {
-        const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
-        const logSnap = await t.get(logRef);
-        
-        if (logSnap.exists()) {
-          throw new Error("Already processed");
+      if (!invoiceData) {
+        console.log(`[SePay Webhook] No invoice found for ${referenceCodeSearch} (Tried variants)`);
+        // We still return 200 to SePay to acknowledge receipt
+        return res.json({ success: true, message: `Invoice ${referenceCodeSearch} not found` });
+      }
+
+      console.log(`[SePay Webhook] Invoice status: ${invoiceData.status}, Expected: ${invoiceData.totalAmount}`);
+
+      let processed = false;
+      if (adminDb) {
+        try {
+          await adminDb.runTransaction(async (t: any) => {
+            const logRefAdmin = adminDb!.doc(`webhook_logs/${String(transactionId)}`);
+            const logSnap = await t.get(logRefAdmin);
+            
+            if (logSnap.exists) {
+              processed = true;
+              return;
+            }
+
+            // Check if amount is enough (allow small margin)
+            const isAmountValid = amount >= (invoiceData.totalAmount - 500);
+            
+            // Mark log as processed REGARDLESS of amount to avoid double hooks
+            t.set(logRefAdmin, {
+              transactionId,
+              amount,
+              referenceCode: referenceCodeSearch,
+              invoiceId: invoiceData.id,
+              status: isAmountValid ? "success" : "invalid_amount",
+              payload: { ...payload, processedAt: new Date().toISOString() },
+              createdAt: admin.firestore.Timestamp.now()
+            });
+
+            if (invoiceData.status === "pending" && isAmountValid) {
+               // Update invoice
+               const invoiceRefAdmin = adminDb!.doc(`invoices/${invoiceData.id}`);
+               t.update(invoiceRefAdmin, {
+                 status: "paid",
+                 paidAt: admin.firestore.Timestamp.now(),
+                 "paymentDetails.sepayTransactionId": transactionId,
+                 "paymentDetails.actualAmount": amount,
+                 "paymentDetails.processedVia": "webhook_admin"
+               });
+
+               // Wallet update logic
+               if (invoiceData.type === "deposit" && invoiceData.userId) {
+                 const userRef = adminDb!.doc(`users/${invoiceData.userId}`);
+                 const userSnap = await t.get(userRef);
+                 const currentBalance = userSnap.exists ? (userSnap.data()?.balance || 0) : 0;
+                 
+                 t.set(userRef, {
+                    balance: currentBalance + invoiceData.totalAmount,
+                 }, { merge: true });
+
+                 // Also record in deposits collection
+                 const depositId = `DEP_${invoiceData.id}`;
+                 t.set(adminDb!.doc(`deposits/${depositId}`), {
+                   id: depositId,
+                   invoiceId: invoiceData.id,
+                   userId: invoiceData.userId,
+                   userEmail: invoiceData.userEmail,
+                   amount: invoiceData.totalAmount,
+                   status: "completed",
+                   createdAt: admin.firestore.Timestamp.now()
+                 });
+               }
+               console.log(`[SePay Webhook] Invoice ${invoiceData.id} marked as PAID via Transaction ${transactionId}`);
+            } else {
+              console.log(`[SePay Webhook] Invoice ${invoiceData.id} NOT PAID: Status=${invoiceData.status}, ValidAmount=${isAmountValid}`);
+            }
+          });
+          processed = true;
+        } catch (err: any) {
+          console.error("[SePay Webhook] Transaction execution error:", err.message);
         }
+      } 
+      
+      if (!processed && db) {
+        const invoiceRef = doc(db, `invoices/${invoiceData.id}`);
+        await runTransaction(db, async (t) => {
+          const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+          const logSnap = await t.get(logRef);
+          
+          if (logSnap.exists) {
+            return;
+          }
 
-        // Mark as processed
-        t.set(logRef, {
-          payload,
-          createdAt: Timestamp.now()
-        });
+          const isAmountValid = amount >= (invoiceData.totalAmount - 500);
 
-        if (invoiceData && invoiceRef && invoiceData.status === "pending" && amount >= (invoiceData.totalAmount - 100)) {
-           // Update invoice
-           t.update(invoiceRef, {
-             status: "paid",
-             paidAt: Timestamp.now(),
-             "paymentDetails.sepayTransactionId": transactionId,
-             "paymentDetails.actualAmount": amount
-           });
+          t.set(logRef, {
+            payload: { ...payload, processedAt: new Date().toISOString() },
+            createdAt: Timestamp.now(),
+            validAmount: isAmountValid
+          });
 
-           // Wallet update logic (if needed)
-           if (invoiceData.type === "deposit") {
-             const userRef = doc(db, `users/${invoiceData.userId}`);
-             const userSnap = await t.get(userRef);
-             const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
-             
-             t.set(userRef, {
-                balance: currentBalance + invoiceData.totalAmount,
-             }, { merge: true });
-
-             // Also record in deposits collection
-             const depositId = `DEP_${invoiceData.id}`;
-             t.set(doc(db, `deposits/${depositId}`), {
-               id: depositId,
-               invoiceId: invoiceData.id,
-               userId: invoiceData.userId,
-               userEmail: invoiceData.userEmail,
-               amount: invoiceData.totalAmount,
-               status: "completed",
-               createdAt: Timestamp.now()
+          if (invoiceData.status === "pending" && isAmountValid) {
+             // Update invoice
+             t.update(invoiceRef, {
+               status: "paid",
+               paidAt: Timestamp.now(),
+               "paymentDetails.sepayTransactionId": transactionId,
+               "paymentDetails.actualAmount": amount,
+               "paymentDetails.processedVia": "webhook_client"
              });
-           }
-           console.log(`Invoice ${invoiceRef.id} marked as PAID via SePay transaction ${transactionId}`);
-        }
-      });
 
-      res.json({ success: true });
+             // Wallet update logic
+             if (invoiceData.type === "deposit" && invoiceData.userId) {
+               const userRef = doc(db, `users/${invoiceData.userId}`);
+               const userSnap = await t.get(userRef);
+               const currentBalance = userSnap.exists() ? (userSnap.data()?.balance || 0) : 0;
+               
+               t.set(userRef, {
+                  balance: currentBalance + invoiceData.totalAmount,
+               }, { merge: true });
+
+               const depositId = `DEP_${invoiceData.id}`;
+               t.set(doc(db, `deposits/${depositId}`), {
+                 id: depositId,
+                 invoiceId: invoiceData.id,
+                 userId: invoiceData.userId,
+                 userEmail: invoiceData.userEmail,
+                 amount: invoiceData.totalAmount,
+                 status: "completed",
+                 createdAt: Timestamp.now()
+               });
+             }
+          }
+        });
+      }
+
+      res.json({ success: true, invoiceId: invoiceData.id });
     } catch (error: any) {
       console.error("SePay Webhook Error details:", {
         message: error.message,
@@ -538,72 +1186,188 @@ app.use(cookieParser());
   };
 
   app.post("/api/webhooks/sepay", handleSepayWebhook);
-  app.get("/api/webhooks/sepay", handleSepayWebhook);
-  app.post("/hooks/sepay-payment", handleSepayWebhook); // Alias for user's configured URL
-  app.get("/hooks/sepay-payment", handleSepayWebhook);
+  app.get("/api/webhooks/sepay", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
+  app.post("/hooks/sepay-payment", handleSepayWebhook); 
+  app.get("/hooks/sepay-payment", (req, res) => res.json({ status: "active", message: "SePay Webhook endpoint is ready (POST only)" }));
 
   // Manual confirmation / callback verification endpoint for invoices (checks SePay transactions API)
+  app.get("/api/invoices/verify", (req, res) => {
+    res.send(`
+      <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+        <h2>API Xác Thực Giao Dịch</h2>
+        <p>Đây là điểm cuối API dành cho phương thức <b>POST</b>.</p>
+        <p>Hệ thống không thể xử lý yêu cầu GET trực tiếp từ trình duyệt.</p>
+        <p>Vui lòng sử dụng chức năng "Kiểm tra thanh toán" trên giao diện Nạp tiền của Website.</p>
+        <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px;">Quay lại Trang chủ</a>
+      </div>
+    `);
+  });
   app.post("/api/invoices/verify", async (req, res) => {
+    const { invoiceId, isSandboxMock } = req.body;
+    console.log(`[Invoice Verify] Start: invoiceId=${invoiceId}, Project=${firebaseConfig?.projectId}, DB=${databaseId}`);
     try {
-      const { invoiceId, isSandboxMock } = req.body;
       if (!invoiceId) {
         return res.status(400).json({ error: "Missing invoiceId" });
       }
 
       let invoiceData;
       let invoiceExists = false;
+      
+      // 1. Try Admin SDK
       if (adminDb) {
-        const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
-        const invoiceSnap = await invoiceRefAdmin.get();
-        if (invoiceSnap.exists) {
-          invoiceExists = true;
-          invoiceData = invoiceSnap.data();
+        try {
+          const variants = [invoiceId, invoiceId.toUpperCase(), invoiceId.toLowerCase()];
+          const standard = invoiceId.replace(/^bmass/i, 'Bmass');
+          if (!variants.includes(standard)) variants.push(standard);
+
+          for (const idToTry of variants) {
+            console.log(`[Invoice Verify] Admin SDK lookup attempt: ${idToTry}`);
+            const snap = await adminDb.doc(`invoices/${idToTry}`).get();
+            if (snap.exists) {
+              invoiceExists = true;
+              invoiceData = snap.data();
+              console.log(`[Invoice Verify] Admin SDK Found doc: ${idToTry}`);
+              break;
+            }
+          }
+        } catch (adminErr: any) {
+          console.error(`[Invoice Verify] Admin SDK error (non-fatal):`, adminErr.message);
         }
-      } else {
-        const invoiceRef = doc(db, `invoices/${invoiceId}`);
-        const invoiceSnap = await getDoc(invoiceRef);
-        if (invoiceSnap.exists()) {
-          invoiceExists = true;
-          invoiceData = invoiceSnap.data();
+      } 
+      
+      // 2. Fallback to Client SDK
+      if (!invoiceExists && db) {
+        try {
+          const variants = [invoiceId, invoiceId.toUpperCase(), invoiceId.toLowerCase()];
+          const standard = invoiceId.replace(/^bmass/i, 'Bmass');
+          if (!variants.includes(standard)) variants.push(standard);
+
+          for (const idToTry of variants) {
+            console.log(`[Invoice Verify] Client SDK lookup attempt: ${idToTry}`);
+            const snap = await getDoc(doc(db, `invoices/${idToTry}`));
+            if (snap.exists()) {
+              invoiceExists = true;
+              invoiceData = snap.data();
+              console.log(`[Invoice Verify] Client SDK Found doc: ${idToTry}`);
+              break;
+            }
+          }
+        } catch (clientErr: any) {
+          console.error(`[Invoice Verify] Client SDK error:`, clientErr.message);
         }
       }
 
       if (!invoiceExists) {
-        return res.status(404).json({ error: "No invoice found" });
+        // 3. Last chance: Search by referenceCode field
+        try {
+          console.log(`[Invoice Verify] No direct ID match. Searching for doc with referenceCode field: ${invoiceId}`);
+          let snap;
+          const variants = [invoiceId, invoiceId.toUpperCase(), invoiceId.toLowerCase(), invoiceId.replace(/^bmass/i, 'Bmass')];
+          
+          if (adminDb) {
+            for (const refValue of variants) {
+              const querySnap = await adminDb.collection("invoices").where("paymentDetails.referenceCode", "==", refValue).limit(1).get();
+              if (!querySnap.empty) {
+                invoiceExists = true;
+                invoiceData = querySnap.docs[0].data();
+                console.log(`[Invoice Verify] Found via Admin SDK field search: ${refValue}`);
+                break;
+              }
+            }
+          }
+          
+          if (!invoiceExists && db) {
+            for (const refValue of variants) {
+              const querySnap = await getDocs(query(collection(db, "invoices"), where("paymentDetails.referenceCode", "==", refValue), limit(1)));
+              if (!querySnap.empty) {
+                invoiceExists = true;
+                invoiceData = querySnap.docs[0].data();
+                console.log(`[Invoice Verify] Found via Client SDK field search: ${refValue}`);
+                break;
+              }
+            }
+          }
+        } catch (searchErr: any) {
+          console.error(`[Invoice Verify] Field search error:`, searchErr.message);
+        }
+      }
+
+      if (!invoiceExists) {
+        console.warn(`[Invoice Verify] Invoice NOT FOUND after all attempts: ${invoiceId}`);
+        // Log additional info to help user debug
+        console.log(`[Invoice Verify] Config used: Project=${firebaseConfig?.projectId}, Database=${databaseId}`);
+        return res.status(404).json({ 
+          error: "No invoice found", 
+          debug: { 
+            invoiceId, 
+            projectId: firebaseConfig?.projectId, 
+            databaseId,
+            adminDbReady: !!adminDb,
+            clientDbReady: !!db,
+            message: "Invoice not found. Please ensure code/description in payment is exactly correct (BmassXXXXXX)."
+          } 
+        });
       }
 
       if (invoiceData?.status === "paid") {
-        return res.json({ success: true, status: "paid", message: "Hóa đơn này đã được xác nhận thanh toán thành công!" });
+        return res.json({ 
+          success: true, 
+          status: "paid", 
+          invoiceId: invoiceData.id,
+          message: "Hóa đơn này đã được xác nhận thanh toán thành công!" 
+        });
       }
 
-      const referenceCode = invoiceData?.paymentDetails?.referenceCode || invoiceId;
+      const referenceCode = invoiceData?.paymentDetails?.referenceCode || invoiceData?.id || invoiceId;
       const expectedAmount = invoiceData?.totalAmount || 0;
 
       // 1. Sandbox mock simulation (always available to ease testing/sandbox flow when API or transfers are not ready)
       if (isSandboxMock) {
-        await updateDoc(doc(db, "invoices", invoiceId), {
-          status: "paid",
-          paidAt: Timestamp.now(),
-          "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
-          "paymentDetails.isSandboxMock": true
-        });
+        if (adminDb) {
+          await adminDb.doc(`invoices/${invoiceData.id}`).update({
+            status: "paid",
+            paidAt: admin.firestore.Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        } else {
+          await updateDoc(doc(db, "invoices", invoiceData.id), {
+            status: "paid",
+            paidAt: Timestamp.now(),
+            "paymentDetails.sepayTransactionId": `MOCK_${Math.floor(10000000 + Math.random() * 90000000)}`,
+            "paymentDetails.isSandboxMock": true
+          });
+        }
         await updateWalletOnPayment(invoiceData);
-        return res.json({ success: true, status: "paid", message: "Duyệt giao dịch mô phỏng nâng cao thành công!" });
+        return res.json({ 
+          success: true, 
+          status: "paid", 
+          invoiceId: invoiceData.id,
+          message: "Duyệt giao dịch mô phỏng nâng cao thành công!" 
+        });
       }
 
       // 2. Query SePay API to fetch latest bank transactions in real-time
       const sepayApiKey = process.env.SEPAY_API_KEY;
-      if (sepayApiKey) {
-        const sysSnap = await getDoc(doc(db, "settings/system"));
-        const bankingConfig = sysSnap.exists() ? sysSnap.data()?.bankingConfig : null;
-        const bankAccount = bankingConfig?.bankAccount || "";
+      if (sepayApiKey && (db || adminDb)) {
+        let sysSnap = null;
+        if (db) {
+          try {
+            sysSnap = await getDoc(doc(db, "settings/system"));
+          } catch (e) {
+            console.warn("Failed to get system settings via client SDK:", e);
+          }
+        }
+        
+        const bankingConfig = sysSnap?.exists() ? sysSnap.data()?.bankingConfig : null;
+        const bankAccount = bankingConfig?.bankAccount || "00010302003";
 
-        let url = "https://apigateway.sepay.vn/api/transactions/list?limit=20";
+        let url = "https://apigateway.sepay.vn/api/transactions/list?limit=50";
         if (bankAccount) {
           url += `&account_number=${encodeURIComponent(bankAccount)}`;
         }
 
-        console.log(`Checking SePay list API for invoice ${invoiceId} (Reference: ${referenceCode})`);
+        console.log(`[Invoice Verify] Checking Account: ${bankAccount || 'All'}, Invoice: ${invoiceData.id}, Ref: ${referenceCode}, Amount: ${expectedAmount}`);
         
         try {
           const apiResponse = await axios.get(url, {
@@ -615,40 +1379,71 @@ app.use(cookieParser());
 
           const data = apiResponse.data;
           if (data && data.transactions && Array.isArray(data.transactions)) {
+            console.log(`[Invoice Verify] Scanned ${data.transactions.length} recent transactions.`);
             const matchedTx = data.transactions.find((tx: any) => {
-              const content = String(tx.transaction_content || tx.content || tx.description || "").toUpperCase();
-              const txCode = String(tx.code || "").toUpperCase();
-              const referenceUpper = referenceCode.toUpperCase();
+              const contentRaw = String(tx.transaction_content || tx.content || tx.description || "").toLowerCase();
+              const txCodeRaw = String(tx.code || tx.transaction_code || tx.referenceCode || "").toLowerCase().trim();
+              const searchStrRaw = referenceCode.toLowerCase().trim();
               
-              const codeInContent = content.includes(referenceUpper);
-              const codeMatches = txCode === referenceUpper;
+              // 1. Level 1: Direct inclusion check
+              let isMatch = contentRaw.includes(searchStrRaw) || txCodeRaw.includes(searchStrRaw);
               
-              const amount = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
-              const amountMatches = amount >= (expectedAmount - 100);
+              // 2. Level 2: Normalized check (remove non-alphanumeric)
+              const normalize = (s: string) => s.replace(/[^a-z0-9]/g, '');
+              const contentNorm = normalize(contentRaw);
+              const searchStrNorm = normalize(searchStrRaw);
+              const txCodeNorm = normalize(txCodeRaw);
+              
+              if (!isMatch) {
+                isMatch = contentNorm.includes(searchStrNorm) || (txCodeNorm && searchStrNorm.includes(txCodeNorm));
+              }
+              
+              // 3. Level 3: Numeric part check (strong fallback for BmassXXXXXX)
+              // If reference is Bmass609804, numeric is 609804
+              const numericMatch = searchStrRaw.match(/\d{5,}/); // Look for 5+ digits
+              if (!isMatch && numericMatch) {
+                const numComp = numericMatch[0];
+                isMatch = contentRaw.includes(numComp) || txCodeRaw.includes(numComp);
+              }
+                              
+              const amountIn = Number(tx.amount_in || tx.transferAmount || tx.amount || 0);
+              const amountMatches = Math.abs(amountIn - expectedAmount) <= 500;
 
-              return (codeInContent || codeMatches) && amountMatches;
+              if (isMatch || contentRaw.includes(searchStrRaw.substring(searchStrRaw.length - 6))) {
+                 console.log(`[Invoice Verify] Match Check: TxCode="${txCodeRaw}", Search="${searchStrRaw}", NormSearch="${searchStrNorm}", MatchFound=${isMatch}, AmountInRange=${amountMatches}`);
+              }
+              return isMatch && amountMatches;
             });
 
             if (matchedTx) {
               const transactionId = matchedTx.id || matchedTx.transactionId;
-              const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
-              await setDoc(logRef, {
-                payload: matchedTx,
-                createdAt: Timestamp.now(),
-                manualCheck: true
-              });
+              console.log(`[Invoice Verify] MATCHED Transaction: ${transactionId} for Invoice: ${invoiceData.id}`);
 
-               if (adminDb) {
-                const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceId}`);
+              if (adminDb) {
+                const logRef = adminDb.doc(`webhook_logs/${String(transactionId)}`);
+                await logRef.set({
+                  payload: matchedTx,
+                  createdAt: admin.firestore.Timestamp.now(),
+                  manualCheck: true
+                });
+
+                const invoiceRefAdmin = adminDb.doc(`invoices/${invoiceData.id}`);
                 await invoiceRefAdmin.update({
                   status: "paid",
-                  paidAt: Timestamp.now(),
+                  paidAt: admin.firestore.Timestamp.now(),
                   "paymentDetails.sepayTransactionId": transactionId,
                   "paymentDetails.actualAmount": Number(matchedTx.amount_in || matchedTx.transferAmount || matchedTx.amount || 0),
                   "paymentDetails.actualSource": "sepay_api_manual_check"
                 });
               } else {
-                await updateDoc(doc(db, "invoices", invoiceId), {
+                const logRef = doc(db, `webhook_logs/${String(transactionId)}`);
+                await setDoc(logRef, {
+                  payload: matchedTx,
+                  createdAt: Timestamp.now(),
+                  manualCheck: true
+                });
+
+                await updateDoc(doc(db, "invoices", invoiceData.id), {
                   status: "paid",
                   paidAt: Timestamp.now(),
                   "paymentDetails.sepayTransactionId": transactionId,
@@ -662,18 +1457,13 @@ app.use(cookieParser());
               return res.json({ 
                 success: true, 
                 status: "paid", 
+                invoiceId: invoiceData.id,
                 message: "Cổng SePay xác nhận đã tìm thấy giao dịch chuyển khoản thành công!" 
               });
             }
           }
         } catch (apiErr: any) {
-          console.log(`SePay list API connection issues (expected in sandboxed trial): ${apiErr?.message || apiErr}`);
-          return res.json({
-            success: false,
-            status: "pending",
-            isNetworkOffline: true,
-            message: "Không thể kết nối cổng thanh toán tự động. Vui lòng xác nhận giao dịch thủ công bằng cách nhấn 'Tôi đã thanh toán (Kiểm tra ngay)' sau khi hoàn tất chuyển khoản."
-          });
+          console.log(`SePay list API connection issue or timeout: ${apiErr?.message || apiErr}`);
         }
       }
 
@@ -681,12 +1471,17 @@ app.use(cookieParser());
       return res.json({ 
         success: false, 
         status: "pending", 
-        message: `Không tìm thấy nội dung chuyển khoản "${referenceCode}" với số tiền ${expectedAmount.toLocaleString()}đ trên lịch sử SePay. Bạn có muốn duyệt nhanh hoặc kích hoạt chế độ sandbox để kiểm nghiệm không?`
+        message: `Hệ thống chưa tìm thấy giao dịch chuyển khoản với nội dung "${referenceCode}" và số tiền ${expectedAmount.toLocaleString()}đ. Nếu bạn vừa chuyển khoản, vui lòng đợi 1-2 phút rồi thử lại.`
       });
 
     } catch (error: any) {
-      console.error("Manual verify action error:", safeStringify(error));
-      res.status(500).json({ error: "Lỗi kiểm tra hóa đơn: " + (error.message || error) });
+      const errMsg = error.message || String(error);
+      const errStack = error.stack || "";
+      console.error("Manual verify action error:", errMsg, errStack);
+      res.status(500).json({ 
+        error: "Lỗi kiểm tra hóa đơn: " + errMsg,
+        debug: { stack: errStack.split('\n').slice(0, 3) }
+      });
     }
   });
 
@@ -749,6 +1544,65 @@ app.use(cookieParser());
     }
   });
 
+  // Proxy for Admin: Bulk Create Users in Firebase Auth
+  app.post("/api/admin/bulk-create-users", async (req, res) => {
+    try {
+      const { users } = req.body;
+      if (!users || !Array.isArray(users)) {
+        return res.status(400).json({ error: "Dữ liệu người dùng không hợp lệ" });
+      }
+
+      // Check if admin is initialized
+      const a = admin as any;
+      const adminBase = a.default || a;
+      
+      const results = [];
+      const auth = adminBase.auth();
+
+      for (const u of users) {
+        try {
+          if (!u.email) {
+             results.push({ status: 'error', message: "Thiếu Email" });
+             continue;
+          }
+          // Check if user already exists
+          let userRecord;
+          try {
+            userRecord = await auth.getUserByEmail(u.email);
+            // User exists, update password if provided
+            if (u.password) {
+              await auth.updateUser(userRecord.uid, {
+                password: u.password,
+                displayName: u.displayName || userRecord.displayName,
+              });
+            }
+          } catch (e: any) {
+            if (e.code === 'auth/user-not-found') {
+              // Create new user
+              userRecord = await auth.createUser({
+                email: u.email,
+                password: u.password,
+                displayName: u.displayName,
+                phoneNumber: u.phoneNumber || undefined,
+              });
+            } else {
+              throw e;
+            }
+          }
+
+          results.push({ email: u.email, uid: userRecord.uid, status: 'success' });
+        } catch (err: any) {
+          results.push({ email: u.email, status: 'error', message: err.message });
+        }
+      }
+
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("Bulk User Creation Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Proxy for Cloud Storage or other APIs would go here
 
   export default app;
@@ -766,12 +1620,16 @@ app.use(cookieParser());
       });
       app.use(vite.middlewares);
     } else {
-      const distPath = path.join(process.cwd(), "dist");
-      app.use(express.static(distPath));
-      // Serve index.html for all undefined GET requests (SPA catch-all)
-      app.get(/.*/, (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    // Serve index.html for all undefined GET requests (SPA catch-all)
+    app.get('*all', (req, res, next) => {
+      // Don't intercept API or webhook routes
+      if (req.path.startsWith('/api/') || req.path.startsWith('/hooks/')) {
+        return next();
+      }
+      res.sendFile(path.join(distPath, "index.html"));
+    });
     }
 
     app.listen(PORT, "0.0.0.0", () => {
@@ -779,7 +1637,7 @@ app.use(cookieParser());
     });
   }
 
-  // Khởi động nội bộ khi không chạy trên Vercel Serverless
-  if (!process.env.VERCEL) {
-    startServer();
-  }
+  startServer().catch(err => {
+    console.error("Fatal startup error:", err);
+    process.exit(1);
+  });

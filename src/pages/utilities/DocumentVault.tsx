@@ -812,7 +812,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Danh mục</th>
 
                    <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ngày tạo</th>
-                   <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-slate-50 dark:bg-zinc-950/20">Thao tác</th>
+                   <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-slate-50 dark:bg-zinc-950/20">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
@@ -851,7 +851,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                      <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap bg-white dark:bg-zinc-950/30 transition-colors">
+                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap bg-white dark:bg-zinc-950/30 transition-colors">
                        <div className="flex justify-center">
                          {expandedRow === docItem.id ? (
                            <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">

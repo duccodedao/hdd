@@ -1,8 +1,9 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity, Bookmark as BookmarkIcon, Star, Trash2 } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity, Bookmark as BookmarkIcon, Star, Trash2, Shield } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+import { collection, query, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -99,12 +100,98 @@ export default function Topbar() {
     };
   }, []);
   const [locationName, setLocationName] = useState<string>('');
+  const [resettingLocation, setResettingLocation] = useState(false);
+
+  const handleResetLocation = async () => {
+    if (resettingLocation) return;
+    setResettingLocation(true);
+    const toastId = toast.loading('Đang cập nhật vị trí thiết bị...');
+    
+    if (!navigator.geolocation) {
+      toast.error('Trình duyệt không hỗ trợ xác định vị trí hiện tại.', { id: toastId });
+      setResettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          
+          // Fetch reverse address
+          const gRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, 
+            { headers: { 'Accept-Language': 'vi' } }
+          );
+          const gData = await gRes.json();
+          let address = 'Việt Nam';
+          
+          if (gData?.address) {
+            const addr = gData.address;
+            const parts = [];
+            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+            const district = addr.city_district || addr.county || addr.district || addr.town;
+            const city = addr.city || addr.state || addr.province;
+            if (ward) parts.push(ward);
+            if (district) parts.push(district);
+            if (city) parts.push(city);
+            address = parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Việt Nam');
+          } else if (gData?.display_name) {
+            address = gData.display_name;
+          }
+
+          if (user?.uid) {
+            // Update Firestore so it propagates globally and updates other listeners
+            await setDoc(doc(db, 'users', user.uid), {
+              location: {
+                lat: latitude,
+                lng: longitude,
+                address: address,
+                updatedAt: Date.now()
+              }
+            }, { merge: true });
+          } else {
+            // Unauthenticated user - fall back to local state
+            setLocationName(address);
+          }
+
+          // Trigger weather reload manually as well
+          const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+          const wData = await wRes.json();
+          if (wData?.current_weather) {
+            const getWeatherDescription = (code: number) => {
+              const descriptions: { [key: number]: string } = {
+                0: 'Trời quang', 1: 'Có mây', 2: 'Nhiều mây', 3: 'U ám', 45: 'Sương mù', 
+                61: 'Có mưa', 63: 'Có mưa', 65: 'Mưa lớn', 71: 'Có tuyết', 95: 'Có bão'
+              };
+              return descriptions[code] || 'Trời quang';
+            };
+            setWeather({
+              temp: Math.round(wData.current_weather.temperature),
+              code: wData.current_weather.weathercode,
+              description: getWeatherDescription(wData.current_weather.weathercode)
+            });
+          }
+
+          toast.success('Đã làm mới vị trí & thời tiết thành công!', { id: toastId });
+        } catch (err: any) {
+          toast.error('Lỗi khi lưu vị trí: ' + (err.message || String(err)), { id: toastId });
+        } finally {
+          setResettingLocation(false);
+        }
+      },
+      (err) => {
+        toast.error('Bạn đã từ chối quyền truy cập vị trí hoặc có lỗi định vị.', { id: toastId });
+        setResettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const { bookmarks, toggleBookmark } = useBookmarkStore();
   const { notifications, readNotificationIds, markAsRead, markAllAsRead } = useNotificationStore();
 
-  const [showBookmarks, setShowBookmarks] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const [showNotificationDetail, setShowNotificationDetail] = useState(false);
@@ -226,39 +313,63 @@ export default function Topbar() {
       return descriptions[code] || 'Trời quang';
     };
 
-    if ("geolocation" in navigator) {
+    const fetchWeatherAndAddress = async (latitude: number, longitude: number) => {
+      try {
+        const [wRes, gRes] = await Promise.all([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
+        ]);
+        const wData = await wRes.json();
+        const gData = await gRes.json();
+        if (wData?.current_weather) {
+          setWeather({
+            temp: Math.round(wData.current_weather.temperature),
+            code: wData.current_weather.weathercode,
+            description: getWeatherDescription(wData.current_weather.weathercode)
+          });
+        }
+        if (gData?.address) {
+          const addr = gData.address;
+          const parts = [];
+          const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+          const district = addr.city_district || addr.county || addr.district || addr.town;
+          const city = addr.city || addr.state || addr.province;
+          if (ward) parts.push(ward);
+          if (district) parts.push(district);
+          if (city) parts.push(city);
+          
+          setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
+        }
+      } catch {}
+    };
+
+    if (userData?.location?.lat && userData?.location?.lng) {
+      if (userData.location.address) {
+        setLocationName(userData.location.address);
+        // Only fetch weather and let coordinates populate weather stats
+        (async () => {
+          try {
+            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userData.location!.lat}&longitude=${userData.location!.lng}&current_weather=true`);
+            const wData = await wRes.json();
+            if (wData?.current_weather) {
+              setWeather({
+                temp: Math.round(wData.current_weather.temperature),
+                code: wData.current_weather.weathercode,
+                description: getWeatherDescription(wData.current_weather.weathercode)
+              });
+            }
+          } catch {}
+        })();
+      } else {
+        fetchWeatherAndAddress(userData.location.lat, userData.location.lng);
+      }
+    } else if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const { latitude, longitude } = pos.coords;
-        try {
-          const [wRes, gRes] = await Promise.all([
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
-          ]);
-          const wData = await wRes.json();
-          const gData = await gRes.json();
-          if (wData?.current_weather) {
-            setWeather({
-              temp: Math.round(wData.current_weather.temperature),
-              code: wData.current_weather.weathercode,
-              description: getWeatherDescription(wData.current_weather.weathercode)
-            });
-          }
-          if (gData?.address) {
-            const addr = gData.address;
-            const parts = [];
-            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
-            const district = addr.city_district || addr.county || addr.district || addr.town;
-            const city = addr.city || addr.state || addr.province;
-            if (ward) parts.push(ward);
-            if (district) parts.push(district);
-            if (city) parts.push(city);
-            
-            setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
-          }
-        } catch {}
+        fetchWeatherAndAddress(latitude, longitude);
       }, () => setLocationName('Việt Nam'));
     }
-  }, []);
+  }, [userData?.location?.lat, userData?.location?.lng, userData?.location?.address]);
 
   const getWeatherIcon = (code: number) => {
     if (code === 0 || code === 1) return <Sun className="w-3.5 h-3.5 text-amber-400" />;
@@ -300,11 +411,21 @@ export default function Topbar() {
           </div>
 
           <div className="flex items-center gap-4 text-slate-500 dark:text-zinc-500">
-             <div className="flex items-center gap-2 group cursor-help">
-               <MapPin className="w-3.5 h-3.5 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
-               <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
-                 {locationName || 'Đang định vị...'}
-               </span>
+             <div className="flex items-center gap-2 group">
+               <div className="flex items-center gap-1.5 cursor-help">
+                 <MapPin className="w-3.5 h-3.5 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
+                 <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+                   {locationName || 'Đang định vị...'}
+                 </span>
+               </div>
+               <button
+                 onClick={handleResetLocation}
+                 disabled={resettingLocation}
+                 className="p-1 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-md text-slate-400 hover:text-indigo-600 active:scale-95 transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-slate-200 dark:hover:border-zinc-700 ml-1 shrink-0"
+                 title="Cập nhật lại vị trí hiện tại"
+               >
+                 <RefreshCw className={cn("w-3 h-3 text-slate-400 hover:text-indigo-500", resettingLocation && "animate-spin")} />
+               </button>
              </div>
              {weather && (
                <div className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-white/5">
@@ -415,108 +536,11 @@ export default function Topbar() {
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
-          {/* Bookmarks Control */}
-          {user && (
-            <div className="relative">
-              <button
-                onClick={() => { setShowBookmarks(!showBookmarks); setShowNotifications(false); setShowProfileMenu(false); }}
-                className={cn(
-                  "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
-                  showBookmarks
-                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
-                )}
-                title="Dấu trang lưu trữ"
-              >
-                <BookmarkIcon className="w-4 h-4" />
-                {bookmarks.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 bg-indigo-600 dark:bg-indigo-500 rounded-full text-[8px] font-black text-white items-center justify-center animate-pulse shadow-md">
-                    {bookmarks.length}
-                  </span>
-                )}
-              </button>
-
-              <AnimatePresence>
-                {showBookmarks && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowBookmarks(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      className="absolute right-0 mt-2 w-72 md:w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl z-50 overflow-hidden"
-                    >
-                      <div className="p-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <BookmarkIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <span className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider font-sans">
-                            Dấu trang của bạn
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full">
-                          {bookmarks.length} Mục
-                        </span>
-                      </div>
-
-                      <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.02] p-1.5 space-y-0.5 no-scrollbar">
-                        {bookmarks.length === 0 ? (
-                          <div className="py-8 px-4 text-center">
-                            <Star className="w-8 h-8 text-slate-300 dark:text-zinc-750 mx-auto stroke-1" />
-                            <p className="text-[11px] text-slate-500 dark:text-zinc-500 mt-2 font-medium">Chưa lưu dấu trang nào.</p>
-                            <p className="text-[9px] text-slate-400 dark:text-zinc-600 mt-1 max-w-[200px] mx-auto leading-relaxed">Nhấp dấu sao tại các trang Công cụ, Tiện ích để tìm lại nhanh ở đây.</p>
-                          </div>
-                        ) : (
-                          bookmarks.map((b) => (
-                            <div
-                              key={b.id}
-                              className="group flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all text-left"
-                            >
-                              <div
-                                onClick={() => {
-                                  setShowBookmarks(false);
-                                  navigate(b.url);
-                                }}
-                                className="flex-1 min-w-0 pr-2 cursor-pointer flex items-center gap-3"
-                              >
-                                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                                  <Star className="w-3.5 h-3.5 fill-current" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[11px] font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-indigo-600 dark:group-hover:text-white transition-colors">
-                                    {b.title}
-                                  </p>
-                                  <p className="text-[9px] font-mono text-zinc-400 dark:text-zinc-550 truncate uppercase tracking-wider mt-0.5">
-                                    {b.type}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleBookmark({ itemId: b.itemId, title: b.title, type: b.type, url: b.url });
-                                }}
-                                className="w-7 h-7 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 dark:hover:text-rose-450 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                                title="Xóa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
           {/* Notifications Control */}
           {user && (
             <div className="relative">
               <button
-                onClick={() => { setShowNotifications(!showNotifications); setShowBookmarks(false); setShowProfileMenu(false); }}
+                onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }}
                 className={cn(
                   "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
                   showNotifications
@@ -711,6 +735,19 @@ export default function Topbar() {
                     </div>
                     
                     <div className="p-1.5 space-y-0.5">
+                      {(isAdmin || isSuperAdmin || userData?.role === 'review') && (
+                        <button 
+                          onClick={() => {
+                            navigate('/admin');
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md transition-all text-[11px] font-semibold border-b border-slate-150/40 dark:border-white/5 pb-2 cursor-pointer"
+                        >
+                          <Shield className="w-3.5 h-3.5 text-indigo-500" />
+                          Trung tâm Quản trị
+                        </button>
+                      )}
+
                       <button 
                         onClick={() => {
                           navigate('/profile');

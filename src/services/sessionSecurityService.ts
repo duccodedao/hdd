@@ -43,7 +43,57 @@ export function parseUserAgent(ua: string): string {
   return `${os} (${browser})`;
 }
 
+async function getBrowserLocation(): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !navigator || !navigator.geolocation) {
+      resolve('');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, {
+            headers: { 'Accept-Language': 'vi' }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.address) {
+              const addr = data.address;
+              const parts = [];
+              const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
+              const district = addr.city_district || addr.county || addr.district || addr.town;
+              const city = addr.city || addr.state || addr.province;
+              if (ward) parts.push(ward);
+              if (district) parts.push(district);
+              if (city) parts.push(city);
+              const name = parts.length > 0 ? parts.join(', ') : (data.display_name || '');
+              if (name) {
+                resolve(name);
+                return;
+              }
+            }
+          }
+        } catch {}
+        resolve(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      },
+      () => {
+        resolve('');
+      },
+      { timeout: 4000 }
+    );
+  });
+}
+
 export async function fetchIpAndLocation(): Promise<{ ip: string; location: string }> {
+  // Query browser-side precise GPS device metrics first
+  let geoLoc = '';
+  try {
+    geoLoc = await getBrowserLocation();
+  } catch (err) {
+    console.warn("Precision GPS resolver skipped", err);
+  }
+
   // Try ip-api.com first (highly reliable JSON endpoint with no CORS restrictions)
   try {
     const res = await fetch('https://ip-api.com/json');
@@ -51,10 +101,13 @@ export async function fetchIpAndLocation(): Promise<{ ip: string; location: stri
       const data = await res.json();
       if (data && data.status === 'success') {
         const ip = data.query || 'Unknown';
+        if (geoLoc) {
+          return { ip, location: geoLoc };
+        }
         const city = data.city || '';
         const region = data.regionName || '';
         const country = data.country || '';
-        const location = [city, region, country].filter(Boolean).join(', ') || 'Chưa rõ';
+        const location = [city, region, country].filter(Boolean).join(', ') || 'Việt Nam';
         return { ip, location };
       }
     }
@@ -68,10 +121,13 @@ export async function fetchIpAndLocation(): Promise<{ ip: string; location: stri
     if (res.ok) {
       const data = await res.json();
       const ip = data.ip || 'Unknown';
+      if (geoLoc) {
+        return { ip, location: geoLoc };
+      }
       const city = data.city || '';
       const region = data.region || '';
       const country = data.country_name || '';
-      const location = [city, region, country].filter(Boolean).join(', ') || 'Chưa rõ';
+      const location = [city, region, country].filter(Boolean).join(', ') || 'Việt Nam';
       return { ip, location };
     }
   } catch (e) {
@@ -83,7 +139,24 @@ export async function fetchIpAndLocation(): Promise<{ ip: string; location: stri
     const res2 = await fetch('https://api.ipify.org?format=json');
     if (res2.ok) {
       const data2 = await res2.json();
-      return { ip: data2.ip || 'Local Dev', location: 'Chưa rõ (Vị trí mạng nội bộ)' };
+      const ip = data2.ip || 'Local Dev';
+      if (geoLoc) {
+        return { ip, location: geoLoc };
+      }
+      try {
+        const searchRes = await fetch(`https://ip-api.com/json/${ip}`);
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData && searchData.status === 'success') {
+            const city = searchData.city || '';
+            const region = searchData.regionName || '';
+            const country = searchData.country || '';
+            const location = [city, region, country].filter(Boolean).join(', ') || 'Việt Nam';
+            return { ip, location };
+          }
+        }
+      } catch {}
+      return { ip, location: 'Việt Nam' };
     }
   } catch (e2) {
     console.warn("api.ipify.org lookup failed", e2);
@@ -92,7 +165,7 @@ export async function fetchIpAndLocation(): Promise<{ ip: string; location: stri
   // Pure Local Sandbox Fallback
   return { 
     ip: '127.0.0.1 (Local Dev)', 
-    location: 'Mạng cục bộ / Sandboxed' 
+    location: geoLoc || 'Việt Nam' 
   };
 }
 

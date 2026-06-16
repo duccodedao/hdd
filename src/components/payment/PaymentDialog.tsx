@@ -160,7 +160,11 @@ export const PaymentDialog = ({ isOpen, onClose, item, onPaid }: PaymentDialogPr
         toast.success(resData.message || 'Thanh toán thành công!');
         onPaid();
       } else {
-        toast.error(resData.message || 'Không tìm thấy giao dịch chuyển khoản');
+        const errorDetail = resData.message || resData.error || 'Không tìm thấy giao dịch';
+        toast.error(errorDetail);
+        if (resData.debug) {
+           console.log("[Verification Debug]", resData.debug);
+        }
         if (!isMock) {
           setShowSandboxBypass(true);
         }

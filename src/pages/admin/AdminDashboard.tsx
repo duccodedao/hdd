@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
-import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag } from 'lucide-react';
+import { initializeApp, getApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { db, firebaseConfig } from '../../lib/firebase';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, Copy, X, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag, FileSpreadsheet } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -21,10 +23,7 @@ import AdminPartners from './AdminPartners';
 import AdminOverview from './AdminOverview';
 import AdminAiTools from './AdminAiTools';
 import AdminSecuritySessions from './AdminSecuritySessions';
-import AdminRevenueStats from './AdminRevenueStats';
-import AdminDepositHistory from './AdminDepositHistory';
-import AdminUserPurchases from './AdminUserPurchases';
-import AdminShopSetup from './AdminShopSetup';
+import AdminAffiliate from './AdminAffiliate';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -32,12 +31,19 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 
 export default function AdminDashboard() {
   const { isSuperAdmin, userData } = useAuthStore();
+  const [showReviewUserModal, setShowReviewUserModal] = useState(false);
+  const [reviewModalMode, setReviewModalMode] = useState<'auto'|'manual'>('auto');
+  const [reviewEmail, setReviewEmail] = useState('');
+  const [reviewPassword, setReviewPassword] = useState('');
+  const [reviewCreatedInfo, setReviewCreatedInfo] = useState<{email:string, password:string}|null>(null);
+  const [showPasswordForUser, setShowPasswordForUser] = useState<any>(null);
   const { maintenanceMode, setMaintenanceMode, maintenanceTabs, setMaintenanceTabs, maintenanceDevices, setMaintenanceDevices, blockedDevices, setBlockedDevices, hasUnapprovedSessions } = useAppStore();
   const { openConfirm } = useConfirmStore();
   
   const [users, setUsers] = useState<UserData[]>([]);
+  const [userFilter, setUserFilter] = useState<'all' | 'review'>('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'revenue_stats' | 'all_transactions' | 'purchase_history' | 'shop_setup'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'affiliate'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -75,6 +81,8 @@ export default function AdminDashboard() {
   });
 
   const [googleClientId, setGoogleClientIdState] = useState('');
+  const [ipWhitelistEnabled, setIpWhitelistEnabled] = useState(false);
+  const [ipWhitelistText, setIpWhitelistText] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [adminPin, setAdminPin] = useState('1234');
   const [bankingConfig, setBankingConfig] = useState({
@@ -165,8 +173,164 @@ export default function AdminDashboard() {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [systemTools, setSystemTools] = useState<any>({});
 
+  const [selectedAppIds, setSelectedAppIds] = useState<string[]>([]);
+  const [selectedUserUids, setSelectedUserUids] = useState<string[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [isImportingUsers, setIsImportingUsers] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const toggleSelectApp = (id: string) => {
+    setSelectedAppIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllApps = () => {
+    if (selectedAppIds.length === adminApps.length) {
+      setSelectedAppIds([]);
+    } else {
+      setSelectedAppIds(adminApps.map(a => a.id));
+    }
+  };
+
+  const handleBulkDeleteApps = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt ứng dụng',
+      message: `Bạn có chắc chắn muốn xóa ${selectedAppIds.length} ứng dụng đã chọn? Thao tác này không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedAppIds.forEach(id => {
+            batch.delete(doc(db, 'apps', id));
+          });
+          await batch.commit();
+          setSelectedAppIds([]);
+          toast.success('Đã xóa các ứng dụng được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt ứng dụng');
+        }
+      }
+    });
+  };
+
+  const toggleSelectUser = (uid: string) => {
+    setSelectedUserUids(prev => prev.includes(uid) ? prev.filter(i => i !== uid) : [...prev, uid]);
+  };
+
+  const toggleSelectAllUsers = () => {
+    const filteredUsers = userFilter === 'all' ? users : users.filter(u => u.role === 'review');
+    if (selectedUserUids.length === filteredUsers.length) {
+      setSelectedUserUids([]);
+    } else {
+      setSelectedUserUids(filteredUsers.map(u => u.uid));
+    }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    if (!isSuperAdmin) {
+      toast.error('Bạn không có quyền thực hiện hành động này');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt người dùng',
+      message: `Bạn có chắc chắn muốn xóa ${selectedUserUids.length} người dùng đã chọn? Thao tác này sẽ xóa vĩnh viễn dữ liệu người dùng khỏi Database.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedUserUids.forEach(uid => {
+            batch.delete(doc(db, 'users', uid));
+          });
+          await batch.commit();
+          setSelectedUserUids([]);
+          toast.success('Đã xóa các người dùng được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt người dùng');
+        }
+      }
+    });
+  };
+
+  const toggleSelectContact = (id: string) => {
+    setSelectedContactIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllContacts = () => {
+    if (selectedContactIds.length === contacts.length) {
+      setSelectedContactIds([]);
+    } else {
+      setSelectedContactIds(contacts.map(c => c.id));
+    }
+  };
+
+  const handleBulkDeleteContacts = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt yêu cầu',
+      message: `Bạn có chắc chắn muốn xóa ${selectedContactIds.length} yêu cầu hỗ trợ đã chọn?`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedContactIds.forEach(id => {
+            batch.delete(doc(db, 'contact_requests', id));
+          });
+          await batch.commit();
+          setSelectedContactIds([]);
+          toast.success('Đã xóa các yêu cầu được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt yêu cầu');
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    setSelectedAppIds([]);
+    setSelectedUserUids([]);
+    setSelectedContactIds([]);
+  }, [activeTab, userFilter]);
+
   useEffect(() => {
     if (!userData) return;
+
+    if (userData.role === 'review') {
+      setContacts([]);
+      setAllUtilities([]);
+      setAdminApps([]);
+      setAppCategories([]);
+      setUsers([]);
+      setActivityData([]);
+      setRoleDistribution([]);
+      setSiteStats({ today: 0, month: 0, year: 0, total: 0, last7Days: [] });
+      setAboutConfig({
+        introTitle: '', introDesc: '', adminName: '', adminBio: '', adminPhoto: '', webLogo: '',
+        facebook: '', github: '', youtube: '', email: '', phone: '', zalo: '', address: ''
+      });
+      setSeoConfig({ title: '', description: '', imageUrl: '', faviconUrl: '' });
+      setGoogleClientIdState('');
+      setIpWhitelistText('');
+      setAppVersion('');
+      setAdminPin('');
+      setLoading(false);
+      return;
+    }
 
     const isAdmin = userData.role === 'admin' || userData.role === 'superadmin' || userData.email === 'sonlyhongduc@gmail.com' || userData.email === 'sonlyhongduc1@ghn.vn';
 
@@ -190,6 +354,8 @@ export default function AdminDashboard() {
         if (sysSnap.exists()) {
           const data = sysSnap.data();
           if (data.googleClientId) setGoogleClientIdState(data.googleClientId);
+          if (data.ipWhitelistEnabled !== undefined) setIpWhitelistEnabled(data.ipWhitelistEnabled);
+          if (data.ipWhitelistText !== undefined) setIpWhitelistText(data.ipWhitelistText);
           if (data.appVersion) setAppVersion(data.appVersion);
           if (data.adminPin) setAdminPin(data.adminPin);
           if (data.blockedDevices) setBlockedDevices(data.blockedDevices);
@@ -204,22 +370,26 @@ export default function AdminDashboard() {
           }
         }
 
-        const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
-        if (ghSnap.exists()) {
-          const data = ghSnap.data();
-          const fetchedUsername = data.username || data.owner || '';
-          const fetchedToken = data.token || '';
-          setGithubIntegrationConfig({
-            username: fetchedUsername,
-            repo: data.repo || '',
-            token: fetchedToken,
-            branch: data.branch || 'main',
-            path: data.path || 'assets/uploads'
-          });
-          setGithubGlobalConfig(prev => ({
-            username: prev.username || fetchedUsername,
-            token: prev.token || fetchedToken
-          }));
+        try {
+          const ghSnap = await getDoc(doc(db, 'settings', 'github_integration'));
+          if (ghSnap.exists()) {
+            const data = ghSnap.data();
+            const fetchedUsername = data.username || data.owner || '';
+            const fetchedToken = data.token || '';
+            setGithubIntegrationConfig({
+              username: fetchedUsername,
+              repo: data.repo || '',
+              token: fetchedToken,
+              branch: data.branch || 'main',
+              path: data.path || 'assets/uploads'
+            });
+            setGithubGlobalConfig(prev => ({
+              username: prev.username || fetchedUsername,
+              token: prev.token || fetchedToken
+            }));
+          }
+        } catch (err) {
+          console.warn("Could not fetch github_integration settings (may not be admin or missing collection):", err);
         }
 
         const audioSnap = await getDoc(doc(db, 'settings', 'audio'));
@@ -327,6 +497,10 @@ export default function AdminDashboard() {
   const [isUploadingWebLogo, setIsUploadingWebLogo] = useState(false);
 
   const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -380,6 +554,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadWebLogoToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -437,6 +615,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveNotification = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'settings', 'system'), {
         notificationConfig
@@ -448,6 +630,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveAdminPin = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       if (adminPin.length !== 4 || !/^\d+$/.test(adminPin)) {
         toast.error('Mã PIN bảo mật phải chứa đúng 4 chữ số (0-9)!');
@@ -463,6 +649,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveFileManager = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'settings', 'system'), {
         fileManagerConfig: {
@@ -478,6 +668,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveGithubGlobal = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       // Save global & auto sync to fileManager & imageUpload configs in standard systems doc
       await setDoc(doc(db, 'settings', 'system'), {
@@ -508,6 +702,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveImageUploadConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), {
         imageUploadConfig: {
@@ -523,6 +721,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveStampConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), {
         stampConfig
@@ -534,6 +736,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveMaintenanceStampConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), {
         maintenanceStampConfig
@@ -545,6 +751,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveBankingConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), {
         bankingConfig
@@ -556,6 +766,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -610,6 +824,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadMaintenanceStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -654,6 +872,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveGithubIntegration = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       const mergedUsername = githubGlobalConfig.username || githubIntegrationConfig.username || '';
       const mergedToken = githubGlobalConfig.token || githubIntegrationConfig.token || '';
@@ -672,6 +894,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveGoogleConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), { googleClientId }, { merge: true });
       toast.success('Cập nhật Google One Tap Client ID thành công!');
@@ -680,7 +906,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveIpWhitelist = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { 
+        ipWhitelistEnabled, 
+        ipWhitelistText: ipWhitelistText.trim()
+      }, { merge: true });
+      toast.success('Đã cấu hình thiết bị chỉ định IP/Wifi thành công!');
+    } catch (e: any) {
+      toast.error('Lỗi khi lưu cấu hình Whitelist IP');
+    }
+  };
+
   const handleSaveAppVersion = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'system'), { appVersion }, { merge: true });
       toast.success('Đã lưu phiên bản hệ thống thành công');
@@ -690,6 +936,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveAudioConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'audio'), {
         musicUrl: audioConfig.musicUrl,
@@ -705,6 +955,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveSeoConfig = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'seo'), seoConfig, { merge: true });
       toast.success('Đã lưu cấu hình SEO thành công');
@@ -714,6 +968,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadSeoImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -770,6 +1028,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadSeoIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -826,6 +1088,10 @@ export default function AdminDashboard() {
   };
 
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -893,6 +1159,10 @@ export default function AdminDashboard() {
   };
 
   const handleSaveApp = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!appForm.title || !appForm.appUrl) {
       toast.error('Vui lòng nhập Tên và Link ứng dụng');
       return;
@@ -930,6 +1200,10 @@ export default function AdminDashboard() {
   };
 
   const handleAddCategory = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!newCategoryName.trim()) return;
     try {
       await addDoc(collection(db, 'app_categories'), {
@@ -944,6 +1218,10 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteCategory = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa danh mục ứng dụng',
       message: 'Xóa danh mục này? Các ứng dụng trong danh mục sẽ không còn thuộc danh mục nào.',
@@ -961,6 +1239,10 @@ export default function AdminDashboard() {
   };
 
   const handleEditCategory = async (id: string, currentName: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const newName = window.prompt('Nhập tên danh mục mới:', currentName);
     if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
     try {
@@ -972,6 +1254,10 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteApp = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa ứng dụng liên kết',
       message: 'Bạn có chắc chắn muốn xóa liên kết ứng dụng này không? Thao tác này không thể hoàn tác.',
@@ -1016,6 +1302,10 @@ export default function AdminDashboard() {
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1075,6 +1365,10 @@ export default function AdminDashboard() {
   };
 
   const handleUploadLogoToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1150,6 +1444,11 @@ export default function AdminDashboard() {
 
   const fetchUsers = async () => {
     setLoading(true);
+    if (userData?.role === 'review') {
+      setUsers([]);
+      setLoading(false);
+      return () => {};
+    }
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const usersData: UserData[] = [];
@@ -1170,7 +1469,76 @@ export default function AdminDashboard() {
     return () => { unsub.then(fn => fn && fn()) };
   }, []);
 
+    const handleCreateReviewUser = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Chỉ Super Admin mới có quyền tạo Review User');
+      return;
+    }
+    setShowReviewUserModal(true);
+    setReviewModalMode('auto');
+    setReviewEmail('');
+    setReviewPassword('');
+    setReviewCreatedInfo(null);
+  };
+
+  const executeCreateReviewUser = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
+    let finalEmail = reviewEmail;
+    let finalPassword = reviewPassword;
+
+    if (reviewModalMode === 'auto') {
+      finalEmail = `review_${Math.random().toString(36).substring(2, 8)}@bmass.review`;
+      finalPassword = Math.random().toString(36).substring(2, 10).toLowerCase() + Math.random().toString().substring(2, 4);
+    } else {
+      if (!finalEmail || !finalPassword) {
+        toast.error('Vui lòng nhập đầy đủ Gmail và Mật khẩu.');
+        return;
+      }
+    }
+
+    try {
+      toast.loading('Đang khởi tạo tài khoản...', { id: 'create_review' });
+
+      let secApp;
+      try {
+        secApp = getApp('SecondaryApp');
+      } catch (e) {
+        secApp = initializeApp(firebaseConfig, 'SecondaryApp');
+      }
+      const secAuth = getAuth(secApp);
+      
+      const cred = await createUserWithEmailAndPassword(secAuth, finalEmail, finalPassword);
+      
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        email: finalEmail,
+        displayName: 'Reviewer Mode',
+        role: 'review',
+        status: 'active',
+        reviewPassword: finalPassword,
+        createdAt: Date.now(),
+        lastLoginAt: Date.now()
+      });
+
+      await secAuth.signOut();
+
+      toast.success('Tạo tài khoản Review thành công!', { id: 'create_review', duration: 3000 });
+      setReviewCreatedInfo({ email: finalEmail, password: finalPassword });
+
+    } catch (e: any) {
+      toast.error('Lỗi khi tạo tài khoản (Có thể bị trùng Gmail): ' + e.message, { id: 'create_review' });
+      console.error(e);
+    }
+  };
+
   const handleRoleChange = async (userId: string, newRole: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!isSuperAdmin) {
       toast.error('Chỉ Super Admin mới có quyền đổi Role');
       return;
@@ -1192,6 +1560,10 @@ export default function AdminDashboard() {
   };
 
   const handleBanUser = async (userId: string, isBanned: boolean) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!isSuperAdmin) {
       toast.error('Bạn không có quyền thực hiện hành động này');
       return;
@@ -1216,7 +1588,159 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleDownloadUserTemplate = () => {
+    const templateData = [
+      {
+        'Gmail': 'example@gmail.com',
+        'Mật khẩu': '123456',
+        'Số điện thoại': '0901234567',
+        'Vai trò': 'user',
+        'Trạng thái': 'active',
+        'Họ tên': 'Nguyễn Văn A',
+        'Đăng nhập lần cuối': format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
+        'IP': 'Auto',
+        'Vị trí': 'Auto'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Mau_Import_Tai_Khoan.xlsx");
+  };
+
+  const handleImportUsersExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingUsers(true);
+    const tid = toast.loading('Đang xử lý dữ liệu Excel...');
+
+    try {
+      // Get Importer IP and Location
+      let importerIp = 'Unknown';
+      let importerLocation = 'Unknown';
+      try {
+        const [ipRes, locRes] = await Promise.all([
+          fetch('https://api64.ipify.org?format=json').then(r => r.json()),
+          fetch('https://ipapi.co/json/').then(r => r.json())
+        ]);
+        importerIp = ipRes.ip || 'Unknown';
+        importerLocation = `${locRes.city || ''}, ${locRes.region || ''}, ${locRes.country_name || ''}`.replace(/^, /, '');
+      } catch (err) {
+        console.warn('Could not fetch importer info:', err);
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const bstr = event.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+          if (data.length === 0) {
+            toast.error('File Excel không có dữ liệu.', { id: tid });
+            setIsImportingUsers(false);
+            return;
+          }
+
+          // Step 1: Create accounts in Firebase Auth via Proxy API
+          toast.loading('Đang khởi tạo tài khoản trên hệ thống Auth...', { id: tid });
+          const usersToAuth = data.map(row => ({
+            email: row['Gmail'] || row['gmail'] || row['Email'] || '',
+            password: String(row['Mật khẩu'] || row['password'] || '123456'),
+            displayName: row['Họ tên'] || row['name'] || '',
+            phoneNumber: row['Số điện thoại'] || row['phone'] ? String(row['Số điện thoại'] || row['phone']) : ''
+          })).filter(u => u.email);
+
+          const apiRes = await fetch('/api/admin/bulk-create-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ users: usersToAuth })
+          });
+
+          if (!apiRes.ok) throw new Error('Máy chủ Auth không phản hồi. Vui lòng thử lại sau.');
+          const authData = await apiRes.json();
+          const authResults = authData.results || [];
+
+          // Step 2: Sync successfully created/updated users to Firestore
+          toast.loading('Đang đồng bộ dữ liệu người dùng vào Database...', { id: tid });
+          const { writeBatch } = await import('firebase/firestore');
+          const batchSize = 100; // Small batch for clarity
+          let importedCount = 0;
+          let failedCount = 0;
+
+          for (let i = 0; i < authResults.length; i += batchSize) {
+            const batch = writeBatch(db);
+            const chunk = authResults.slice(i, i + batchSize);
+
+            chunk.forEach((result: any) => {
+              if (result.status === 'success') {
+                const row = data.find(r => (r['Gmail'] || r['gmail'] || r['Email'] || '') === result.email);
+                if (!row) return;
+
+                const userId = result.uid;
+                const userRef = doc(db, 'users', userId);
+                
+                const phone = row['Số điện thoại'] || row['phone'] || '';
+                const role = row['Vai trò'] || row['role'] || 'user';
+                const status = row['Trạng thái'] || row['status'] || 'active';
+                const rowLastLogin = row['Đăng nhập lần cuối'] || row['lastLoginAt'];
+                const rowIp = row['IP'] || row['ip'];
+                const rowLocation = row['Vị trí'] || row['location'];
+
+                batch.set(userRef, {
+                  uid: userId,
+                  email: result.email,
+                  phoneNumber: phone || null,
+                  displayName: row['Họ tên'] || row['name'] || result.email.split('@')[0],
+                  role: role.toLowerCase(),
+                  status: status.toLowerCase(),
+                  lastLoginAt: rowLastLogin ? (isNaN(Date.parse(rowLastLogin)) ? Date.now() : Date.parse(rowLastLogin)) : Date.now(),
+                  importIp: (rowIp && rowIp !== 'Auto') ? rowIp : importerIp,
+                  importLocation: (rowLocation && rowLocation !== 'Auto') ? rowLocation : importerLocation,
+                  createdAt: Date.now(),
+                  isImported: true
+                }, { merge: true });
+                importedCount++;
+              } else {
+                failedCount++;
+                console.error(`Auth creation failed: ${result.email}`, result.message);
+              }
+            });
+
+            await batch.commit();
+          }
+
+          if (importedCount > 0) {
+            toast.success(`Đã chuẩn bị thành công ${importedCount} tài khoản! ${failedCount > 0 ? `(${failedCount} thất bại)` : ''}`, { id: tid });
+          } else {
+            toast.error(`Không có tài khoản nào được tạo. Có ${failedCount} lỗi xảy ra.`, { id: tid });
+          }
+        } catch (err: any) {
+          toast.error(`Lỗi xử lý file: ${err.message}`, { id: tid });
+        } finally {
+          setIsImportingUsers(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      };
+      reader.readAsBinaryString(file);
+    } catch (err: any) {
+      toast.error(`Lỗi chuẩn bị: ${err.message}`, { id: tid });
+      setIsImportingUsers(false);
+    }
+  };
   const handleQuickBanIp = async (ip: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!isSuperAdmin) {
       toast.error('Chỉ Super Admin mới có quyền chặn IP');
       return;
@@ -1243,6 +1767,10 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
     if (!isSuperAdmin) {
       toast.error('Bạn không có quyền xóa User');
       return;
@@ -1261,25 +1789,6 @@ export default function AdminDashboard() {
         }
       }
     });
-  };
-
-  const handleAdjustBalance = async (user: UserData) => {
-    if (!isSuperAdmin) return toast.error('Quyền truy cập bị từ chối.');
-    const amountStr = window.prompt(`Cộng/Trừ tiền cho ${user.displayName} (vd: 50000 để cộng, -20000 để trừ):`, '0');
-    if (amountStr === null || amountStr === '') return;
-    
-    const amount = parseInt(amountStr);
-    if (isNaN(amount)) return toast.error('Số tiền không hợp lệ');
-
-    try {
-      const currentBalance = user.balance || 0;
-      await updateDoc(doc(db, 'users', user.uid), {
-        balance: currentBalance + amount
-      });
-      toast.success(`Đã ${amount > 0 ? 'cộng' : 'trừ'} ${Math.abs(amount).toLocaleString()}đ thành công!`);
-    } catch (e) {
-      toast.error('Lỗi khi cập nhật số dư');
-    }
   };
 
   const toggleBlockedDevice = async (type: 'ios' | 'android') => {
@@ -1376,6 +1885,11 @@ export default function AdminDashboard() {
   const [roleDistribution, setRoleDistribution] = useState<any[]>([]);
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setActivityData([]);
+      setRoleDistribution([]);
+      return;
+    }
     const unsubscribe = onSnapshot(query(collection(db, 'activities'), orderBy('timestamp', 'desc')), (snapshot) => {
       const activities = snapshot.docs.map(doc => doc.data());
       // Process activity for a simple daily chart
@@ -1405,72 +1919,232 @@ export default function AdminDashboard() {
 
   const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'];
 
+  // Categorized Tab Groups for UI/UX 5.0 Redesign
+  const tabGroups = [
+    {
+      id: 'finance',
+      title: 'Thương mại & Quỹ tài chính',
+      shortTitle: 'Thương mại',
+      icon: Landmark,
+      color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+      items: [
+        { id: 'dashboard', label: 'Bảng tổng quan', icon: Activity },
+      ]
+    },
+    {
+      id: 'security',
+      title: 'Quản lý Người dùng & An ninh',
+      shortTitle: 'An ninh',
+      icon: Shield,
+      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+      items: [
+        { id: 'users', label: 'Tài khoản người dùng', icon: Users },
+        { id: 'banned', label: 'Bộ lọc IP Banned', icon: ShieldAlert },
+        { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
+        { id: 'partners', label: 'Đối tác liên kết', icon: Users },
+      ]
+    },
+    {
+      id: 'data',
+      title: 'Dữ liệu số & Tiện ích ứng dụng',
+      shortTitle: 'Tiện ích',
+      icon: FolderOpen,
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+      items: [
+        { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
+        { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
+        { id: 'forms', label: 'Folders & Biểu mẫu', icon: Files },
+        { id: 'utilities', label: 'Cộng cụ Tiện ích', icon: Wrench },
+        { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
+      ]
+    },
+    {
+      id: 'marketing',
+      title: 'Marketing & Quảng cáo',
+      shortTitle: 'Marketing',
+      icon: Gift,
+      color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+      items: [
+        { id: 'affiliate', label: 'Cấu hình Affiliate', icon: Gift },
+      ]
+    },
+    {
+      id: 'system',
+      title: 'Hạ tầng hệ thống số',
+      shortTitle: 'Hệ thống',
+      icon: Server,
+      color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
+      items: [
+        { id: 'system', label: 'Hệ thống cốt lõi', icon: Settings },
+        { id: 'apikeys', label: 'Khóa API Keys', icon: Code },
+        { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
+        { id: 'versions', label: 'Phiên bản máy chủ', icon: RefreshCcw },
+        { id: 'about', label: 'Cấu hình Giới thiệu', icon: Info },
+        { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
+      ]
+    }
+  ];
+
+  // Helper check active tab category map
+  const activeGroupIdx = tabGroups.findIndex(g => g.items.some(item => item.id === activeTab));
+  const [mobileCategoryIdx, setMobileCategoryIdx] = useState(activeGroupIdx !== -1 ? activeGroupIdx : 0);
+
+  // Sync category selection on activeTab changes
+  useEffect(() => {
+    const idx = tabGroups.findIndex(g => g.items.some(item => item.id === activeTab));
+    if (idx !== -1) {
+      setMobileCategoryIdx(idx);
+    }
+  }, [activeTab]);
+
   return (
-    <div className="flex flex-col lg:flex-row min-h-[80vh] bg-transparent">
-      {/* Sidebar Navigation */}
-      <div className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-4 lg:p-6 flex flex-col gap-4 lg:gap-8 bg-transparent">
-        <h1 className="text-xl font-bold text-slate-950 dark:text-white flex items-center gap-2">
-            <Shield className="w-7 h-7 text-amber-500" />
-            Quản trị Hệ thống
-        </h1>
+    <div className="flex flex-col lg:flex-row min-h-screen bg-transparent">
+      {/* Sidebar Navigation - UI/UX 5.0 Glassmorphism */}
+      <div className="w-full lg:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-white/5 p-4 lg:p-6 flex flex-col gap-4 lg:gap-6 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md">
         
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-hidden pb-2 lg:pb-0 scroll-smooth no-scrollbar">
-          {[
-            { id: 'dashboard', label: 'Tổng quan', icon: Activity },
-            { id: 'revenue_stats', label: 'Thống kê Doanh thu', icon: LineChart },
-            { id: 'all_transactions', label: 'Lịch sử Nạp - Rút', icon: Landmark },
-            { id: 'purchase_history', label: 'Lịch sử Mua hàng', icon: ShoppingBag },
-            { id: 'shop_setup', label: 'Shop Setup', icon: Settings },
-            { id: 'system', label: 'Hệ thống', icon: Settings },
-            { id: 'users', label: 'Người dùng', icon: Users },
-            { id: 'apps', label: 'Ứng dụng Link', icon: AppWindow },
-            { id: 'document_vault', label: 'Kho Văn Bản', icon: FolderOpen },
-            { id: 'forms', label: 'Folders/Form', icon: Files },
-            { id: 'utilities', label: 'Tiện ích', icon: Wrench },
-            { id: 'banned', label: 'IP Banned', icon: ShieldAlert },
-            { id: 'security_sessions', label: 'Bảo mật Đăng nhập', icon: Lock },
-            { id: 'partners', label: 'Đối tác', icon: Users },
-            { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
-            { id: 'apikeys', label: 'API Keys', icon: Code },
-            { id: 'contacts', label: 'Yêu cầu hỗ trợ', icon: Mail },
-            { id: 'versions', label: 'Phiên bản', icon: RefreshCcw },
-            { id: 'about', label: 'About Setup', icon: Info },
-            { id: 'admin_system', label: 'Hệ thống System Data', icon: Server }
-          ].map(tab => {
-            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
-            return (
-              <button 
-                key={tab.id} 
-                onClick={() => setActiveTab(tab.id as any)} 
+        {/* Sidebar Title */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">
+                Quản lý hệ thống
+              </h1>
+              <span className="text-[10px] text-slate-400 font-bold tracking-widest mt-1 block">ADMIN CONSOLE v5.0</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="hidden lg:block w-full h-[1px] bg-slate-200/50 dark:bg-white/5" />
+
+        {/* MOBILE VIEW CATEGORIES SLIDER */}
+        <div className="lg:hidden">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Phân mục quản trị</p>
+          <div className="flex gap-2 overflow-x-auto pb-2 scroll-smooth no-scrollbar">
+            {tabGroups.map((group, grpIdx) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setMobileCategoryIdx(grpIdx)}
                 className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition shrink-0 lg:shrink relative overflow-hidden",
-                  activeTab === tab.id 
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 font-bold" 
-                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white",
-                  isUnapprovedSecurityTab && "animate-pulse border border-red-500/50 bg-red-500/10 dark:bg-red-500/15 text-red-500 dark:text-red-400 font-bold shadow-[0_0_12px_rgba(239,68,68,0.2)]"
+                  "px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border flex items-center gap-1.5",
+                  mobileCategoryIdx === grpIdx
+                    ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10"
+                    : "bg-slate-50 dark:bg-zinc-900 border-slate-200/30 dark:border-white/5 text-slate-500"
                 )}
               >
-                  <div className="flex items-center gap-3">
-                    <tab.icon className={cn("w-5 h-5", isUnapprovedSecurityTab ? "text-red-500 animate-bounce" : "")} />
-                    <span className="whitespace-nowrap">{tab.label}</span>
-                  </div>
-                  {isUnapprovedSecurityTab && (
-                    <span className="relative flex h-2 w-2 mr-1">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                  )}
+                <group.icon className="w-3.5 h-3.5" />
+                <span>{group.shortTitle}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* MOBILE NAVIGATION GRID (Triggered by active mobileCategoryIdx) */}
+        <nav className="lg:hidden grid grid-cols-2 gap-2 p-2 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-200/50 dark:border-white/5">
+          {tabGroups[mobileCategoryIdx].items.map(tab => {
+            const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-3 rounded-xl text-[11px] font-bold transition-all relative overflow-hidden",
+                  isActive
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-white/10 shadow-sm"
+                    : "text-slate-500 hover:text-slate-950 dark:hover:text-white",
+                  isUnapprovedSecurityTab && "animate-pulse bg-red-500/10 text-red-500 border border-red-500"
+                )}
+              >
+                <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{tab.label}</span>
+                {isUnapprovedSecurityTab && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-550 animate-ping absolute right-2 top-2" />
+                )}
               </button>
             );
           })}
         </nav>
+
+        {/* DESKTOP VIEW SIDEBAR (Categorized Stack) */}
+        <div className="hidden lg:flex flex-col gap-5 overflow-y-auto no-scrollbar max-h-[80vh] pr-1">
+          {tabGroups.map((group) => (
+            <div key={group.id} className="space-y-1.5">
+              {/* Group Banner Header */}
+              <div className="flex items-center gap-2 px-2.5 py-1 w-full bg-slate-100/50 dark:bg-zinc-900/50 rounded-xl border border-slate-200/20 dark:border-white/5">
+                <group.icon className="w-3.5 h-3.5 text-indigo-500/80" />
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-zinc-400 tracking-wider">
+                  {group.title}
+                </span>
+              </div>
+              
+              {/* Group Buttons Stack */}
+              <div className="space-y-0.5 pl-1.5 border-l-2 border-slate-100 dark:border-white/5 ml-4">
+                {group.items.map((tab) => {
+                  const isUnapprovedSecurityTab = hasUnapprovedSessions && tab.id === 'security_sessions';
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button 
+                      key={tab.id} 
+                      type="button"
+                      onClick={() => setActiveTab(tab.id as any)} 
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 relative overflow-hidden group/btn cursor-pointer",
+                        isActive 
+                          ? "bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400" 
+                          : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <tab.icon className={cn(
+                          "w-4 h-4 transition-transform duration-300 group-hover/btn:scale-110",
+                          isActive ? "text-indigo-500 dark:text-indigo-400" : "text-slate-400 group-hover/btn:text-slate-700 dark:group-hover/btn:text-white"
+                        )} />
+                        <span className="whitespace-nowrap">{tab.label}</span>
+                      </div>
+                      
+                      {isUnapprovedSecurityTab && (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-3 md:p-6 lg:p-10 overflow-x-auto w-full">
-        <h1 className="text-2xl lg:text-3xl font-medium text-slate-950 dark:text-white mb-6 lg:mb-8 tracking-tight">
-            { activeTab === 'dashboard' ? 'Tổng quan' : `Quản lý ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống', versions: 'Phiên bản', partners: 'Đối tác', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools', revenue_stats: 'Thống kê Doanh thu & Tài chính', all_transactions: 'Lịch sử Nạp & Rút', purchase_history: 'Lịch sử Mua hàng', shop_setup: 'Shop Setup'}[activeTab as any] }` }
-        </h1>
+      {/* Main Content Pane */}
+      <div className="flex-1 p-3 md:p-6 lg:p-8 overflow-x-auto w-full transition-all duration-300">
+        {userData?.role === 'review' && (
+          <div className="mb-6 bg-slate-900 border border-amber-500/30 px-6 py-4 rounded-[1.5rem] flex items-center gap-3 text-amber-500 animate-pulse shadow-xl select-none">
+            <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500" />
+            <div className="text-left">
+              <strong className="text-sm block text-amber-400 font-bold uppercase tracking-wider">CHẾ ĐỘ REVIEWER (CHỈ XEM THÔNG TIN)</strong>
+              <span className="text-xs text-slate-400 mt-1 block leading-relaxed">Bạn đang trải nghiệm Admin Center dưới quyền của Tài khoản Reviewer. Tất cả các dữ liệu hiển thị là thật, nhưng mọi hành động cập nhật, lưu trữ, chỉnh sửa hoặc xóa dữ liệu đều bị vô hiệu hóa để bảo đảm toàn vẹn cơ sở dữ liệu.</span>
+            </div>
+          </div>
+        )}
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/50 dark:border-white/5 pb-4">
+          <div className="space-y-1">
+            <h1 className="text-xl md:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight capitalize">
+              { activeTab === 'dashboard' ? 'Tổng quan hệ thống' : `Quản trị ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống System', versions: 'Phiên bản máy chủ', partners: 'Đối tác liên kết', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders Biểu mẫu', about: 'About Setup', admin_system: 'Hệ thống Data', ai_tools: 'AI Tools', affiliate: 'Quản lý Quảng cáo'}[activeTab as any] }` }
+            </h1>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+              Khối xử lý: {activeTab} • Trạng thái sẵn sàng
+            </p>
+          </div>
+        </div>
 
         {activeTab === 'dashboard' && (
            <AdminOverview 
@@ -1484,21 +2158,7 @@ export default function AdminDashboard() {
            />
         )}
 
-        {activeTab === 'revenue_stats' && (
-          <AdminRevenueStats />
-        )}
 
-        {activeTab === 'all_transactions' && (
-          <AdminDepositHistory />
-        )}
-
-        {activeTab === 'purchase_history' && (
-          <AdminUserPurchases />
-        )}
-
-        {activeTab === 'shop_setup' && (
-          <AdminShopSetup />
-        )}
 
 
       {activeTab === 'about' && (
@@ -1704,8 +2364,30 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                 <MessageSquare className="w-5 h-5 text-rose-500" /> Hệ thống Phản hồi & Liên hệ
               </h2>
-              <div className="px-3 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full">
-                {contacts.length} hội thoại
+              <div className="flex items-center gap-4">
+                {contacts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleSelectAllContacts}
+                      className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 transition-all flex items-center gap-2"
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                      {selectedContactIds.length === contacts.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                    </button>
+                    {selectedContactIds.length > 0 && (
+                      <button
+                        onClick={handleBulkDeleteContacts}
+                        className="px-3 py-1.5 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Xóa ({selectedContactIds.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="px-3 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full">
+                  {contacts.length} hội thoại
+                </div>
               </div>
             </div>
             
@@ -1713,7 +2395,19 @@ export default function AdminDashboard() {
               {contacts.length > 0 ? (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {contacts.map((req) => (
-                    <div key={req.id} className="group relative bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 transition-all hover:bg-slate-100 dark:hover:bg-white-[0.07] overflow-hidden">
+                    <div key={req.id} className={cn(
+                      "group relative bg-slate-50 dark:bg-white/5 border rounded-3xl p-8 transition-all hover:bg-slate-100 dark:hover:bg-white-[0.07] overflow-hidden",
+                      selectedContactIds.includes(req.id) ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-lg" : "border-slate-200 dark:border-white/10"
+                    )}>
+                      {/* Select Checkbox */}
+                      <div className="absolute top-4 left-4 z-20">
+                        <input
+                          type="checkbox"
+                          checked={selectedContactIds.includes(req.id)}
+                          onChange={() => toggleSelectContact(req.id)}
+                          className="w-5 h-5 rounded-lg accent-indigo-600 border border-slate-300 dark:border-white/10 cursor-pointer"
+                        />
+                      </div>
                       {/* Decorative gradient */}
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
                       
@@ -1817,6 +2511,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'affiliate' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminAffiliate />
+        </motion.div>
+      )}
+
       {activeTab === 'forms' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminForms />
@@ -1836,7 +2536,46 @@ export default function AdminDashboard() {
                 <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                   <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
                 </h2>
-                <div className="text-sm text-slate-500 font-medium">Tổng số: {users.length} user</div>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={handleDownloadUserTemplate}
+                    className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Mẫu Excel
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImportingUsers}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    {isImportingUsers ? 'Đang nhập...' : 'Nhập Excel Tài khoản'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleImportUsersExcel} 
+                    accept=".xlsx, .xls" 
+                    className="hidden" 
+                  />
+                  <select 
+                    value={userFilter} 
+                    onChange={(e: any) => setUserFilter(e.target.value)}
+                    className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-300 outline-none"
+                  >
+                    <option value="all">Tất cả tài khoản</option>
+                    <option value="review">Tài khoản Reviewer (Chỉ xem)</option>
+                  </select>
+                  <div className="text-sm text-slate-500 font-medium">Tổng số: {(userFilter === 'all' ? users : users.filter(u => u.role === 'review')).length} user</div>
+                  <button 
+                    onClick={handleCreateReviewUser}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Tạo tài khoản Review
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto no-scrollbar scroll-smooth">
@@ -1846,20 +2585,45 @@ export default function AdminDashboard() {
               <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserUids.length === (userFilter === 'all' ? users : users.filter(u => u.role === 'review')).length && (userFilter === 'all' ? users : users.filter(u => u.role === 'review')).length > 0}
+                        onChange={toggleSelectAllUsers}
+                        className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                      />
+                    </th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số dư Ví</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Địa chỉ IP</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vị trí (Location)</th>
-                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Quản trị</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap text-right">
+                      {selectedUserUids.length > 0 && (
+                        <button
+                          onClick={handleBulkDeleteUsers}
+                          className="px-3 py-1.5 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-all flex items-center gap-2 float-right"
+                        >
+                          <Trash2 size={12} /> Xóa ({selectedUserUids.length})
+                        </button>
+                      )}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
-                  {users.map((u) => (
-                    <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                  {(userFilter === 'all' ? users : users.filter(u => u.role === 'review')).map((u) => (
+                    <tr key={u.uid} className={cn(
+                      "hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group",
+                      selectedUserUids.includes(u.uid) && "bg-indigo-50/30 dark:bg-indigo-500/5 shadow-sm"
+                    )}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserUids.includes(u.uid)}
+                          onChange={() => toggleSelectUser(u.uid)}
+                          className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 border border-slate-300 dark:border-white/20">
@@ -1873,18 +2637,6 @@ export default function AdminDashboard() {
                             <div className="font-semibold text-slate-900 dark:text-white">{u.displayName}</div>
                             <div className="text-xs text-slate-500 max-w-[150px] truncate">{u.email}</div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)] !border-l-0 z-10 box-border">
-                        <div className="flex items-center gap-2">
-                           <span className="font-black text-indigo-600 dark:text-indigo-400">{(u.balance || 0).toLocaleString()}đ</span>
-                           <button 
-                             onClick={() => handleAdjustBalance(u)}
-                             className="p-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md text-indigo-500 transition-colors"
-                             title="Điều chỉnh số dư"
-                           >
-                             <Plus size={14} />
-                           </button>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1959,7 +2711,7 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       </td>
-                      <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 text-right whitespace-nowrap">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2 opacity-100 transition-opacity">
                           <button
                             onClick={() => handleBanUser(u.uid, !!u.isBanned)}
@@ -1976,6 +2728,7 @@ export default function AdminDashboard() {
                             className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                           >
                             <option value="user">User</option>
+                            <option value="review">Reviewer (Chỉ xem)</option>
                             <option value="admin">Quản trị viên</option>
                             <option value="superadmin">Tổng Quản trị</option>
                           </select>
@@ -2062,6 +2815,56 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm space-y-6">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <ShieldAlert className="w-6 h-6 text-rose-500" />
+              Thiết bị được chỉ định qua IP máy hoặc qua IP Wifi
+            </h3>
+            
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Khi được kích hoạt, chỉ những thiết bị có địa chỉ IP hoặc dải IP Wifi trùng khớp mới có thể truy cập website. Quản trị viên luôn được miễn trừ khỏi bộ lọc bảo vệ này.
+            </p>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+              <div>
+                <span className="text-sm font-semibold text-slate-800 dark:text-zinc-200 block">Kích hoạt hạn chế thiết bị</span>
+                <span className="text-xs text-slate-400 font-medium">Bật/tắt tường lửa giới hạn thiết bị theo danh sách Whitelist IP Wifi / máy</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={ipWhitelistEnabled}
+                  onChange={(e) => setIpWhitelistEnabled(e.target.checked)}
+                  disabled={!isSuperAdmin}
+                  className="sr-only peer" 
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-650 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Danh mục các địa chỉ IP Whitelist (mỗi IP một dòng hoặc cách nhau bởi dấu phẩy)</label>
+              <textarea
+                value={ipWhitelistText}
+                onChange={(e) => setIpWhitelistText(e.target.value)}
+                disabled={!isSuperAdmin}
+                placeholder="Ví dụ:&#13;111.92.54.10&#13;192.168.1.1, 192.168.1.25"
+                rows={4}
+                className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-zinc-200"
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveIpWhitelist}
+                disabled={!isSuperAdmin}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2"
+              >
+                Lưu cấu hình chỉ định thiết bị
+              </button>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 lg:p-8 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
@@ -2101,7 +2904,6 @@ export default function AdminDashboard() {
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
-                { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
                 { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
                 { key: 'ai_tools', label: 'AI Tools', icon: Sparkles, page: 'Trang chủ' },
               ].map((tab) => (
@@ -3646,18 +4448,46 @@ export default function AdminDashboard() {
                        <p className="text-xs text-slate-400 max-w-sm mt-1">Dùng bảng bên cạnh để đăng ký ứng dụng liên kết và phân phối lên Thực đơn phía người dùng.</p>
                      </div>
                    ) : (
-                      <div className="overflow-x-auto no-scrollbar scroll-smooth">
+                       <div className="overflow-x-auto no-scrollbar scroll-smooth">
                         <table className="w-full text-left border-collapse min-w-[1200px]">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
+                              <th className="py-3 px-2 whitespace-nowrap w-12 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAppIds.length === adminApps.length && adminApps.length > 0}
+                                  onChange={toggleSelectAllApps}
+                                  className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                                />
+                              </th>
                               <th className="py-3 px-2 whitespace-nowrap">Ứng dụng / Logo</th>
                               <th className="py-3 px-2 whitespace-nowrap">Đường dẫn mở</th>
-                              <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
+                              <th className="py-3 px-2 text-right whitespace-nowrap">
+                                {selectedAppIds.length > 0 ? (
+                                  <button
+                                    onClick={handleBulkDeleteApps}
+                                    className="px-3 py-1 bg-red-500 text-white rounded-lg text-[10px] uppercase font-bold hover:bg-red-600 transition-all flex items-center gap-1.5 float-right"
+                                  >
+                                    <Trash2 size={12} /> Xóa ({selectedAppIds.length})
+                                  </button>
+                                ) : 'Thao tác'}
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {adminApps.map((app) => (
-                              <tr key={app.id} className="text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                              <tr key={app.id} className={cn(
+                                "text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]",
+                                selectedAppIds.includes(app.id) && "bg-indigo-50/30 dark:bg-indigo-500/5 shadow-sm"
+                              )}>
+                                <td className="py-4 px-2 whitespace-nowrap text-center">
+                                   <input
+                                     type="checkbox"
+                                     checked={selectedAppIds.includes(app.id)}
+                                     onChange={() => toggleSelectApp(app.id)}
+                                     className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600 cursor-pointer"
+                                   />
+                                </td>
                                 <td className="py-4 px-2 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
@@ -3689,7 +4519,7 @@ export default function AdminDashboard() {
                                     {app.appUrl} <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
                                   </a>
                                 </td>
-                                <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-4 px-2 text-right whitespace-nowrap">
+                                <td className="py-4 px-2 text-right whitespace-nowrap">
                                   <div className="flex justify-end gap-1.5">
                                     <button 
                                       onClick={() => toggleTabMaintenance(`app_${app.id}`)}
@@ -3741,6 +4571,91 @@ export default function AdminDashboard() {
         </motion.div>
       )}
       </div>
-    </div>
+    
+
+      <AnimatePresence>
+        {showReviewUserModal && (
+          <React.Fragment>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { if (!reviewCreatedInfo) setShowReviewUserModal(false); }}
+              className="fixed inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm z-[999]"
+            />
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-6 md:p-8 max-w-md w-full shadow-2xl pointer-events-auto text-left"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  {!reviewCreatedInfo && (
+                    <button
+                      onClick={() => setShowReviewUserModal(false)}
+                      className="p-2 -mr-2 -mt-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+
+                {!reviewCreatedInfo ? (
+                  <>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-tight">
+                      Tạo tài khoản Review
+                    </h3>
+                    <p className="text-slate-650 dark:text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+                      Chọn phương thức tạo tài khoản Review.
+                    </p>
+
+                    <div className="flex gap-4 mb-6">
+                       <button onClick={() => setReviewModalMode('auto')} className={`flex-1 py-2 px-3 rounded-xl border text-sm font-bold transition ${reviewModalMode === 'auto' ? 'border-indigo-500 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400' : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>Tự động</button>
+                       <button onClick={() => setReviewModalMode('manual')} className={`flex-1 py-2 px-3 rounded-xl border text-sm font-bold transition ${reviewModalMode === 'manual' ? 'border-indigo-500 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400' : 'border-slate-200 dark:border-white/10 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>Thủ công</button>
+                    </div>
+
+                    {reviewModalMode === 'manual' && (
+                      <div className="space-y-4 mb-6">
+                        <div>
+                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Gmail</label>
+                           <input type="email" value={reviewEmail} onChange={e => setReviewEmail(e.target.value)} placeholder="review@example.com" className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                        <div>
+                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mật khẩu</label>
+                           <input type="text" value={reviewPassword} onChange={e => setReviewPassword(e.target.value)} placeholder="Nhập mật khẩu..." className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => setShowReviewUserModal(false)} className="px-4 py-2 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Hủy</button>
+                      <button onClick={executeCreateReviewUser} className="px-4 py-2 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-sm drop-shadow">Xác nhận tạo</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 leading-tight">
+                      Đã tạo tài khoản thành công
+                    </h3>
+                    <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-4 mb-6 relative group">
+                       <pre className="text-xs text-emerald-700 dark:text-emerald-400 font-mono whitespace-pre-wrap">
+                          [TÀI KHOẢN REVIEW]{'\n'}Email: {reviewCreatedInfo.email}{'\n'}Mật khẩu: {reviewCreatedInfo.password}
+                       </pre>
+                       <button onClick={() => { navigator.clipboard.writeText(`[TÀI KHOẢN REVIEW]\nEmail: ${reviewCreatedInfo.email}\nMật khẩu: ${reviewCreatedInfo.password}`); toast.success('Đã copy!'); }} className="absolute top-2 right-2 p-1.5 bg-white dark:bg-zinc-800 rounded-lg shadow border border-slate-200 dark:border-white/10 text-slate-500 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Copy className="w-4 h-4" />
+                       </button>
+                    </div>
+                    <button onClick={() => setShowReviewUserModal(false)} className="w-full py-2.5 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-sm drop-shadow">Đóng</button>
+                  </>
+                )}
+              </motion.div>
+            </div>
+          </React.Fragment>
+        )}
+      </AnimatePresence></div>
   );
 }

@@ -2,30 +2,11 @@ import { useEffect } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
-import { useBookmarkStore, Bookmark } from '../store/bookmarkStore';
 import { useNotificationStore, Notification } from '../store/notificationStore';
 import toast from 'react-hot-toast';
 
 export function useFirebaseSync() {
   const { user, userData } = useAuthStore();
-
-  // Bookmarks Sync
-  useEffect(() => {
-    if (!user) {
-      useBookmarkStore.getState().setBookmarks([]);
-      return;
-    }
-
-    const q = query(collection(db, 'bookmarks'), where('userId', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => doc.data() as Bookmark);
-      useBookmarkStore.getState().setBookmarks(list);
-    }, (error) => {
-      console.warn("Bookmark sync error:", error);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
 
   // Notifications Sync
   useEffect(() => {

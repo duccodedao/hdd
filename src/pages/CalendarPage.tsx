@@ -59,6 +59,7 @@ export default function CalendarPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
@@ -545,6 +546,18 @@ export default function CalendarPage() {
     return [...normal, ...recurring];
   };
 
+  const getEventsForMonth = () => {
+    const activeMonthDays = days.filter(d => isSameMonth(d, monthStart));
+    const list: Array<{ day: Date; event: any }> = [];
+    activeMonthDays.forEach(day => {
+      const dayEvents = getEventsForDay(day);
+      dayEvents.forEach(ev => {
+        list.push({ day, event: ev });
+      });
+    });
+    return list.sort((a, b) => a.day.getTime() - b.day.getTime());
+  };
+
   const getImportanceColor = (imp: string) => {
     switch (imp) {
       case 'high': return 'bg-rose-500 text-white border-rose-600';
@@ -654,7 +667,7 @@ export default function CalendarPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50/50 dark:bg-black/20 overflow-y-auto no-scrollbar relative min-h-screen">
-      <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="p-4 md:p-8 max-w-[1750px] mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -742,69 +755,152 @@ export default function CalendarPage() {
         </div>
 
         {viewMode === 'calendar' ? (
-          <>
-            {/* Calendar Grid */}
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden flex flex-col">
-              {/* Days of week */}
-              <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-950/50">
-                {weekDays.map(day => (
-                  <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest">
-                    {day}
-                  </div>
-                ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              {/* Calendar Grid */}
+              <div className="lg:col-span-8 xl:col-span-9 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden flex flex-col">
+                {/* Days of week */}
+                <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-950/50">
+                  {weekDays.map(day => (
+                    <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-widest">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 auto-rows-fr">
+                  {days.map((day, dayIdx) => {
+                    const dayEvents = getEventsForDay(day);
+                    const isCurrentMonth = isSameMonth(day, monthStart);
+                    const isTodayDate = isToday(day);
+                    const hasHighlightedEvent = dayEvents.some(ev => ev.id === highlightedEventId);
+                    
+                    return (
+                      <div 
+                        key={day.toString()} 
+                        onClick={() => {
+                          setSelectedDay(day);
+                          setHighlightedEventId(null);
+                        }}
+                        className={cn(
+                          "min-h-[120px] lg:min-h-[145px] p-2 border-r border-b border-slate-100 dark:border-white/5 relative group transition-all duration-300 cursor-pointer flex flex-col justify-between",
+                          !isCurrentMonth ? "bg-slate-50/50 dark:bg-zinc-950/30 text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-zinc-200",
+                          isTodayDate ? "bg-blue-50/30 dark:bg-indigo-500/5" : "bg-white dark:bg-transparent",
+                          isSameDay(day, selectedDay) && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/20 dark:bg-indigo-500/10",
+                          hasHighlightedEvent ? "ring-2 ring-inset ring-amber-500 bg-amber-500/10 dark:bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.25)] scale-[1.01] z-10" : "",
+                          !hasHighlightedEvent && dayEvents.length > 5 ? "animate-[pulse_3s_infinite] bg-rose-500/5 dark:bg-rose-500/10 ring-1 ring-rose-500/30" : "hover:bg-slate-50 dark:hover:bg-white/5"
+                        )}
+                      >
+                        <div className="flex justify-between items-start w-full">
+                          <span className={cn(
+                            "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full mt-1 ml-1",
+                            isTodayDate && "bg-indigo-600 text-white shadow-md",
+                            !isTodayDate && !isCurrentMonth && "opacity-50"
+                          )}>
+                            {format(day, dateFormat)}
+                          </span>
+                          {dayEvents.length > 5 && (
+                            <span className="hidden md:inline-flex text-[9px] font-extrabold text-rose-600 dark:text-rose-450 bg-rose-50 dark:bg-rose-950/40 px-1 rounded border border-rose-200 dark:border-rose-900 ml-auto mr-1 mt-1 shrink-0 scale-90 animate-bounce" title="Quá tải công việc (>5 việc)">
+                              ⚠️ {dayEvents.length} việc
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Event Label container */}
+                        <div className="mt-2 w-full flex-1 flex flex-col justify-end">
+                          {/* Task dot indicators */}
+                          <div className="flex flex-wrap gap-1 px-1 mt-1 justify-start">
+                            {dayEvents.map(ev => (
+                              <div
+                                key={ev.id}
+                                className={cn(
+                                  "w-2 h-2 rounded-full shadow-sm transition-all",
+                                  ev.isRecurringInstance
+                                    ? 'bg-emerald-500 border border-emerald-600 dark:border-emerald-450'
+                                    : ev.importance === 'high' ? 'bg-rose-500' : ev.importance === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
+                                )}
+                                title={ev.title + (ev.isRecurringInstance ? " (Định kỳ lặp lại)" : "")}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Days Grid */}
-              <div className="grid grid-cols-7 auto-rows-fr">
-                {days.map((day, dayIdx) => {
-                  const dayEvents = getEventsForDay(day);
-                  const isCurrentMonth = isSameMonth(day, monthStart);
-                  const isTodayDate = isToday(day);
-                  
-                  return (
-                    <div 
-                      key={day.toString()} 
-                      onClick={() => setSelectedDay(day)}
-                      className={cn(
-                        "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-white/5 relative group transition-colors cursor-pointer",
-                        !isCurrentMonth ? "bg-slate-50/50 dark:bg-zinc-950/30 text-slate-400 dark:text-zinc-600" : "text-slate-900 dark:text-zinc-200",
-                        isTodayDate ? "bg-blue-50/30 dark:bg-indigo-500/5" : "bg-white dark:bg-transparent",
-                        isSameDay(day, selectedDay) && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/20 dark:bg-indigo-500/10",
-                        dayEvents.length > 5 ? "animate-[pulse_3s_infinite] bg-rose-500/5 dark:bg-rose-500/10 ring-1 ring-rose-500/30" : "hover:bg-slate-50 dark:hover:bg-white/5"
-                      )}
-                    >
-                      <div className="flex justify-between items-start">
-                        <span className={cn(
-                          "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full mt-1 ml-1",
-                          isTodayDate && "bg-indigo-600 text-white shadow-md",
-                          !isTodayDate && !isCurrentMonth && "opacity-50"
-                        )}>
-                          {format(day, dateFormat)}
-                        </span>
-                        {dayEvents.length > 5 && (
-                          <span className="hidden md:inline-flex text-[9px] font-extrabold text-rose-600 dark:text-rose-450 bg-rose-50 dark:bg-rose-950/40 px-1 rounded border border-rose-200 dark:border-rose-900 ml-auto mr-1 mt-1 shrink-0 scale-90 animate-bounce" title="Quá tải công việc (>5 việc)">
-                            ⚠️ {dayEvents.length} việc
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-1 px-1">
-                        {dayEvents.map(ev => (
-                          <div 
-                            key={ev.id}
-                            className={cn(
-                              "w-2.5 h-2.5 rounded-full shadow-sm transition-all",
-                              ev.isRecurringInstance 
-                                ? 'bg-emerald-500 border border-emerald-600 dark:border-emerald-450' 
-                                : ev.importance === 'high' ? 'bg-rose-500' : ev.importance === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
-                            )}
-                            title={ev.title + (ev.isRecurringInstance ? " (Định kỳ lặp lại)" : "")}
-                          />
-                        ))}
-                      </div>
+              {/* Month Calendar List (Right sidebar) */}
+              <div className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-3xl p-5 flex flex-col h-[550px] lg:h-[800px] xl:h-[880px] shadow-sm">
+                <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-white/5 pb-3 mb-3 flex items-center justify-between">
+                  <span>Công việc trong tháng</span>
+                  <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-extrabold px-2 py-0.5 rounded-full inline-flex items-center">
+                    {getEventsForMonth().length} Đơn vị
+                  </span>
+                </h3>
+                
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                  {getEventsForMonth().length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                      <p className="text-slate-450 dark:text-zinc-550 text-xs">Không có công việc nào phát sinh trong chu kỳ tháng này.</p>
                     </div>
-                  );
-                })}
+                  ) : (
+                    getEventsForMonth().map(({ day, event }) => {
+                      const isSelected = isSameDay(day, selectedDay);
+                      const isHighlighted = highlightedEventId === event.id;
+                      return (
+                        <button
+                          key={event.id}
+                          onClick={() => {
+                            setSelectedDay(day);
+                            setHighlightedEventId(event.id);
+                            // Highlight stays for micro-interaction
+                            setTimeout(() => {
+                              setHighlightedEventId(prev => prev === event.id ? null : prev);
+                            }, 3500);
+                          }}
+                          className={cn(
+                            "w-full text-left p-3 rounded-2xl border transition-all duration-300 flex flex-col gap-1.5 active:scale-[0.99] group/item cursor-pointer",
+                            isSelected 
+                              ? "bg-indigo-50/40 dark:bg-indigo-500/5 border-indigo-500 shadow-sm"
+                              : isHighlighted
+                                ? "bg-amber-500/5 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.15)] animate-pulse"
+                                : "bg-slate-50/30 dark:bg-zinc-950/20 border-slate-150/40 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2.5 w-full">
+                            <span className={cn(
+                              "text-xs font-bold leading-tight line-clamp-2 group-hover/item:text-indigo-600 dark:group-hover/item:text-indigo-400 transition-colors",
+                              isSelected ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-zinc-300"
+                            )}>
+                              {event.title}
+                            </span>
+                            <span className={cn(
+                              "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+                              event.isRecurringInstance
+                                ? 'bg-emerald-500' 
+                                : event.importance === 'high' ? 'bg-rose-500' : event.importance === 'medium' ? 'bg-amber-500' : 'bg-indigo-500'
+                            )} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between gap-2 text-[9px] font-mono font-semibold text-slate-400 dark:text-zinc-550 mt-1">
+                            <span>Ngày {format(day, 'dd/MM')}</span>
+                            <span className="uppercase tracking-wider">
+                              {event.isRecurringInstance 
+                                ? 'Định kỳ' 
+                                : event.importance === 'high' 
+                                  ? 'Quan trọng' 
+                                  : event.importance === 'medium' 
+                                    ? 'Trung bình' 
+                                    : 'Thấp'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
 
@@ -840,7 +936,7 @@ export default function CalendarPage() {
                          <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
                          <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                          <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
-                         {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
+                         {canEdit && <th className="py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -880,7 +976,7 @@ export default function CalendarPage() {
                              {ev.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
                            </td>
                            {canEdit && (
-                             <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                             <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleOpenModal(selectedDay, ev); }}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"
@@ -919,7 +1015,7 @@ export default function CalendarPage() {
                <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-indigo-500" /> Thấp</div>
                <div className="flex items-center gap-1.5 animate-pulse"><div className="w-3 h-3 rounded-sm bg-emerald-500" /> Chấm xanh lá cây: Lặp lại / định kỳ</div>
             </div>
-          </>
+          </div>
         ) : viewMode === 'all-tasks' ? (
           /* All integrated tasks list mode */
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-[400px] space-y-4">
@@ -975,7 +1071,7 @@ export default function CalendarPage() {
                       <th className="py-3 px-4 w-32 whitespace-nowrap">Mức độ</th>
                       <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                       <th className="py-3 px-4 whitespace-nowrap">Mô tả chi tiết</th>
-                      {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-36 whitespace-nowrap">Thao tác</th>}
+                      {canEdit && <th className="py-3 px-4 text-right w-36 whitespace-nowrap">Thao tác</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -1047,7 +1143,7 @@ export default function CalendarPage() {
                           {item.description || <span className="text-slate-300 dark:text-zinc-600 italic font-normal">Không có mô tả</span>}
                         </td>
                         {canEdit && (
-                          <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                             {item.isEvent ? (
                               <div className="flex items-center justify-end space-x-1">
                                 <button 
@@ -1215,7 +1311,7 @@ export default function CalendarPage() {
                         <th className="py-3 px-4 w-36 whitespace-nowrap">Trạng thái</th>
                         <th className="py-3 px-4 w-28 whitespace-nowrap">Mức độ</th>
                         <th className="py-3 px-4 whitespace-nowrap">Mô tả</th>
-                        {canEdit && <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
+                        {canEdit && <th className="py-3 px-4 text-right w-24 whitespace-nowrap">Thao tác</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
@@ -1266,7 +1362,7 @@ export default function CalendarPage() {
                             {re.description || <span className="italic opacity-50 font-normal">Không có mô tả</span>}
                           </td>
                           {canEdit && (
-                            <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+                            <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                               <button 
                                 onClick={() => handleOpenRecurringModal(re)}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all inline-flex items-center"

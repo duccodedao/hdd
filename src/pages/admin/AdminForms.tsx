@@ -1,12 +1,14 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Files, Plus, Trash2, Edit2, Share2, ChevronRight, Save, X, PlusCircle, Layout, ListChecks, Calendar, Type, Hash, ArrowLeft, Eye, Search, Download, Upload, CheckCircle2, Table as TableIcon, RefreshCw } from 'lucide-react';
+import { Files, Plus, Trash2, Edit2, Share2, ChevronRight, Save, X, PlusCircle, Layout, ListChecks, Calendar, Type, Hash, ArrowLeft, Eye, Search, Download, Upload, CheckCircle2, Table as TableIcon, RefreshCw, Square, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import { useConfirmStore } from '../../store/confirmStore';
+import { cn } from '../../lib/utils';
 import * as XLSX from 'xlsx';
 
 interface Question {
@@ -36,6 +38,7 @@ interface Form {
 }
 
 export default function AdminForms() {
+  const { userData } = useAuthStore();
   const { openConfirm } = useConfirmStore();
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +48,8 @@ export default function AdminForms() {
   const [formResponsesLoading, setFormResponsesLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [responseCounts, setResponseCounts] = useState<{ [key: string]: number }>({});
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+  const [selectedResponseIds, setSelectedResponseIds] = useState<string[]>([]);
   const [creationMode, setCreationMode] = useState<'standard' | 'dataset' | null>(null);
 
   // Dataset Import State
@@ -66,6 +71,11 @@ export default function AdminForms() {
   });
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setForms([]);
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'forms'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setForms(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Form)));
@@ -86,6 +96,10 @@ export default function AdminForms() {
   }, []);
 
   const handleCreateForm = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!formData.name) return toast.error('Vui lòng nhập tên Folder!');
     
     const slug = formData.slug || formData.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
@@ -112,6 +126,10 @@ export default function AdminForms() {
   };
 
   const handleUpdateForm = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!selectedForm) return;
 
     const slug = formData.slug || selectedForm.slug;
@@ -138,6 +156,10 @@ export default function AdminForms() {
   };
 
   const handleDeleteForm = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa Folder Form',
       message: 'Bạn có chắc chắn muốn xóa Folder này và toàn bộ dữ liệu phản hồi bên trong?',
@@ -155,6 +177,10 @@ export default function AdminForms() {
   };
 
   const handleDeleteResponse = (responseId: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa câu trả lời',
       message: 'Bạn có chắc chắn muốn xóa phản hồi này? Người dùng đã trả lời và bị giới hạn trước đó sẽ được trả lời lại.',
@@ -173,6 +199,93 @@ export default function AdminForms() {
           toast.success('Đã xóa câu trả lời thành công!');
         } catch (e) {
           toast.error('Lỗi khi xóa câu trả lời');
+        }
+      }
+    });
+  };
+
+  const toggleSelectForm = (id: string) => {
+    setSelectedFormIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllForms = () => {
+    if (selectedFormIds.length === filteredForms.length) {
+      setSelectedFormIds([]);
+    } else {
+      setSelectedFormIds(filteredForms.map(f => f.id));
+    }
+  };
+
+  const handleBulkDeleteForms = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    if (selectedFormIds.length === 0) return;
+    openConfirm({
+      title: 'Xóa Folder Form hàng loạt',
+      message: `Bạn có chắc chắn muốn xóa ${selectedFormIds.length} Folder đã chọn? Hành động này sẽ xóa vĩnh viễn tất cả dữ liệu bên trong.`,
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          selectedFormIds.forEach(id => {
+            batch.delete(doc(db, 'forms', id));
+          });
+          await batch.commit();
+          toast.success(`Đã xóa ${selectedFormIds.length} Folder`);
+          setSelectedFormIds([]);
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt');
+        }
+      }
+    });
+  };
+
+  const toggleSelectResponse = (id: string) => {
+    setSelectedResponseIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllResponses = () => {
+    if (selectedResponseIds.length === responses.length) {
+      setSelectedResponseIds([]);
+    } else {
+      setSelectedResponseIds(responses.map(r => r.id));
+    }
+  };
+
+  const handleBulkDeleteResponses = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    if (selectedResponseIds.length === 0) return;
+    openConfirm({
+      title: 'Xóa phản hồi hàng loạt',
+      message: `Bạn có chắc chắn muốn xóa ${selectedResponseIds.length} phản hồi đã chọn?`,
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          selectedResponseIds.forEach(id => {
+            batch.delete(doc(db, 'form_responses', id));
+          });
+          await batch.commit();
+          toast.success(`Đã xóa ${selectedResponseIds.length} phản hồi`);
+          setResponses(prev => prev.filter(r => !selectedResponseIds.includes(r.id)));
+          if (selectedForm) {
+            setResponseCounts(prev => ({
+              ...prev,
+              [selectedForm.id]: Math.max(0, (prev[selectedForm.id] || 0) - selectedResponseIds.length)
+            }));
+          }
+          setSelectedResponseIds([]);
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt');
         }
       }
     });
@@ -486,7 +599,7 @@ export default function AdminForms() {
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-zinc-400">Quản lý các thư mục biểu mẫu thu thập dữ liệu.</p>
               </div>
-              <div className="flex flex-col md:flex-row items-center gap-4">
+             <div className="flex flex-col md:flex-row items-center gap-4">
                  <div className="relative w-full md:w-64">
                     <input 
                       type="text"
@@ -498,6 +611,13 @@ export default function AdminForms() {
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                  </div>
                  <button 
+                  onClick={toggleSelectAllForms}
+                  className="w-full md:w-auto bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                >
+                  {selectedFormIds.length === filteredForms.length && filteredForms.length > 0 ? <CheckCircle2 className="w-4 h-4 text-purple-500" /> : <Layout className="w-4 h-4" />}
+                  {selectedFormIds.length === filteredForms.length && filteredForms.length > 0 ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                </button>
+                 <button 
                   onClick={() => { resetForm(); setView('create'); }}
                   className="w-full md:w-auto bg-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-purple-700 transition flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95 shrink-0"
                 >
@@ -507,12 +627,41 @@ export default function AdminForms() {
               </div>
            </div>
 
+           {selectedFormIds.length > 0 && (
+             <motion.div 
+               initial={{ opacity: 0, y: -20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 rounded-2xl shadow-sm"
+             >
+               <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-purple-500/30">
+                    {selectedFormIds.length}
+                 </div>
+                 <span className="text-sm font-bold text-purple-700 dark:text-purple-300">Folder đã chọn</span>
+               </div>
+               <button 
+                 onClick={handleBulkDeleteForms}
+                 className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20"
+               >
+                 <Trash2 size={14} /> Xóa vĩnh viễn
+               </button>
+             </motion.div>
+           )}
+
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {filteredForms.map(form => (
-                <div key={form.id} className="group relative bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/5 transition-all">
+                <div key={form.id} className={cn("group relative bg-white dark:bg-white/5 border rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/5 transition-all", selectedFormIds.includes(form.id) ? "border-purple-500 bg-purple-50/30 dark:bg-purple-500/5 shadow-md shadow-purple-500/10" : "border-slate-200 dark:border-white/10")}>
                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                        <Files className="w-6 h-6" />
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); toggleSelectForm(form.id); }}
+                          className={cn("w-6 h-6 rounded-lg border flex items-center justify-center transition-all", selectedFormIds.includes(form.id) ? "bg-purple-600 border-purple-600 text-white" : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-white/10 text-transparent")}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </button>
+                        <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                          <Files className="w-6 h-6" />
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 transition-opacity">
                         <button onClick={() => { shareForm(form.slug); }} className="p-2 text-slate-500 hover:text-blue-500 transition-colors" title="Share link"><Share2 className="w-4 h-4" /></button>
@@ -998,12 +1147,20 @@ export default function AdminForms() {
                          {selectedForm?.questions.map(q => (
                            <th key={q.id} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{q.label}</th>
                          ))}
-                         <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Thao tác</th>
+                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Thao tác</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-200 dark:divide-white/10">
                       {responses.map((resp, idx) => (
-                        <tr key={resp.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        <tr key={resp.id} className={cn("hover:bg-slate-50 dark:hover:bg-white/5 transition-colors", selectedResponseIds.includes(resp.id) && "bg-purple-50/30 dark:bg-purple-500/5")}>
+                           <td className="px-6 py-4 text-center">
+                              <button 
+                                onClick={() => toggleSelectResponse(resp.id)} 
+                                className={cn("transition-colors", selectedResponseIds.includes(resp.id) ? "text-purple-600" : "text-slate-300 hover:text-slate-400")}
+                              >
+                                 {selectedResponseIds.includes(resp.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                              </button>
+                           </td>
                            <td className="px-6 py-4 whitespace-nowrap">
                              <div className="flex flex-col">
                                <span className="text-sm text-slate-900 dark:text-white font-medium">{format(toSafeDate(resp.submittedAt), 'HH:mm dd/MM')}</span>
@@ -1071,7 +1228,7 @@ export default function AdminForms() {
                                </div>
                              </td>
                            ))}
-                           <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border px-6 py-4 whitespace-nowrap text-right">
+                           <td className="px-6 py-4 whitespace-nowrap text-right">
                              <button
                                onClick={() => handleDeleteResponse(resp.id)}
                                className="p-1 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ml-auto cursor-pointer border border-rose-200 dark:border-rose-500/20 active:scale-95 inline-flex whitespace-nowrap"

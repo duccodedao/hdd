@@ -1,3 +1,4 @@
+import { useAuthStore } from '../../store/authStore';
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -19,7 +20,7 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { useConfirmStore } from '../../store/confirmStore';
-import { safeJsonStringify } from '../../lib/utils';
+import { safeJsonStringify, cn } from '../../lib/utils';
 
 interface CollectionStatus {
   name: string;
@@ -29,7 +30,10 @@ interface CollectionStatus {
 }
 
 export default function AdminSystem() {
+  const { userData } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [auditing, setAuditing] = useState(false);
+  const [auditResult, setAuditResult] = useState<any | null>(null);
   const [customCollectionName, setCustomCollectionName] = useState('');
   const { openConfirm } = useConfirmStore();
   
@@ -50,8 +54,8 @@ export default function AdminSystem() {
     { name: 'documents', count: null, loading: false, selected: true },
     { name: 'calendar_events', count: null, loading: false, selected: true },
     { name: 'recurring_events', count: null, loading: false, selected: true },
-    { name: 'hrm_employees', count: null, loading: false, selected: true },
-    { name: 'hrm_collaborators', count: null, loading: false, selected: true },
+    { name: 'contacts', count: null, loading: false, selected: true },
+    { name: 'hrm_population', count: null, loading: false, selected: true },
     { name: 'avatar_frames', count: null, loading: false, selected: true },
     { name: 'apps', count: null, loading: false, selected: true },
     { name: 'app_categories', count: null, loading: false, selected: true },
@@ -72,6 +76,10 @@ export default function AdminSystem() {
 
   // Batch query to load document count for each collection
   const loadCollectionCounts = async () => {
+    if (userData?.role === 'review') {
+      setCollections(prev => prev.map(c => ({ ...c, count: 0, loading: false })));
+      return;
+    }
     setCollections(prev => prev.map(c => ({ ...c, loading: true })));
     
     for (let i = 0; i < collections.length; i++) {
@@ -101,6 +109,10 @@ export default function AdminSystem() {
 
   // Add customized collection name on the fly
   const handleAddCustomCollection = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     const trimmed = customCollectionName.trim();
     if (!trimmed) return;
     
@@ -131,6 +143,10 @@ export default function AdminSystem() {
 
   // Remove a collection from the active list
   const handleRemoveCollection = (name: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     setCollections(prev => prev.filter(c => c.name !== name));
     toast.success(`Đã bỏ bộ sưu tập ${name} khỏi danh sách cấu trúc`);
   };
@@ -201,6 +217,114 @@ export default function AdminSystem() {
     }
   };
 
+  const handleRunAudit = async () => {
+    setAuditing(true);
+    const toastId = toast.loading('Đang khởi động tiến trình kiểm thấu cấu trúc Firestore...', { id: 'schema_audit' });
+    try {
+      const selected = collections.filter(c => c.selected);
+      if (selected.length === 0) {
+        toast.error('Vui lòng chọn ít nhất 1 bộ sưu tập để thực hiện phân tích.', { id: 'schema_audit' });
+        setAuditing(false);
+        return;
+      }
+
+      const results: any = {};
+      let totalFieldsDetected = 0;
+      let totalIssues = 0;
+      let score = 100;
+
+      for (const col of selected) {
+        toast.loading(`Đang phân tích cấu trúc [${col.name}]...`, { id: 'schema_audit' });
+        const snap = await getDocs(collection(db, col.name));
+        const docs = snap.docs.slice(0, 3);
+
+        const fields: { [key: string]: string } = {};
+        let redundantInconsistentFields = false;
+
+        docs.forEach(doc => {
+          const data = doc.data();
+          Object.keys(data).forEach(key => {
+            const val = data[key];
+            let detectedType: string = typeof val;
+            if (val instanceof Timestamp || (val && typeof val === 'object' && (val as any).seconds !== undefined)) {
+              detectedType = 'Timestamp';
+            } else if (val === null) {
+              detectedType = 'null';
+            } else if (Array.isArray(val)) {
+              detectedType = 'Array';
+            } else if (typeof val === 'object') {
+              detectedType = 'Object (Map)';
+            }
+            
+            if (fields[key] && fields[key] !== detectedType) {
+              redundantInconsistentFields = true;
+            }
+            fields[key] = detectedType;
+          });
+        });
+
+        const colIssues: string[] = [];
+        const indexRecommendations: string[] = [];
+
+        if (snap.docs.length === 0) {
+          colIssues.push("Bộ sưu tập trống, chưa có thực thể lưu vết.");
+          score -= 5;
+        } else {
+          const keys = Object.keys(fields);
+          totalFieldsDetected += keys.length;
+          
+          if (keys.length > 20) {
+            colIssues.push(`Cảnh báo: Bảng chứa rất nhiều trường thông tin (${keys.length} trường). Nên tối ưu hóa dữ liệu.`);
+            score -= 3;
+          }
+          if (redundantInconsistentFields) {
+            colIssues.push("Phát hiện kiểu dữ liệu không đồng nhất giữa các tài liệu. Kiểm tra định dạng lưu trữ.");
+            score -= 8;
+          }
+
+          if (col.name === 'calendar_events') {
+            indexRecommendations.push("Đề xuất thiết lập compound index: `date ASC, status ASC` để hiển thị mượt lịch.");
+          } else if (col.name === 'tasks') {
+            indexRecommendations.push("Đề xuất thiết lập compound index: `assignedTo ASC, status ASC` hỗ trợ hiển thị phân trang.");
+          } else if (col.name === 'device_logins') {
+            indexRecommendations.push("Gợi ý thiết lập TTL index tự động giải phóng bản ghi sau 30 ngày.");
+          } else if (col.name === 'utility_stats') {
+            indexRecommendations.push("Gợi ý thiết lập compound index: `utilityId ASC, visits DESC` để tăng tốc độ truy vấn danh mục hot.");
+          } else {
+            if (keys.length > 4) {
+              indexRecommendations.push(`Gợi ý thiết lập Chỉ mục đơn lẻ cho trường tìm kiếm chính.`);
+            }
+          }
+        }
+
+        totalIssues += colIssues.length;
+
+        results[col.name] = {
+          docCount: snap.docs.length,
+          fields,
+          issues: colIssues,
+          indexes: indexRecommendations
+        };
+      }
+
+      setAuditResult({
+        collectionsAnalyzed: selected.length,
+        totalFieldsDetected,
+        totalIssues,
+        score: Math.max(40, score - totalIssues * 2),
+        details: results,
+        auditedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+
+      toast.success('Kiểm toán kết xuất hoàn tất! Xem báo cáo phân tích chi tiết bên dưới.', { id: 'schema_audit' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Có lỗi trong quá trình kiểm thấu: ${err.message || err}`, { id: 'schema_audit' });
+    } finally {
+      setAuditing(false);
+    }
+  };
+
   // Inspect upload file to show dry-run preview before executing import
   const handleUploadFileForPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -243,6 +367,10 @@ export default function AdminSystem() {
 
   // Comprehensive and dynamically inclusive schema restoration
   const executeImport = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!importFile) return;
 
     openConfirm({
@@ -469,6 +597,143 @@ export default function AdminSystem() {
             {loading ? 'Đang đóng gói dữ liệu...' : 'Xuất Toàn bộ JSON Chọn lọc'}
           </button>
         </div>
+      </div>
+
+      {/* FIRESTORE SCHEMA AUDIT & OPTIMIZATION REPORT CARD */}
+      <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 lg:p-8 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-950 dark:text-white">
+              <Database className="w-5.5 h-5.5 text-indigo-500" />
+              Kiểm toán & Đánh giá Sức khỏe Cơ cấu Dữ liệu Firestore
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Phân tích các trường thông tin thực tế, lập bản ghi kiểu dữ liệu và đề xuất cấu trúc chỉ mục tối ưu hóa cho tốc độ truy vấn.
+            </p>
+          </div>
+
+          <button
+            disabled={auditing}
+            onClick={handleRunAudit}
+            className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-55 text-white font-semibold rounded-2xl text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className={cn("w-4 h-4", auditing && "animate-spin")} />
+            {auditing ? 'Đang Phân tích...' : 'Khởi chạy Phân tích'}
+          </button>
+        </div>
+
+        {auditResult && (
+          <div className="space-y-6 pt-4 border-t border-slate-100 dark:border-white/5 animate-fade-in">
+            {/* Summary Score Tracker */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-150/50 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Điểm Số Sức Khỏe Dữ Liệu</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className={cn(
+                    "text-3xl font-extrabold",
+                    auditResult.score >= 90 ? "text-emerald-500" : auditResult.score >= 70 ? "text-amber-500" : "text-rose-500"
+                  )}>{auditResult.score}</span>
+                  <span className="text-xs text-slate-400">/100</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-150/50 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số Bảng Phân Tích</span>
+                <div className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
+                  {auditResult.collectionsAnalyzed}
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-150/50 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số Trường Thông Tin</span>
+                <div className="text-3xl font-extrabold text-indigo-500 mt-1">
+                  {auditResult.totalFieldsDetected}
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-zinc-900/40 rounded-2xl border border-slate-150/50 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Vấn Đề Ghi Nhận</span>
+                <div className="text-3xl font-extrabold text-rose-500 mt-1">
+                  {auditResult.totalIssues}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Collection Reports */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center justify-between">
+                <span>Chi tiết báo cáo cấu trúc từng Collection</span>
+                <span>Kiểm toán lúc: {auditResult.auditedAt}</span>
+              </h3>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {Object.keys(auditResult.details).map(colName => {
+                  const detail = auditResult.details[colName];
+                  return (
+                    <div key={colName} className="p-5 rounded-2xl border border-slate-150/60 dark:border-white/5 bg-slate-50/25 dark:bg-zinc-900/20 flex flex-col justify-between space-y-4">
+                      <div>
+                        {/* Title Row */}
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-white/5 pb-2.5">
+                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{colName}</span>
+                          <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-650 dark:text-zinc-400">
+                            {detail.docCount} tài liệu
+                          </span>
+                        </div>
+
+                        {/* Types List */}
+                        {detail.docCount > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400/80 block">Bản Đồ Trường Dữ Liệu (Schema Map):</span>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {Object.keys(detail.fields).map(fName => (
+                                <span key={fName} className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50/30 dark:bg-indigo-500/5 text-indigo-750 dark:text-indigo-300 border border-indigo-100/30 dark:border-indigo-950/20">
+                                  {fName}: <span className="font-bold opacity-75">{detail.fields[fName]}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400 dark:text-zinc-550 text-xs italic mt-3">
+                            (Không phát hiện dữ liệu mẫu để khảo sát trường thông tin)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Warnings and Indexes */}
+                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs">
+                        {detail.issues.length > 0 && (
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 flex items-center gap-1">
+                              ⚠️ Chú ý về Cấu trúc:
+                            </span>
+                            {detail.issues.map((iss: string, iIdx: number) => (
+                              <p key={iIdx} className="text-rose-600 dark:text-rose-400 font-medium pl-1">
+                                • {iss}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {detail.indexes.length > 0 && (
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500 flex items-center gap-1">
+                              💡 Đề xuất Chỉ mục tăng tốc:
+                            </span>
+                            {detail.indexes.map((ind: string, iIdx: number) => (
+                              <p key={iIdx} className="text-slate-650 dark:text-zinc-400 pl-1 font-medium italic">
+                                • {ind}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* DYNAMIC IMPORT AND MIGRATION RESTORATION CARD */}

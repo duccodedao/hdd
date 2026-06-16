@@ -16,15 +16,15 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { isSuperAdmin, isAdmin } = useAuthStore();
+  const { isSuperAdmin, isAdmin, userData } = useAuthStore();
 
   React.useEffect(() => {
-    if (isSuperAdmin) {
+    if (isSuperAdmin || userData?.role === 'review') {
       navigate('/admin');
     } else if (isAdmin) {
       navigate('/utilities');
     }
-  }, [isSuperAdmin, isAdmin, navigate]);
+  }, [isSuperAdmin, isAdmin, userData, navigate]);
 
   const resolveIdentifierToEmail = async (id: string) => {
     if (id.includes('@')) return id;
@@ -72,6 +72,7 @@ export default function AdminLogin() {
       if (
         role !== 'admin' && 
         role !== 'superadmin' && 
+        role !== 'review' &&
         userCred.user.email !== 'sonlyhongduc@gmail.com' && 
         userCred.user.email !== 'sonlyhongduc1@ghn.vn'
       ) {
@@ -83,7 +84,7 @@ export default function AdminLogin() {
       const isUserSuperAdmin = role === 'superadmin' || userCred.user.email === 'sonlyhongduc@gmail.com' || userCred.user.email === 'sonlyhongduc1@ghn.vn';
 
       toast.success('Xác thực quản trị thành công.');
-      if (isUserSuperAdmin) {
+      if (isUserSuperAdmin || role === 'review') {
         navigate('/admin');
       } else {
         navigate('/utilities');

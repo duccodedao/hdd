@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Shield, Lock, Laptop, Smartphone, HelpCircle, LogOut, CheckCircle2, UserCircle, Globe, Calendar, RefreshCw, AlertTriangle, X, Check, ShieldAlert, CheckSquare, Square, Trash } from 'lucide-react';
+import { Shield, Lock, Laptop, Smartphone, HelpCircle, LogOut, CheckCircle2, UserCircle, Globe, Calendar, RefreshCw, AlertTriangle, X, Check, ShieldAlert, CheckSquare, Square, Trash, Users, Radio, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toSafeDate } from '../../lib/utils';
 import toast from 'react-hot-toast';
@@ -27,11 +27,35 @@ export interface AdminSession {
   approved?: boolean;
 }
 
+export interface GuestVisit {
+  id: string;
+  ip: string;
+  device: string;
+  lastActiveAt: number;
+  blocked: boolean;
+}
+
+export interface AccessRequest {
+  id: string;
+  email: string;
+  displayName: string;
+  ipWifi: string;
+  device: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+}
+
 export default function AdminSecuritySessions() {
+  const [activeTab, setActiveTab] = useState<'guests' | 'auth' | 'approved' | 'pending'>('auth');
+  
   const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [guests, setGuests] = useState<GuestVisit[]>([]);
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedApprovedEmails, setExpandedApprovedEmails] = useState<string[]>([]);
   const { openConfirm } = useConfirmStore();
   const { userData } = useAuthStore();
 
@@ -41,22 +65,61 @@ export default function AdminSecuritySessions() {
   const [customBlockReason, setCustomBlockReason] = useState('Đăng xuất từ xa / Chặn từ bảo mật quản lý thiết bị');
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setSessions([]);
+      setGuests([]);
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const q = query(collection(db, 'admin_sessions'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snap) => {
+    let loadedCount = 0;
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= 3) setLoading(false);
+    };
+
+    // Sessions listener
+    const qSessions = query(collection(db, 'admin_sessions'), orderBy('createdAt', 'desc'));
+    const unSubSessions = onSnapshot(qSessions, (snap) => {
       const list: AdminSession[] = [];
-      snap.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as AdminSession);
-      });
+      snap.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() } as AdminSession));
       setSessions(list);
-      setLoading(false);
+      checkAllLoaded();
     }, (error) => {
-      console.error("Error listening to sessions:", error);
-      setLoading(false);
+      console.error(error);
+      checkAllLoaded();
     });
 
-    return () => unsubscribe();
+    // Guests listener
+    const qGuests = query(collection(db, 'guest_visits'), orderBy('lastActiveAt', 'desc'));
+    const unSubGuests = onSnapshot(qGuests, (snap) => {
+      const list: GuestVisit[] = [];
+      snap.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() } as GuestVisit));
+      setGuests(list);
+      checkAllLoaded();
+    }, (error) => {
+      console.error(error);
+      checkAllLoaded();
+    });
+
+    // AccessRequests listener
+    const qRequests = query(collection(db, 'access_requests'), orderBy('createdAt', 'desc'));
+    const unSubRequests = onSnapshot(qRequests, (snap) => {
+      const list: AccessRequest[] = [];
+      snap.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() } as AccessRequest));
+      setRequests(list);
+      checkAllLoaded();
+    }, (error) => {
+      console.error(error);
+      checkAllLoaded();
+    });
+
+    return () => {
+      unSubSessions();
+      unSubGuests();
+      unSubRequests();
+    };
   }, []);
 
   const toggleSelectAll = () => {
@@ -73,6 +136,10 @@ export default function AdminSecuritySessions() {
   };
 
   const handleBulkDelete = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (selectedIds.length === 0) return;
     openConfirm({
       title: 'Xóa hàng loạt lịch sử?',
@@ -93,6 +160,10 @@ export default function AdminSecuritySessions() {
   };
 
   const handleLogoutAllOtherSessions = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!userData?.email) return;
     const currentSessionId = getOrCreateSessionId();
 
@@ -113,12 +184,20 @@ export default function AdminSecuritySessions() {
   };
 
   const handleRevokeSession = (session: AdminSession) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     setRevokeTargetSession(session);
     setShouldBlockIp(false);
     setCustomBlockReason(`Đăng xuất từ xa do phát hiện xung đột bảo mật thiết bị [IP: ${session.ip}]`);
   };
 
   const handleConfirmRevoke = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     if (!revokeTargetSession) return;
     try {
       await logoutSessionAndBlockIp(
@@ -134,7 +213,95 @@ export default function AdminSecuritySessions() {
     }
   };
 
+  const handleApproveRequest = async (req: AccessRequest) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'access_requests', req.id), { status: 'approved' });
+      // Add IP to whitelist
+      const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+      let whitelistText = '';
+      if (sysSnap.exists()) {
+        whitelistText = sysSnap.data().ipWhitelistText || '';
+      }
+      
+      const ipList = whitelistText.split(/[\n,\s]+/).map(i => i.trim()).filter(i => i);
+      if (!ipList.includes(req.ipWifi)) {
+        ipList.push(req.ipWifi);
+      }
+      const newText = ipList.join('\n');
+      
+      await setDoc(doc(db, 'settings', 'system'), {
+        ipWhitelistText: newText
+      }, { merge: true });
+
+      toast.success(`Đã duyệt IP ${req.ipWifi} cho người dùng ${req.email}`);
+    } catch (e: any) {
+      toast.error('Lỗi duyệt yêu cầu: ' + e.message);
+    }
+  };
+
+  const handleRejectRequest = async (req: AccessRequest) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'access_requests', req.id), { status: 'rejected' });
+      toast.success('Đã từ chối yêu cầu truy cập');
+    } catch (e: any) {
+      toast.error('Lỗi: ' + e.message);
+    }
+  };
+
+  const handleDeleteRequest = async (id: string, ipWifi?: string, status?: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: status === 'approved' ? 'Xóa IP khỏi danh sách đã duyệt?' : 'Xóa yêu cầu?',
+      message: status === 'approved' ? 'Hành động này sẽ xóa Thiết bị/IP này khỏi danh sách cho phép. Người dùng này sẽ không thể truy cập lại. Tiếp tục?' : 'Bạn có chắc chắn muốn xóa bản ghi yêu cầu này không?',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'access_requests', id));
+          if (status === 'approved' && ipWifi) {
+             const sysSnap = await getDoc(doc(db, 'settings', 'system'));
+             if (sysSnap.exists()) {
+                const text = sysSnap.data().ipWhitelistText || '';
+                const arr = text.split(/[\n,\s]+/).map((i: string) => i.trim()).filter((i: string) => i && i !== ipWifi);
+                await setDoc(doc(db, 'settings', 'system'), { ipWhitelistText: arr.join('\n') }, { merge: true });
+             }
+          }
+          toast.success('Xóa thành công!');
+        } catch(e) {}
+      }
+    });
+  };
+
+  const handleBlockGuestIP = async (ip: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    try {
+       await setDoc(doc(db, 'blockedIps', ip), { ip, reason: 'Chặn từ Quản lý phiên khách', createdAt: Date.now() });
+       await setDoc(doc(db, 'guest_visits', ip), { blocked: true }, { merge: true });
+       toast.success('Đã chặn thiết bị khách ' + ip);
+    } catch (e: any) {
+       toast.error('Lỗi khi chặn: ' + e.message);
+    }
+  };
+
   const handleApproveSession = async (session: AdminSession) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     try {
       await approveSession(session.id);
       toast.success(`Đã duyệt cho phép thiết bị ${session.device} (IP: ${session.ip}) hoạt động.`);
@@ -143,7 +310,25 @@ export default function AdminSecuritySessions() {
     }
   };
 
+  const handleUnblockGuestIP = async (ip: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    try {
+       await deleteDoc(doc(db, 'blockedIps', ip));
+       await setDoc(doc(db, 'guest_visits', ip), { blocked: false }, { merge: true });
+       toast.success('Đã mở chặn thiết bị khách ' + ip);
+    } catch (e: any) {
+       toast.error('Lỗi khi mở chặn: ' + e.message);
+    }
+  };
+
   const handleDeleteSessionRecord = (id: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
     openConfirm({
       title: 'Xóa lịch sử phiên?',
       message: 'Hành động này sẽ xóa vĩnh viễn dòng lịch sử phiên đăng nhập này khỏi danh sách giám sát. Tiếp tục?',
@@ -211,6 +396,114 @@ export default function AdminSecuritySessions() {
         </div>
       </div>
 
+      {/* Unapproved Admin Sessions Security Warnings */}
+      {(() => {
+        const unapprovedActiveSessions = sessions.filter(
+          s => s.active && !s.approved && s.id !== localStorage.getItem('active_admin_session_id')
+        );
+        if (unapprovedActiveSessions.length === 0) return null;
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500 text-left">
+            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-500 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 rounded-2xl">
+              <ShieldAlert className="w-5 h-5 text-rose-600 dark:text-rose-500 animate-bounce" />
+              <span className="text-xs uppercase font-extrabold tracking-widest text-rose-700 dark:text-rose-400">
+                Lưu ý khẩn cấp: Phát hiện đăng nhập quản trị chưa phê duyệt ({unapprovedActiveSessions.length})
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {unapprovedActiveSessions.map(sess => (
+                <div 
+                  key={sess.id}
+                  className="bg-white dark:bg-zinc-900 relative rounded-[2rem] border border-rose-500/[0.25] overflow-hidden p-6 text-left shadow-lg shadow-rose-500/5 bg-gradient-to-br from-rose-500/[0.02] to-transparent dark:from-rose-500/[0.04]"
+                >
+                  <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <div className="flex gap-4 items-start relative z-10">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-550/10 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100/30">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="font-extrabold text-sm text-slate-900 dark:text-rose-200 truncate">{sess.displayName || 'Quản trị viên'}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate font-mono">{sess.email}</p>
+                      
+                      <div className="pt-2.5 text-xs text-slate-600 dark:text-slate-350 space-y-1.5 font-medium">
+                        <div className="flex items-center gap-2">
+                          <Laptop className="w-3.5 h-3.5 text-rose-550 shrink-0" />
+                          <span className="truncate text-slate-705 dark:text-zinc-300">{sess.device}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Lock className="w-3.5 h-3.5 text-rose-550 shrink-0" />
+                          <span className="font-mono text-slate-705 dark:text-zinc-350">{sess.ip}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-3.5 h-3.5 text-rose-550 shrink-0" />
+                          <span className="truncate text-slate-705 dark:text-zinc-300">{sess.location || "Vị trí không rõ"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-end gap-3 relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => handleRevokeSession(sess)}
+                      className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-sm hover:shadow-md active:scale-95 duration-200"
+                    >
+                      Từ chối / Chặn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveSession(sess)}
+                      className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-sm hover:shadow-md active:scale-95 duration-200"
+                    >
+                      Duyệt
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tabs navigation */}
+      <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab('auth')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'auth' ? 'bg-white dark:bg-zinc-800 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          <Shield className="w-4 h-4" /> Phiên Đã Login ({sessions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('guests')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'guests' ? 'bg-white dark:bg-zinc-800 text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          <Users className="w-4 h-4" /> Lịch sử Khách ({guests.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'pending' ? 'bg-white dark:bg-zinc-800 text-amber-500 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          <Radio className="w-4 h-4" /> Đợi Duyệt ({requests.filter(r => r.status === 'pending').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('approved')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'approved' ? 'bg-white dark:bg-zinc-800 text-blue-500 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          <CheckCircle className="w-4 h-4" /> Danh sách Đã Duyệt
+        </button>
+      </div>
+
       {/* Control Box */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-3xl">
         <div className="relative w-full md:max-w-md">
@@ -256,6 +549,7 @@ export default function AdminSecuritySessions() {
       )}
 
       {/* Main Sessions Table */}
+      {activeTab === 'auth' && (
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-sm">
         <div className="overflow-x-auto no-scrollbar scroll-smooth">
           <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[1200px]">
@@ -288,7 +582,7 @@ export default function AdminSecuritySessions() {
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">IP (Bảo mật)</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Vị trí</th>
                 <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 capitalize border-b border-slate-100 dark:border-white/5">Ngày giờ đăng nhập</th>
-                <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5">Thao tác</th>
+                <th className="p-4 text-xs font-bold text-slate-400 dark:text-slate-550 text-right capitalize bg-slate-50/50 dark:bg-black/10 border-b border-slate-100 dark:border-white/5">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -383,7 +677,7 @@ export default function AdminSecuritySessions() {
                     </td>
 
                     {/* Thao tác Column */}
-                    <td className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-4 align-middle text-right">
+                    <td className="whitespace-nowrap p-4 align-middle text-right">
                       {session.active ? (
                         <div className="flex items-center justify-end gap-2">
                           {isCurrentSession ? (
@@ -439,7 +733,7 @@ export default function AdminSecuritySessions() {
 
               {filteredSessions.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={9} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
+                  <td colSpan={9} className="whitespace-nowrap p-12 text-center text-slate-500 dark:text-slate-450 text-sm">
                     Không tìm thấy phiên đăng nhập nào khớp với điều kiện tìm kiếm.
                   </td>
                 </tr>
@@ -447,7 +741,7 @@ export default function AdminSecuritySessions() {
 
               {loading && (
                 <tr>
-                  <td colSpan={9} className="whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border p-12 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="whitespace-nowrap p-12 text-center text-slate-400 text-sm">
                     <AppLogo className="w-12 h-12 mx-auto mb-3" isLoading={true} />
                     Đang tải danh sách phiên bảo mật...
                   </td>
@@ -457,6 +751,189 @@ export default function AdminSecuritySessions() {
           </table>
         </div>
       </div>
+      )}
+
+      {/* Guest Visits Tab */}
+      {activeTab === 'guests' && (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+            <h3 className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-500" />
+              Lịch sử kết nối Khách
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Danh sách các thiết bị ẩn danh (chưa đăng nhập) đã truy cập vào hệ thống.
+            </p>
+          </div>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 dark:bg-zinc-900 dark:border-white/10 text-xs text-slate-500 dark:text-slate-400">
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">IP Thiết bị / Wifi</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">Thông tin thiết bị (User Agent)</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">Hoạt động cuối</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5 text-right">Trạng thái / Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+              {guests.map(guest => (
+                <tr key={guest.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                  <td className="p-4 font-mono font-bold text-slate-700 dark:text-zinc-300">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-emerald-500" />
+                      {guest.ip}
+                    </div>
+                  </td>
+                  <td className="p-4 text-xs text-slate-500 truncate max-w-sm" title={guest.device}>{guest.device}</td>
+                  <td className="p-4 text-xs font-mono">{format(toSafeDate(guest.lastActiveAt), 'dd/MM/yyyy HH:mm')}</td>
+                  <td className="p-4 text-right">
+                    {guest.blocked ? (
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="text-rose-500 text-[10px] font-bold uppercase whitespace-nowrap"><ShieldAlert className="w-3 h-3 inline pb-0.5"/> Đã bị cấm</span>
+                        <button onClick={() => handleUnblockGuestIP(guest.ip)} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Mở truy cập</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => handleBlockGuestIP(guest.ip)} className="bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Cấm truy cập</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {guests.length === 0 && (
+                 <tr>
+                   <td colSpan={4} className="p-8 text-center text-slate-400 text-sm">Chưa có lịch sử kết nối ẩn danh nào.</td>
+                 </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pending Access Requests Tab */}
+      {activeTab === 'pending' && (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+            <h3 className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Radio className="w-5 h-5 text-amber-500" />
+              Yêu cầu cấp quyền truy cập
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Người dùng đã đăng nhập nhưng bị chặn do giới hạn IP Wifi có thể gửi yêu cầu xin cấp quyền tại đây.
+            </p>
+          </div>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 dark:bg-zinc-900 dark:border-white/10 text-xs text-slate-500 dark:text-slate-400">
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">Người dùng (Gmail)</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">IP / Wifi Requested</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">Thông tin máy / thiết bị</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5">Thời gian</th>
+                <th className="p-4 font-bold border-b border-slate-100 dark:border-white/5 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+              {requests.filter(r => r.status === 'pending').map(req => (
+                <tr key={req.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                  <td className="p-4 text-slate-900 dark:text-zinc-100">
+                    <div className="font-bold">{req.displayName || 'User'}</div>
+                    <div className="text-xs text-slate-500">{req.email}</div>
+                  </td>
+                  <td className="p-4 font-mono font-bold text-slate-700 dark:text-zinc-300">{req.ipWifi}</td>
+                  <td className="p-4 text-xs text-slate-500 truncate max-w-xs" title={req.device}>{req.device}</td>
+                  <td className="p-4 text-xs font-mono text-slate-400">{format(toSafeDate(req.createdAt), 'dd/MM HH:mm')}</td>
+                  <td className="p-4 text-right space-x-2">
+                    <button onClick={() => handleRejectRequest(req)} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">Từ chối</button>
+                    <button onClick={() => handleApproveRequest(req)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm drop-shadow-sm">✅ Duyệt IP</button>
+                  </td>
+                </tr>
+              ))}
+              {requests.filter(r => r.status === 'pending').length === 0 && (
+                 <tr>
+                   <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">Không có yêu cầu đợi duyệt.</td>
+                 </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Approved Access Requests Tab */}
+      {activeTab === 'approved' && (() => {
+        const approved = requests.filter(r => r.status === 'approved');
+        const grouped = approved.reduce((acc, req) => {
+          if (!acc[req.email]) acc[req.email] = [];
+          acc[req.email].push(req);
+          return acc;
+        }, {} as Record<string, AccessRequest[]>);
+        const entries = Object.entries(grouped);
+
+        return (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+            <h3 className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-blue-500" />
+              Thiết bị / IP đã được duyệt
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              Danh sách các thiết bị và IP đã được phê duyệt truy cập.
+            </p>
+          </div>
+          <div className="flex flex-col">
+            {entries.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">
+                Chưa có thiết bị nào được duyệt từ hệ thống.
+              </div>
+            ) : (
+              entries.map(([email, userRequests]) => {
+                const isExpanded = expandedApprovedEmails.includes(email);
+                return (
+                  <div key={email} className="border-b border-slate-100 dark:border-white/5 last:border-0">
+                    <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                          <UserCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-slate-900 dark:text-zinc-100">{email}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{userRequests.length} thiết bị/IP đã đăng ký truy cập</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setExpandedApprovedEmails(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email])}
+                        className="px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition whitespace-nowrap"
+                      >
+                        {isExpanded ? 'Đóng lại' : 'Xem chi tiết thiết bị'}
+                      </button>
+                    </div>
+                    {isExpanded && (
+                      <div className="bg-slate-50 dark:bg-black/20 p-4 border-t border-slate-100 dark:border-white/5">
+                        <div className="space-y-3">
+                          {userRequests.map(req => (
+                            <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Lock className="w-3.5 h-3.5 text-blue-500" />
+                                  <span className="font-mono font-bold text-slate-700 dark:text-zinc-300 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded text-sm select-all">{req.ipWifi}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-450 line-clamp-1" title={req.device}>{req.device}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Duyệt lúc: {format(toSafeDate(req.createdAt), 'dd/MM/yyyy HH:mm')}</p>
+                              </div>
+                              <button 
+                                onClick={() => handleDeleteRequest(req.id, req.ipWifi, req.status)} 
+                                className="shrink-0 max-w-fit px-3 py-1.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-lg text-xs font-bold transition border border-rose-200 dark:border-rose-500/20"
+                              >
+                                Xóa bản ghi (Chặn IP)
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      );})()}
 
       {/* Custom Revoke with Optional IP Block Modal */}
       <AnimatePresence>
