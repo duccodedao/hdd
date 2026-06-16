@@ -685,7 +685,7 @@ export default function HrmPage() {
                     )}
                     <th className="py-4 px-6 whitespace-nowrap">Số điện thoại</th>
                     <th className="py-4 px-6 whitespace-nowrap">Chế độ hiển thị</th>
-                    <th className="sticky right-0 bg-slate-50 dark:bg-zinc-950/90 backdrop-blur shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-200 dark:border-white/10 z-20 box-border py-4 px-6 text-right w-32 whitespace-nowrap">Thao tác</th>
+                    <th className="py-4 px-6 text-right w-32 whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150/40 dark:divide-white/5 text-sm">
@@ -748,7 +748,7 @@ export default function HrmPage() {
                           </span>
                         )}
                       </td>
-                      <td className="sticky right-0 bg-white dark:bg-zinc-950 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] border-l border-slate-100 dark:border-white/5 z-10 box-border py-4 px-6 text-right whitespace-nowrap">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {canEdit ? (
                             <>

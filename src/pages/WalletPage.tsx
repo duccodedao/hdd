@@ -51,8 +51,16 @@ export default function WalletPage() {
   const { user } = useAuthStore();
   const { maintenanceTabs } = useAppStore();
   const [userData, setUserData] = useState<any>(null);
-  const [activeTab, setActiveTabTab] = useState<'deposit' | 'withdraw' | 'offers'>('deposit');
+  const [activeTab, setActiveTabTab] = useState<'deposit' | 'transfer' | 'withdraw' | 'offers'>('deposit');
   const [activeHistoryTab, setActiveHistoryTab] = useState<'deposits' | 'purchases'>('deposits');
+  
+  // Transfer States
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [foundRecipient, setFoundRecipient] = useState<any>(null);
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferMessage, setTransferMessage] = useState('Chuyển tiền qua ví BMASS');
+  const [isSearchingRecipient, setIsSearchingRecipient] = useState(false);
+  const [isSendingTransfer, setIsSendingTransfer] = useState(false);
   
   // Real-time collections
   const [deposits, setDeposits] = useState<any[]>([]);
@@ -218,6 +226,92 @@ export default function WalletPage() {
     setTimeout(() => setIsRefreshing(false), 900);
   };
 
+  const handleFindRecipient = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!recipientSearch.trim()) {
+      toast.error('Vui lòng nhập email hoặc số điện thoại.');
+      return;
+    }
+    setIsSearchingRecipient(true);
+    setFoundRecipient(null);
+    try {
+      const resp = await fetch('/api/wallet/find-recipient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchKey: recipientSearch })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setFoundRecipient(data);
+        toast.success(`Tìm thấy người dùng: ${data.displayName}`);
+      } else {
+        toast.error(data.error || 'Không tìm thấy người nhận.');
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối máy chủ');
+    } finally {
+      setIsSearchingRecipient(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!user) {
+      toast.error('Vui lòng đăng nhập.');
+      return;
+    }
+    if (!foundRecipient) {
+      toast.error('Vui lòng tìm người nhận trước.');
+      return;
+    }
+    const amount = parseInt(transferAmount);
+    if (isNaN(amount) || amount < 1000) {
+      toast.error('Số tiền chuyển tối thiểu là 1.000đ.');
+      return;
+    }
+    if (amount > (userData?.balance || 0)) {
+      toast.error('Số dư ví không đủ để thực hiện.');
+      return;
+    }
+
+    if (user.uid === foundRecipient.uid) {
+      toast.error('Bạn không thể tự chuyển khoản cho chính mình.');
+      return;
+    }
+
+    if (!confirm(`Bạn có chắc chắn muốn chuyển ${amount.toLocaleString()}đ cho ${foundRecipient.displayName} (${foundRecipient.email || foundRecipient.phoneNumber || 'Thành viên'})?`)) {
+      return;
+    }
+
+    setIsSendingTransfer(true);
+    try {
+      const resp = await fetch('/api/wallet/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderId: user.uid,
+          recipientId: foundRecipient.uid,
+          amount: amount,
+          message: transferMessage
+        })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        toast.success('Chuyển tiền thành công!');
+        // Reset states
+        setFoundRecipient(null);
+        setRecipientSearch('');
+        setTransferAmount('');
+        setTransferMessage('Chuyển tiền qua ví BMASS');
+      } else {
+        toast.error(data.error || 'Lỗi giao dịch.');
+      }
+    } catch (err) {
+      toast.error('Lỗi kết nối máy chủ');
+    } finally {
+      setIsSendingTransfer(false);
+    }
+  };
+
   // Pagination Logic
   const filteredDepositsList = deposits
     .sort((a, b) => {
@@ -275,10 +369,26 @@ export default function WalletPage() {
       });
 
       if (!resp.ok) {
-        const errorData = await resp.json().catch(() => ({}));
-        const msg = errorData.error || 'Create invoice server failure';
-        if (errorData.hint) {
-          toast.error(`${msg}\n${errorData.hint}`, { duration: 8000 });
+        let msg = 'Lỗi hệ thống khi tạo hóa đơn.';
+        let hint = '';
+        try {
+          const errorData = await resp.json();
+          msg = errorData.error || msg;
+          hint = errorData.hint || '';
+        } catch (e) {
+          msg = `Lỗi server ${resp.status}: ${resp.statusText}`;
+        }
+        
+        if (hint) {
+          toast.error(
+            <div className="flex flex-col gap-1">
+              <p className="font-bold">{msg}</p>
+              <p className="text-[10px] opacity-80 leading-tight">{hint}</p>
+            </div>, 
+            { duration: 8000 }
+          );
+        } else {
+          toast.error(msg);
         }
         throw new Error(msg);
       }
@@ -395,9 +505,10 @@ export default function WalletPage() {
 
           {/* Controls */}
           <div className="bg-white dark:bg-zinc-950 rounded-3xl p-4 border border-slate-100 dark:border-white/5 shadow-sm">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { id: 'deposit', label: 'Nạp tiền', icon: Plus },
+                { id: 'transfer', label: 'Chuyển tiền', icon: ArrowDownLeft },
                 { id: 'withdraw', label: 'Rút tiền', icon: ArrowUpRight },
               ].map(tab => (
                 <button
@@ -405,14 +516,14 @@ export default function WalletPage() {
                   onClick={() => {
                     setActiveTabTab(tab.id as any);
                   }}
-                  className={`flex flex-col items-center justify-center gap-3 py-5 rounded-2xl transition-all font-black border ${
+                  className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl transition-all font-black border ${
                     activeTab === tab.id 
                       ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 border-indigo-600' 
                       : 'bg-slate-50 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-850 border-transparent'
                   }`}
                 >
-                  <tab.icon className="w-5 h-5" />
-                  <span className="text-[11px] font-black uppercase tracking-wider">{tab.label}</span>
+                  <tab.icon className="w-4 h-4" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -702,19 +813,19 @@ export default function WalletPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2.5 w-full">
+                    <div className="flex flex-col sm:flex-row gap-2.5 w-full">
                       <button
                         onClick={() => handleVerifyInvoiceStatus(activeInvoice.id, false)}
-                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-655 dark:bg-zinc-900 dark:text-slate-350 dark:hover:bg-zinc-850 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-slate-200/50 dark:border-white/5"
+                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-500/10"
                       >
-                        Kiểm tra lại ngay
+                        Kiểm tra thanh toán thực tế
                       </button>
 
                       <button
                         onClick={() => handleVerifyInvoiceStatus(activeInvoice.id, true)}
-                        className="hidden flex-1 py-3 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                        className="flex-1 py-3 bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
                       >
-                        Duyệt Mô phỏng (Sandbox)
+                        Thanh toán giả lập (Sandbox)
                       </button>
                     </div>
 
@@ -766,6 +877,126 @@ export default function WalletPage() {
                   </div>
                 )}
                 
+              </motion.div>
+            )}
+
+            {/* TAB: CHUYỂN TIỀN */}
+            {activeTab === 'transfer' && (
+              <motion.div
+                key="view-transfer"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="border-b border-slate-100 dark:border-white/5 pb-3">
+                  <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200 uppercase tracking-widest flex items-center gap-2">
+                    <ArrowDownLeft className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    Chuyển số dư tài khoản
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                    Chuyển số dư ví điện tử BMASS đến thành viên khác trong hệ thống tức thời và hoàn toàn miễn phí.
+                  </p>
+                </div>
+
+                {!foundRecipient ? (
+                  <form onSubmit={handleFindRecipient} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block ml-1">
+                        Nhập Email hoặc số điện thoại người nhận
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={recipientSearch}
+                          onChange={(e) => setRecipientSearch(e.target.value)}
+                          placeholder="Nhập email đăng ký tài khoản..."
+                          className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5 pl-11 text-xs font-bold text-slate-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSearchingRecipient}
+                      className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isSearchingRecipient ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>Tìm người thụ hưởng</>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-4 pt-1 animate-in fade-in duration-250">
+                    <div className="p-4 bg-indigo-50/10 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100/50 dark:border-indigo-500/10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-lg shadow-sm">
+                          {foundRecipient.photoURL ? (
+                            <img src={foundRecipient.photoURL} alt="Recipient" className="w-full h-full object-cover rounded-xl" />
+                          ) : (
+                            <span>{foundRecipient.displayName?.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800 dark:text-zinc-200">{foundRecipient.displayName}</p>
+                          <p className="text-[10px] text-slate-400 font-bold max-w-[200px] truncate">{foundRecipient.email || foundRecipient.phoneNumber || 'Thành viên'}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setFoundRecipient(null)}
+                        className="text-[10px] font-black text-rose-500 hover:underline px-2 py-1 cursor-pointer"
+                      >
+                        Thay đổi
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block ml-1">Số tiền muốn gửi (VNĐ)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            placeholder="Nhập tối thiểu 1.000đ..."
+                            className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5 text-xs font-black text-slate-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 italic">đ</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block ml-1">Nội dung đính kèm</label>
+                        <input
+                          type="text"
+                          value={transferMessage}
+                          onChange={(e) => setTransferMessage(e.target.value)}
+                          placeholder="Chuyển tiền..."
+                          className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5 text-xs font-bold text-slate-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        onClick={handleTransfer}
+                        disabled={isSendingTransfer}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isSendingTransfer ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>Xác nhận chuyển số dư</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -953,7 +1184,11 @@ export default function WalletPage() {
                             {tx.createdAt?.toMillis ? format(tx.createdAt.toMillis(), 'HH:mm dd/MM/yy') : 'Vừa xong'}
                           </td>
                           <td className="py-4 px-2 text-[11px] font-bold text-slate-800 dark:text-zinc-200 truncate max-w-[200px] uppercase">{tx.productName || tx.description || 'Giao dịch'}</td>
-                          <td className="py-4 px-2 text-[11px] font-black text-rose-500 text-right">-{tx.amount?.toLocaleString()}đ</td>
+                          <td className={`py-4 px-2 text-[11px] font-black text-right ${
+                            tx.type === 'transfer_in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+                          }`}>
+                            {tx.type === 'transfer_in' ? '+' : '-'}{tx.amount?.toLocaleString()}đ
+                          </td>
                           <td className="py-4 px-6 text-right">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
                               Thành công
