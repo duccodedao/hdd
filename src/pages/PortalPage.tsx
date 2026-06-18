@@ -36,6 +36,23 @@ interface Post {
   pubDate?: string;
 }
 
+interface HealthDoc {
+  id: string;
+  docNumber: string;       // Số hiệu (e.g. 15/2026/TT-BYT)
+  title: string;           // Tiêu đề / Trích yếu (e.g. Thông tư quy định...)
+  docType: string;         // Phân loại: Thông tư, Quyết định, Chỉ thị, Hướng dẫn
+  signer: string;          // Người ký
+  issuedDate: string;      // Ngày ban hành
+  effectiveDate?: string;  // Ngày có hiệu lực
+  issuer: string;          // Cơ quan ban hành (Bộ Y tế, Sở Y tế)
+  pdfUrl?: string;         // Link tải
+  summary: string;         // Tóm tắt nội dung chi tiết
+  createdAt: number;
+  userId: string;
+  userName: string;
+}
+
+
 const DEFAULT_CATEGORIES = [
   { id: 'all', name: '🎯 Tất cả', color: 'text-indigo-400 bg-indigo-500/10' },
   { id: 'news', name: '📰 Tin tức', color: 'text-blue-400 bg-blue-500/10' },
@@ -108,6 +125,7 @@ const BACKGROUND_PRESETS = [
 
 export default function PortalPage() {
   const { user, userData, isAdmin } = useAuthStore();
+  const isAdminUser = isAdmin && userData?.role !== 'review';
   const { openConfirm } = useConfirmStore();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,18 +161,27 @@ export default function PortalPage() {
     return () => unsub();
   }, []);
   
-  // Custom switch between internal and VnExpress news
-  const [portalSource, setPortalSource] = useState<'internal' | 'vnexpress'>('internal');
+  // Custom switch between internal and VnExpress news and Health section
+  const [portalSource, setPortalSource] = useState<'internal' | 'vnexpress' | 'health'>('internal');
   const [vnExpressNews, setVnExpressNews] = useState<Post[]>([]);
   const [vnExpressLoading, setVnExpressLoading] = useState(false);
   const [vnExpressCategory, setVnExpressCategory] = useState('tin-moi-nhat');
+
+  // Health-specific states
+  const [healthNews, setHealthNews] = useState<Post[]>([]);
+  const [healthNewsLoading, setHealthNewsLoading] = useState(false);
+  const [healthSubTab, setHealthSubTab] = useState<'news' | 'docs'>('news');
+  const [healthDocs, setHealthDocs] = useState<HealthDoc[]>([]);
+  const [healthDocsLoading, setHealthDocsLoading] = useState(true);
+  const [healthDocSearch, setHealthDocSearch] = useState('');
+  const [healthDocTypeFilter, setHealthDocTypeFilter] = useState('all');
 
   // Filtering & Pagination State
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'views' | 'likes'>('newest');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = portalSource === 'vnexpress' ? 12 : 6;
+  const itemsPerPage = portalSource === 'internal' ? 6 : 12;
 
   // Selected Post for Expansion/Reader mode
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -179,7 +206,10 @@ export default function PortalPage() {
       const targetUrl = selectedPost.link || '';
       if (targetUrl) {
         fetch(`/api/scrape-article?url=${encodeURIComponent(targetUrl)}`)
-          .then(res => res.json())
+          .then(res => {
+            if (!res.ok) throw new Error('API request failed');
+            return res.json();
+          })
           .then(data => {
             if (data.success && data.paragraphs && data.paragraphs.length > 0) {
               setScrapedContent({
@@ -225,6 +255,11 @@ export default function PortalPage() {
   const [formBgValue, setFormBgValue] = useState('deep-slate'); // preset ID or direct image URL
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
     const q = query(collection(db, 'portal_posts'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       const list: Post[] = [];
@@ -243,6 +278,11 @@ export default function PortalPage() {
 
   // Fetch VnExpress news when source is vnexpress or vnExpressCategory changes
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setVnExpressNews([]);
+      setVnExpressLoading(false);
+      return;
+    }
     if (portalSource === 'vnexpress') {
       const fetchVnNews = async () => {
         setVnExpressLoading(true);
@@ -288,6 +328,87 @@ export default function PortalPage() {
     }
   }, [portalSource, vnExpressCategory]);
 
+  // Fetch Health news when source is health
+  useEffect(() => {
+    if (userData?.role === 'review') {
+      setHealthNews([]);
+      setHealthNewsLoading(false);
+      return;
+    }
+    if (portalSource === 'health') {
+      const fetchHealthNews = async () => {
+        setHealthNewsLoading(true);
+        try {
+          const res = await fetch(`/api/vnexpress-news?category=suc-khoe`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.items) {
+              const formatted: Post[] = data.items.map((item: any, idx: number) => ({
+                id: item.link || `vne-health-${idx}`,
+                title: item.title,
+                summary: item.summary,
+                content: item.summary,
+                category: 'suc-khoe',
+                background: item.image || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+                views: Math.floor(Math.random() * 800) + 100,
+                shares: Math.floor(Math.random() * 50) + 5,
+                likes: Math.floor(Math.random() * 120) + 20,
+                likedBy: [],
+                authorId: 'vnexpress',
+                authorName: 'VnExpress Y Tế',
+                createdAt: item.pubDate ? new Date(item.pubDate).getTime() : Date.now() - (idx * 300000),
+                isVnExpress: true,
+                link: item.link,
+                pubDate: item.pubDate
+              }));
+              setHealthNews(formatted);
+            }
+          }
+        } catch (e) {
+          console.error("Health news fetch error:", e);
+        } finally {
+          setHealthNewsLoading(false);
+        }
+      };
+
+      fetchHealthNews();
+    }
+  }, [portalSource]);
+
+  // Health docs real-time fetched from MOH
+  useEffect(() => {
+    if (userData?.role === 'review') {
+      setHealthDocs([]);
+      setHealthDocsLoading(false);
+      return;
+    }
+    const fetchHealthDocs = async () => {
+      setHealthDocsLoading(true);
+      try {
+        const response = await fetch('/api/health-docs');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new TypeError("Oops, we haven't got JSON!");
+        }
+        const data = await response.json();
+        if (data.success) {
+          setHealthDocs(data.items || []);
+        } else {
+          setHealthDocs([]);
+        }
+      } catch (e) {
+        console.error("Error fetching health docs:", e);
+        setHealthDocs([]);
+      } finally {
+        setHealthDocsLoading(false);
+      }
+    };
+    fetchHealthDocs();
+  }, [portalSource]);
+
   // Sync expanded post details modal if post updates live
   useEffect(() => {
     if (!selectedPost) return;
@@ -296,6 +417,18 @@ export default function PortalPage() {
       setSelectedPost(currentLivePost);
     }
   }, [posts, selectedPost?.id]);
+
+  // On query params check for single post linking (deeplinking)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const linkedPostId = urlParams.get('post');
+    if (linkedPostId && posts.length > 0) {
+      const matched = posts.find((p) => p.id === linkedPostId);
+      if (matched) {
+        setSelectedPost(matched);
+      }
+    }
+  }, [posts]);
 
   // Open creation modal
   const handleOpenCreateModal = () => {
@@ -400,6 +533,10 @@ export default function PortalPage() {
   // Handle Like Post toggle
   const handleToggleLike = async (post: Post, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (userData?.role === 'review') {
+      toast.error("Tài khoản Review không thể thực hiện thao tác này.");
+      return;
+    }
     if (!user) {
       toast.error("Vui lòng đăng nhập để like bài viết!");
       return;
@@ -437,6 +574,8 @@ export default function PortalPage() {
       await navigator.clipboard.writeText(shareUrl);
       toast.success("Đã sao chép link chia sẻ bài viết vào bộ nhớ tạm!");
       
+      if (userData?.role === 'review') return;
+
       // Update DB counter
       await updateDoc(doc(db, 'portal_posts', post.id), {
         shares: (post.shares || 0) + 1
@@ -449,6 +588,7 @@ export default function PortalPage() {
   // View post detailed details (increments views counter)
   const handleOpenReader = async (post: Post) => {
     setSelectedPost(post);
+    if (userData?.role === 'review') return;
     // Silent increment for views count in DB
     try {
       await updateDoc(doc(db, 'portal_posts', post.id), {
@@ -562,7 +702,7 @@ export default function PortalPage() {
             Quay lại danh sách bản tin
           </button>
 
-          {!isSelectedVnExpress && isAdmin && (
+          {!isSelectedVnExpress && isAdminUser && (
             <div className="flex items-center gap-2">
               <button
                 onClick={(e) => handleOpenEditModal(selectedPost, e)}
@@ -792,6 +932,7 @@ export default function PortalPage() {
   }
 
   const isVnExpress = portalSource === 'vnexpress';
+  const isHealth = portalSource === 'health';
 
   // Filters the complete list based on active source choice
   const filteredPosts = isVnExpress
@@ -801,24 +942,31 @@ export default function PortalPage() {
           post.summary.toLowerCase().includes(searchQuery.toLowerCase());
         return matchSearch;
       })
-    : posts
-        .filter((post) => {
-          const matchCat = activeCategory === 'all' || post.category === activeCategory;
+    : isHealth
+      ? healthNews.filter((post) => {
           const matchSearch = 
             post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            post.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            post.content.toLowerCase().includes(searchQuery.toLowerCase());
-          return matchCat && matchSearch;
+            post.summary.toLowerCase().includes(searchQuery.toLowerCase());
+          return matchSearch;
         })
-        .sort((a, b) => {
-          if (sortBy === 'views') {
-            return (b.views || 0) - (a.views || 0);
-          }
-          if (sortBy === 'likes') {
-            return (b.likes || 0) - (a.likes || 0);
-          }
-          return b.createdAt - a.createdAt; // newest default
-        });
+      : posts
+          .filter((post) => {
+            const matchCat = activeCategory === 'all' || post.category === activeCategory;
+            const matchSearch = 
+              post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              post.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              post.content.toLowerCase().includes(searchQuery.toLowerCase());
+            return matchCat && matchSearch;
+          })
+          .sort((a, b) => {
+            if (sortBy === 'views') {
+              return (b.views || 0) - (a.views || 0);
+            }
+            if (sortBy === 'likes') {
+              return (b.likes || 0) - (a.likes || 0);
+            }
+            return b.createdAt - a.createdAt; // newest default
+          });
 
   // Paginated Posts
   const totalPages = Math.ceil(filteredPosts.length / itemsPerPage) || 1;
@@ -827,7 +975,11 @@ export default function PortalPage() {
     currentPage * itemsPerPage
   );
 
-  const listLoading = isVnExpress ? vnExpressLoading : loading;
+  const listLoading = isVnExpress 
+    ? vnExpressLoading 
+    : isHealth 
+      ? healthNewsLoading 
+      : loading;
 
   return (
     <div className="max-w-[1600px] mx-auto py-6 px-4 md:px-8 space-y-10 animate-fadeIn no-scrollbar">
@@ -852,7 +1004,7 @@ export default function PortalPage() {
           </p>
         </div>
 
-        {!isVnExpress && isAdmin && (
+        {!isVnExpress && isAdminUser && (
           <div className="flex flex-wrap items-center gap-3 z-10 shrink-0">
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -906,6 +1058,20 @@ export default function PortalPage() {
           <Globe className="w-3.5 h-3.5 text-rose-500" />
           Tin tức VnExpress
         </button>
+        <button
+          onClick={() => {
+            setPortalSource('health');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            portalSource === 'health'
+              ? 'bg-white dark:bg-zinc-900 text-teal-650 dark:text-white shadow-md border-b-2 border-teal-500'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+          }`}
+        >
+          <Heart className="w-3.5 h-3.5 text-rose-500 animate-pulse fill-rose-500/20" />
+          Thông tin Y tế
+        </button>
       </div>
 
       {/* Layout / View Mode Choice Selection */}
@@ -950,7 +1116,113 @@ export default function PortalPage() {
       </div>
 
       {/* Control Panel: Filters, Search, Sort */}
-      {portalSource === 'vnexpress' ? (
+      {portalSource === 'health' ? (
+        <div className="bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm animate-fadeIn">
+          {/* Authentic Health sub-navigation bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-zinc-900/10 border-b border-slate-150 dark:border-white/5 gap-4">
+            <div className="flex bg-slate-200/60 dark:bg-zinc-800 p-1 rounded-xl w-fit">
+              <button
+                onClick={() => {
+                  setHealthSubTab('news');
+                  setCurrentPage(1);
+                  setSearchQuery('');
+                }}
+                className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  healthSubTab === 'news'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                📰 Tin tức Y tế Sức khỏe
+              </button>
+              <button
+                onClick={() => {
+                  setHealthSubTab('docs');
+                  setCurrentPage(1);
+                  setSearchQuery('');
+                }}
+                className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  healthSubTab === 'docs'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                📋 Văn bản pháp quy Y tế
+              </button>
+            </div>
+
+            {/* Admin or testing quick action button to add custom documents removed to comply with "Lấy từ Bộ Y tế, không phải tự đăng tải" */}
+            {healthSubTab === 'docs' && null}
+          </div>
+
+          {/* Render inputs based on whether they read news or docs */}
+          {healthSubTab === 'news' ? (
+            <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-xs text-slate-500 dark:text-zinc-400 font-sans font-medium">
+                Cập nhật toàn bộ tin tức bằng <strong className="text-teal-600 dark:text-teal-400 font-sans font-extrabold">API VnExpress Health</strong> tự động tức thời theo phút:
+              </span>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm nhanh tin tức y tế..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-100/60 dark:bg-zinc-900 border border-slate-250 dark:border-white/10 rounded-xl text-xs text-slate-850 dark:text-zinc-200 placeholder-slate-405 focus:outline-none focus:border-teal-500"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 bg-teal-500/5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mr-1">Phân loại văn bản:</span>
+                {['all', 'Thông tư', 'Quyết định', 'Chỉ thị', 'Hướng dẫn'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setHealthDocTypeFilter(type)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      healthDocTypeFilter === type
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-850'
+                    }`}
+                  >
+                    {type === 'all' ? 'Tất cả' : type}
+                  </button>
+                ))}
+              </div>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Tra số hiệu hoặc trích yếu..."
+                  value={healthDocSearch}
+                  onChange={(e) => setHealthDocSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-100/60 dark:bg-zinc-900 border border-slate-250 dark:border-white/10 rounded-xl text-xs text-slate-850 dark:text-zinc-200 placeholder-slate-405 focus:outline-none focus:border-teal-500"
+                />
+                {healthDocSearch && (
+                  <button 
+                    onClick={() => setHealthDocSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : portalSource === 'vnexpress' ? (
         <div className="bg-white dark:bg-zinc-950 border border-slate-200/80 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm animate-fadeIn">
           {/* Authentic newspaper header bar */}
           <div className="hidden md:flex items-center justify-between px-6 py-2.5 bg-slate-50/50 dark:bg-zinc-900/10 border-b border-slate-100 dark:border-white/5 text-xs text-slate-500 dark:text-zinc-400 font-sans">
@@ -1084,7 +1356,114 @@ export default function PortalPage() {
       )}
 
       {/* Main Grid display listing posts with custom background and category */}
-      {listLoading ? (
+      {portalSource === 'health' && healthSubTab === 'docs' ? (
+        <div className="space-y-6 animate-fadeIn">
+          {healthDocsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="h-56 bg-slate-100 dark:bg-zinc-900 rounded-3xl animate-pulse border border-slate-200 dark:border-white/5" />
+              ))}
+            </div>
+          ) : healthDocs.filter((docItem) => {
+              const matchType = healthDocTypeFilter === 'all' || docItem.docType === healthDocTypeFilter;
+              const matchSearch = 
+                docItem.docNumber.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                docItem.title.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                docItem.issuer.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                docItem.summary.toLowerCase().includes(healthDocSearch.toLowerCase());
+              return matchType && matchSearch;
+            }).length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-20 bg-slate-50 dark:bg-zinc-950/20 border border-dashed border-slate-200/55 dark:border-white/5 rounded-3xl space-y-3.5">
+              <HelpCircle className="w-12 h-12 text-slate-300 dark:text-zinc-700 animate-bounce" />
+              <p className="text-sm font-medium text-slate-500 dark:text-zinc-400">Không có</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {healthDocs
+                .filter((docItem) => {
+                  const matchType = healthDocTypeFilter === 'all' || docItem.docType === healthDocTypeFilter;
+                  const matchSearch = 
+                    docItem.docNumber.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                    docItem.title.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                    docItem.issuer.toLowerCase().includes(healthDocSearch.toLowerCase()) ||
+                    docItem.summary.toLowerCase().includes(healthDocSearch.toLowerCase());
+                  return matchType && matchSearch;
+                })
+                .map((docItem) => {
+                  const badgeColors: Record<string, string> = {
+                    'Thông tư': 'text-purple-600 bg-purple-100 dark:text-purple-300 dark:bg-purple-900/35 border-purple-200/50',
+                    'Quyết định': 'text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/35 border-amber-200/50',
+                    'Chỉ thị': 'text-rose-600 bg-rose-100 dark:text-rose-300 dark:bg-rose-900/35 border-rose-200/50',
+                    'Hướng dẫn': 'text-emerald-600 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/35 border-emerald-200/50',
+                  };
+                  const docBadge = badgeColors[docItem.docType] || 'text-slate-600 bg-slate-100 dark:text-zinc-300 dark:bg-zinc-900/30';
+
+                  return (
+                    <motion.div
+                      key={docItem.id}
+                      whileHover={{ scale: 1.01, y: -2 }}
+                      className="p-6 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/5 rounded-3xl shadow-sm text-left flex flex-col justify-between gap-5 transition-all relative overflow-hidden"
+                    >
+                      <div className="space-y-4">
+                        {/* Top metadata strip */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider uppercase border ${docBadge}`}>
+                            {docItem.docType}
+                          </span>
+                          <span className="font-mono text-xs font-bold text-slate-705 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-900 px-2.5 py-1 rounded-lg">
+                            {docItem.docNumber}
+                          </span>
+                        </div>
+
+                        {/* Header and Title */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest font-sans">
+                            <span>Ban hành:</span>
+                            <span className="text-slate-700 dark:text-zinc-300 font-extrabold">{docItem.issuer}</span>
+                            <span>•</span>
+                            <span>Ngày: {new Date(docItem.issuedDate).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                          <h3 className="font-serif font-black text-base md:text-lg text-slate-900 dark:text-white leading-tight line-clamp-2 hover:line-clamp-none transition-all duration-300">
+                            {docItem.title}
+                          </h3>
+                        </div>
+
+                        {/* Content summary */}
+                        <p className="text-xs text-slate-600 dark:text-zinc-400 line-clamp-3 leading-relaxed">
+                          {docItem.summary}
+                        </p>
+                      </div>
+
+                      {/* Bottom strip details */}
+                      <div className="pt-4 border-t border-slate-150 dark:border-white/5 flex items-center justify-between gap-3 text-[10px] text-slate-450 dark:text-zinc-500">
+                        <div className="space-y-0.5">
+                          <div>Người ký: <strong className="text-slate-750 dark:text-zinc-300">{docItem.signer}</strong></div>
+                          <div>Cập nhật: <span className="font-medium text-slate-600 dark:text-zinc-400">{docItem.userName}</span></div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {/* Download link button */}
+                          <a
+                            href={docItem.pdfUrl || "https://moh.gov.vn"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/20 dark:text-teal-400 font-bold rounded-xl tracking-wider uppercase transition-all duration-300 flex items-center gap-1 cursor-pointer hover:scale-103"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Xem/Tải</span>
+                          </a>
+
+                    {/* Delete action button removed - not applicable to MOH-fetched data */}
+                    {null}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      ) : listLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((n) => (
             <div key={n} className="h-85 bg-slate-100 dark:bg-zinc-900 rounded-3xl animate-pulse border border-slate-200 dark:border-white/5" />
@@ -1750,7 +2129,7 @@ export default function PortalPage() {
                           </span>
                           
                           {/* Admin management buttons */}
-                          {!isVn && isAdmin && (
+                          {!isVn && isAdminUser && (
                             <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                               <button
                                 onClick={(e) => handleOpenEditModal(post, e)}

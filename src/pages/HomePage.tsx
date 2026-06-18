@@ -1,4 +1,4 @@
-import { ArrowRight, ShieldCheck, Zap, Globe, Code, ArrowUpRight, Activity, TerminalSquare, Box, Star, Blocks, Cpu } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, Globe, Code, ArrowUpRight, Activity, TerminalSquare, Box, Star, Blocks, Cpu, Users } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot, collection } from 'firebase/firestore';
@@ -43,6 +43,11 @@ export default function HomePage() {
   const { stampConfig, webLogo } = useAppStore();
   const [siteStats, setSiteStats] = useState({ today: 0, month: 0, year: 0, total: 0 });
   const [partners, setPartners] = useState<{ id: string, name: string, logoUrl: string }[]>([]);
+  const [popStats, setPopStats] = useState({ 
+    total: 0, male: 0, female: 0,
+    over18: 0, over20: 0, over40: 0, over50: 0,
+    range50_69: 0
+  });
   const [aboutConfig, setAboutConfig] = useState<any>({
     introTitle: 'Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
@@ -53,6 +58,12 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchAbout = async () => {
+      if (useAuthStore.getState().userData?.role === 'review') {
+        setAboutConfig({
+          introTitle: '', introDesc: '', adminName: '', adminBio: '', adminPhoto: '', webLogo: ''
+        });
+        return;
+      }
       try {
         const snap = await getDoc(doc(db, 'settings', 'about'));
         if (snap.exists()) {
@@ -63,6 +74,13 @@ export default function HomePage() {
       }
     };
     fetchAbout();
+
+    if (useAuthStore.getState().userData?.role === 'review') {
+      setSiteStats({ today: 0, month: 0, year: 0, total: 0 });
+      setPopStats({ total: 0, male: 0, female: 0, over18: 0, over20: 0, over40: 0, over50: 0, range50_69: 0 });
+      setPartners([]);
+      return;
+    }
 
     // Stats fetching
     const now = new Date();
@@ -86,6 +104,30 @@ export default function HomePage() {
       console.error("HomePage stats listener error:", err?.message || "Unknown error");
     });
 
+    // Population Stats listener
+    const unsubPop = onSnapshot(collection(db, 'hrm_population'), (snapshot) => {
+      const totals = snapshot.docs.reduce((acc, doc) => {
+        const data = doc.data();
+        const male = Number(data.maleCount || 0);
+        const female = Number(data.femaleCount || 0);
+        const count = male + female;
+        const from = Number(data.fromAge || 0);
+        const to = Number(data.toAge || 0);
+
+        return {
+          male: acc.male + male,
+          female: acc.female + female,
+          total: acc.total + count,
+          over18: acc.over18 + (from >= 18 ? count : 0),
+          over20: acc.over20 + (from >= 20 ? count : 0),
+          over40: acc.over40 + (from >= 40 ? count : 0),
+          over50: acc.over50 + (from >= 50 ? count : 0),
+          range50_69: acc.range50_69 + (from >= 50 && to <= 69 ? count : 0)
+        };
+      }, { male: 0, female: 0, total: 0, over18: 0, over20: 0, over40: 0, over50: 0, range50_69: 0 });
+      setPopStats(totals);
+    });
+
     const unsubPartners = onSnapshot(collection(db, 'partners'), (snapshot) => {
       setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
     }, (error) => {
@@ -94,6 +136,7 @@ export default function HomePage() {
 
     return () => {
       unsubStats();
+      unsubPop();
       unsubPartners();
     };
   }, [user]);
@@ -135,10 +178,10 @@ export default function HomePage() {
              <div className="flex items-center justify-center lg:justify-start gap-4 pt-4">
                {user ? (
                  <button 
-                  onClick={() => navigate('/portal')}
+                  onClick={() => navigate('/utilities')}
                   className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-bold tracking-wider uppercase transition-all shadow-xl shadow-indigo-500/20 active:scale-95 flex items-center gap-2"
                  >
-                   Vào Core Portal
+                   Truy cập ngay (vào tiện ích)
                    <ArrowRight className="w-4 h-4" />
                  </button>
                ) : (
@@ -152,7 +195,7 @@ export default function HomePage() {
                )}
                <button 
                  onClick={() => navigate('/utilities')}
-                 className="px-8 py-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-2xl text-sm font-bold tracking-wider uppercase transition-all active:scale-95 flex items-center gap-2"
+                 className="hidden px-8 py-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-2xl text-sm font-bold tracking-wider uppercase transition-all active:scale-95 flex items-center gap-2"
                >
                  Khám phá Tiện ích
                  <Box className="w-4 h-4" />
@@ -178,20 +221,97 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="col-span-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 shadow-xl flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
+              <div className="col-span-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 shadow-xl flex flex-col justify-between h-32 md:h-40">
+                <div className="flex justify-between items-start mb-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hôm nay</span>
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
-                <Counter value={siteStats.today} className="text-3xl font-black text-slate-900 dark:text-white" />
+                <div>
+                   <Counter value={siteStats.today} className="text-3xl font-black text-slate-900 dark:text-white block" />
+                   <span className="text-[9px] text-slate-400 font-medium">Session events</span>
+                </div>
               </div>
 
-              <div className="col-span-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 shadow-xl flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
+              <div className="col-span-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/50 dark:border-white/5 shadow-xl flex flex-col justify-between h-32 md:h-40">
+                <div className="flex justify-between items-start mb-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tháng này</span>
                   <Activity className="w-3.5 h-3.5 text-indigo-500" />
                 </div>
-                <Counter value={siteStats.month} className="text-3xl font-black text-slate-900 dark:text-white" />
+                <div>
+                   <Counter value={siteStats.month} className="text-3xl font-black text-slate-900 dark:text-white block" />
+                   <span className="text-[9px] text-slate-400 font-medium">Network growth</span>
+                </div>
+              </div>
+
+              {/* Population Stat Card */}
+              <div className="col-span-2 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-md rounded-3xl p-6 border border-slate-200/50 dark:border-white/5 shadow-xl group hover:border-indigo-500/20 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng dân số Phường</p>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">Thống kê dân cư</h4>
+                    </div>
+                  </div>
+                  <Link 
+                    to="/dan-so"
+                    className="p-2 bg-slate-100 dark:bg-zinc-800 rounded-xl text-slate-400 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 pt-2">
+                   <div className="space-y-1">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Toàn phường</span>
+                      <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                        <Counter value={popStats.total} />
+                      </p>
+                   </div>
+                   <div className="space-y-1">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Nam</span>
+                      <p className="text-xl font-bold text-slate-700 dark:text-zinc-300">
+                        <Counter value={popStats.male} />
+                      </p>
+                   </div>
+                   <div className="space-y-1">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Nữ</span>
+                      <p className="text-xl font-bold text-slate-700 dark:text-zinc-300">
+                        <Counter value={popStats.female} />
+                      </p>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">18 tuổi trở lên</span>
+                      <p className="text-lg font-bold text-slate-800 dark:text-zinc-200">
+                        <Counter value={popStats.over18} />
+                      </p>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">20 tuổi trở lên</span>
+                      <p className="text-lg font-bold text-slate-800 dark:text-zinc-200">
+                        <Counter value={popStats.over20} />
+                      </p>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">40 tuổi trở lên</span>
+                      <p className="text-lg font-bold text-slate-800 dark:text-zinc-200">
+                        <Counter value={popStats.over40} />
+                      </p>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">50 tuổi trở lên</span>
+                      <p className="text-lg font-bold text-slate-800 dark:text-zinc-200">
+                        <Counter value={popStats.over50} />
+                      </p>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5 col-span-2">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">50 tuổi đến 69</span>
+                      <p className="text-lg font-bold text-indigo-500">
+                        <Counter value={popStats.range50_69} />
+                      </p>
+                   </div>
+                </div>
               </div>
            </div>
 

@@ -310,6 +310,8 @@ export default function UtilitiesPage() {
   const navigate = useNavigate();
   const [utilities, setUtilities] = useState<UtilityItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'pdf' | 'ai-creative' | 'system-community'>('all');
+  const [sortOrder, setSortOrder] = useState<'default' | 'popular' | 'alphabetical' | 'newest'>('default');
   const [loading, setLoading] = useState(true);
   const [activeUtility, setActiveUtility] = useState<UtilityItem | null>(null);
   const [systemTools, setSystemTools] = useState<any>({});
@@ -376,6 +378,11 @@ export default function UtilitiesPage() {
   };
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilityStats({});
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'utility_stats'), (snapshot) => {
       const stats: { [key: string]: number } = {};
       snapshot.forEach((doc) => {
@@ -402,6 +409,11 @@ export default function UtilitiesPage() {
   }, []);
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilities([]);
+      setRealUsers([]);
+      return;
+    }
     const q = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const dbUtils = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityItem));
@@ -423,8 +435,9 @@ export default function UtilitiesPage() {
       // Filter out ONLY embedded tools from DB (ones that ARE NOT native tool overrides)
       const embeddedTools = dbUtils.filter(dbu => !nativeUtilities.some(nu => nu.id === dbu.id));
       
-      // Combined list: Overridden natives first, then embedded tools
-      setUtilities([...overriddenNative, ...embeddedTools]);
+      // Combined list: Overridden natives first, then embedded tools, filtering out 'document-templates'
+      const combined = [...overriddenNative, ...embeddedTools].filter(item => item.id !== 'document-templates');
+      setUtilities(combined);
       setLoading(false);
     }, (err) => {
       console.error("UtilitiesPage utilities listener error:", err?.message || String(err));
@@ -452,6 +465,17 @@ export default function UtilitiesPage() {
 
   const { maintenanceTabs } = useAppStore();
 
+  const getUtilityCategory = (item: UtilityItem) => {
+    const id = item.id;
+    if (['image-to-pdf', 'pdf-to-word', 'pdf-merger', 'pdf-splitter'].includes(id)) {
+      return 'pdf';
+    }
+    if (['ai-scanner', 'text-to-speech', 'avatar-frame'].includes(id)) {
+      return 'ai-creative';
+    }
+    return 'system-community';
+  };
+
   const allItems = utilities.filter(item => {
     const config = systemTools[item.id];
     const isInternal = config?.internal || (item as any).internalOnly;
@@ -462,6 +486,11 @@ export default function UtilitiesPage() {
   });
 
   const filteredItems = allItems.filter(item => {
+    if (selectedCategory !== 'all') {
+      const cat = getUtilityCategory(item);
+      if (cat !== selectedCategory) return false;
+    }
+    
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -469,6 +498,23 @@ export default function UtilitiesPage() {
       (item.description || '').toLowerCase().includes(q)
     );
   });
+
+  const sortedItems = React.useMemo(() => {
+    const items = [...filteredItems];
+    if (sortOrder === 'default') {
+      return items;
+    }
+    if (sortOrder === 'popular') {
+      return items.sort((a, b) => (utilityStats[b.id] || 0) - (utilityStats[a.id] || 0));
+    }
+    if (sortOrder === 'alphabetical') {
+      return items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'vi'));
+    }
+    if (sortOrder === 'newest') {
+      return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+    return items;
+  }, [filteredItems, sortOrder, utilityStats]);
 
   const topHotIds = React.useMemo(() => {
     return allItems
@@ -638,8 +684,9 @@ export default function UtilitiesPage() {
             </div>
           </div>
 
-          {/* Utility Search Bar */}
-          <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-200/50 dark:border-white/[0.02]">
+          {/* Utility Controls Bar */}
+          <div className="pt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-t border-slate-200/50 dark:border-white/[0.02]">
+            {/* Search Input */}
             <div className="relative max-w-md w-full bg-slate-50 dark:bg-black/20 border border-slate-250 dark:border-white/5 rounded-2xl flex items-center shadow-sm hover:shadow focus-within:ring-2 focus-within:ring-indigo-500/20 transition duration-300">
               <div className="pl-4 text-slate-400 dark:text-zinc-500 shrink-0">
                 <Search className="w-4 h-4" />
@@ -655,54 +702,127 @@ export default function UtilitiesPage() {
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 p-1 rounded-full hover:bg-slate-105 text-slate-450 hover:text-slate-600 dark:hover:text-white transition-colors"
+                  className="absolute right-3 p-1 rounded-full hover:bg-slate-100 text-slate-450 hover:text-slate-650 dark:hover:text-white transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {searchQuery && (
-              <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 bg-slate-100/50 dark:bg-white/[0.02] px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 flex items-center gap-1.5 animate-in fade-in">
-                Tìm thấy <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{filteredItems.length}</strong> kết quả phù hợp
-              </span>
-            )}
-          </div>
-        </header>
+            {/* Premium Category Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/70 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('all')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'all'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Tất cả ({totalTools})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('pdf')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'pdf'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Xử lý PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('ai-creative')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'ai-creative'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Sáng tạo & AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('system-community')}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider cursor-pointer",
+                  selectedCategory === 'system-community'
+                    ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                    : "text-slate-550 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white"
+                )}
+              >
+                Hệ thống & Bản đồ
+              </button>
+            </div>
 
-        <section>
-          <div>
-            {filteredItems.length === 0 ? (
-              <div className="text-center py-20 bg-slate-50/50 dark:bg-black/15 rounded-[2rem] border border-dashed border-slate-250 dark:border-white/5 p-8 max-w-md mx-auto animate-in fade-in zoom-in-95">
-                <Box className="w-12 h-12 text-slate-350 dark:text-zinc-750 mx-auto stroke-1 mb-3" />
-                <p className="text-sm font-bold text-slate-700 dark:text-zinc-450">Không tìm thấy tiện ích nào khớp</p>
-                <p className="text-xs text-slate-450 dark:text-zinc-550 mt-1 px-4 leading-relaxed">Hệ thống không tìm thấy công cụ nào trùng khớp với từ khóa "{searchQuery}" của bạn.</p>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition shadow-sm"
-                >
-                  Đặt lại bộ lọc
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
-                {filteredItems.map((item, idx) => (
-                  <UtilityCard 
-                    key={item.id} 
-                    item={item} 
-                    idx={idx} 
-                    onSelect={handleSelect} 
-                    systemTools={systemTools} 
-                    visits={utilityStats[item.id] || 0}
-                    realUsers={realUsers}
-                    isHot={topHotIds.includes(item.id)}
-                  />
-                ))}
-              </div>
-            )}
+            {/* Sorting Dropdown Select */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sắp xếp:</span>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+                className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-zinc-200 px-3 py-2.5 rounded-2xl shadow-sm focus:outline-none cursor-pointer hover:border-slate-300 dark:hover:border-white/20 transition-all"
+              >
+                <option value="default">Mặc định hệ thống</option>
+                <option value="popular font-bold">Lượt truy cập (Phổ biến nhất)</option>
+                <option value="alphabetical">Tên tiện ích (A-Z)</option>
+                <option value="newest">Mới cập nhật</option>
+              </select>
+            </div>
           </div>
-        </section>
+
+          {searchQuery && (
+            <div className="flex justify-start pt-1">
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 bg-slate-100/50 dark:bg-white/[0.02] px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 flex items-center gap-1.5 animate-in fade-in">
+                Tìm thấy <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{sortedItems.length}</strong> kết quả phù hợp
+              </span>
+            </div>
+          )}
+        </header>
+ 
+         <section>
+           <div>
+             {sortedItems.length === 0 ? (
+               <div className="text-center py-20 bg-slate-50/50 dark:bg-black/15 rounded-[2rem] border border-dashed border-slate-250 dark:border-white/5 p-8 max-w-md mx-auto animate-in fade-in zoom-in-95">
+                 <Box className="w-12 h-12 text-slate-350 dark:text-zinc-750 mx-auto stroke-1 mb-3" />
+                 <p className="text-sm font-bold text-slate-700 dark:text-zinc-450">Không tìm thấy tiện ích nào khớp</p>
+                 <p className="text-xs text-slate-450 dark:text-zinc-550 mt-1 px-4 leading-relaxed">Hệ thống không tìm thấy công cụ nào trùng khớp với các tiêu chí tìm kiếm hoặc phân loại của bạn.</p>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     setSearchQuery('');
+                     setSelectedCategory('all');
+                     setSortOrder('default');
+                   }}
+                   className="mt-6 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition shadow-sm cursor-pointer"
+                 >
+                   Cài đặt lại toàn bộ bộ lọc
+                 </button>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 lg:gap-8">
+                 {sortedItems.map((item, idx) => (
+                   <UtilityCard 
+                     key={item.id} 
+                     item={item} 
+                     idx={idx} 
+                     onSelect={handleSelect} 
+                     systemTools={systemTools} 
+                     visits={utilityStats[item.id] || 0}
+                     realUsers={realUsers}
+                     isHot={topHotIds.includes(item.id)}
+                   />
+                 ))}
+               </div>
+             )}
+           </div>
+         </section>
       </div>
 
       <PaymentDialog 

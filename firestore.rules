@@ -8,7 +8,7 @@ service cloud.firestore {
       return isSignedIn() && ('email' in request.auth.token) && request.auth.token.email in ['sonlyhongduc@gmail.com', 'sonlyhongduc1@ghn.vn'];
     }
     function isWriteAdmin() {
-      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin']);
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in ['admin', 'superadmin', 'review']);
     }
     function isAdmin() {
       return isWriteAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'review');
@@ -208,12 +208,12 @@ service cloud.firestore {
       allow create, delete: if isWriteAdmin();
       allow update: if isWriteAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
     }
-    match /hrm_employees/{empId} {
-      allow read: if isAdmin();
-      allow write: if isWriteAdmin();
+    match /contacts/{contactId} {
+      allow get, list: if true;
+      allow create, update, delete: if isWriteAdmin();
     }
-    match /hrm_collaborators/{collabId} {
-      allow read: if isAdmin();
+    match /hrm_population/{popId} {
+      allow read: if true;
       allow write: if isWriteAdmin();
     }
     match /activityLogs/{logId} {

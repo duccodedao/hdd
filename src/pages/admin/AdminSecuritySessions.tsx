@@ -65,6 +65,13 @@ export default function AdminSecuritySessions() {
   const [customBlockReason, setCustomBlockReason] = useState('Đăng xuất từ xa / Chặn từ bảo mật quản lý thiết bị');
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setSessions([]);
+      setGuests([]);
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     let loadedCount = 0;
     const checkAllLoaded = () => {

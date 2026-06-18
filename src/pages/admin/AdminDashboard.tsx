@@ -4,7 +4,7 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setD
 import { initializeApp, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, firebaseConfig } from '../../lib/firebase';
-import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, Copy, X, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag } from 'lucide-react';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, Copy, X, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag, FileSpreadsheet } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -23,6 +23,7 @@ import AdminPartners from './AdminPartners';
 import AdminOverview from './AdminOverview';
 import AdminAiTools from './AdminAiTools';
 import AdminSecuritySessions from './AdminSecuritySessions';
+import AdminAffiliate from './AdminAffiliate';
 import { useConfirmStore } from '../../store/confirmStore';
 import { useAudioStore } from '../../store/audioStore';
 import { githubService } from '../../services/githubService';
@@ -42,7 +43,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [userFilter, setUserFilter] = useState<'all' | 'review'>('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'affiliate'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);
@@ -57,6 +58,7 @@ export default function AdminDashboard() {
   const [aboutConfig, setAboutConfig] = useState({
     introTitle: 'Hệ thống - Nền tảng công nghệ toàn diện',
     introDesc: 'Trải nghiệm không gian công nghệ số hiện đại. Tích hợp các công cụ quản lý và tiện ích thông minh, mang đến trải nghiệm tinh tế cho người dùng.',
+    heroBanner: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop',
     adminName: 'Quản trị viên',
     adminBio: 'Đam mê phát triển các nền tảng số hiện đại. Tập trung xây dựng giải pháp tối ưu và trải nghiệm người dùng tinh tế thông qua công nghệ.',
     adminPhoto: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
@@ -142,6 +144,8 @@ export default function AdminDashboard() {
   });
 
   const [audioUploading, setAudioUploading] = useState(false);
+  const [isUploadingWebLogo, setIsUploadingWebLogo] = useState(false);
+  const [isUploadingHeroBanner, setIsUploadingHeroBanner] = useState(false);
   const [isUploadingStamp, setIsUploadingStamp] = useState(false);
   const [isUploadingMaintenanceStamp, setIsUploadingMaintenanceStamp] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
@@ -172,8 +176,164 @@ export default function AdminDashboard() {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [systemTools, setSystemTools] = useState<any>({});
 
+  const [selectedAppIds, setSelectedAppIds] = useState<string[]>([]);
+  const [selectedUserUids, setSelectedUserUids] = useState<string[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [isImportingUsers, setIsImportingUsers] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const toggleSelectApp = (id: string) => {
+    setSelectedAppIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllApps = () => {
+    if (selectedAppIds.length === adminApps.length) {
+      setSelectedAppIds([]);
+    } else {
+      setSelectedAppIds(adminApps.map(a => a.id));
+    }
+  };
+
+  const handleBulkDeleteApps = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt ứng dụng',
+      message: `Bạn có chắc chắn muốn xóa ${selectedAppIds.length} ứng dụng đã chọn? Thao tác này không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedAppIds.forEach(id => {
+            batch.delete(doc(db, 'apps', id));
+          });
+          await batch.commit();
+          setSelectedAppIds([]);
+          toast.success('Đã xóa các ứng dụng được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt ứng dụng');
+        }
+      }
+    });
+  };
+
+  const toggleSelectUser = (uid: string) => {
+    setSelectedUserUids(prev => prev.includes(uid) ? prev.filter(i => i !== uid) : [...prev, uid]);
+  };
+
+  const toggleSelectAllUsers = () => {
+    const filteredUsers = userFilter === 'all' ? users : users.filter(u => u.role === 'review');
+    if (selectedUserUids.length === filteredUsers.length) {
+      setSelectedUserUids([]);
+    } else {
+      setSelectedUserUids(filteredUsers.map(u => u.uid));
+    }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    if (!isSuperAdmin) {
+      toast.error('Bạn không có quyền thực hiện hành động này');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt người dùng',
+      message: `Bạn có chắc chắn muốn xóa ${selectedUserUids.length} người dùng đã chọn? Thao tác này sẽ xóa vĩnh viễn dữ liệu người dùng khỏi Database.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedUserUids.forEach(uid => {
+            batch.delete(doc(db, 'users', uid));
+          });
+          await batch.commit();
+          setSelectedUserUids([]);
+          toast.success('Đã xóa các người dùng được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt người dùng');
+        }
+      }
+    });
+  };
+
+  const toggleSelectContact = (id: string) => {
+    setSelectedContactIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllContacts = () => {
+    if (selectedContactIds.length === contacts.length) {
+      setSelectedContactIds([]);
+    } else {
+      setSelectedContactIds(contacts.map(c => c.id));
+    }
+  };
+
+  const handleBulkDeleteContacts = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: 'Xác nhận xóa hàng loạt yêu cầu',
+      message: `Bạn có chắc chắn muốn xóa ${selectedContactIds.length} yêu cầu hỗ trợ đã chọn?`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedContactIds.forEach(id => {
+            batch.delete(doc(db, 'contact_requests', id));
+          });
+          await batch.commit();
+          setSelectedContactIds([]);
+          toast.success('Đã xóa các yêu cầu được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt yêu cầu');
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    setSelectedAppIds([]);
+    setSelectedUserUids([]);
+    setSelectedContactIds([]);
+  }, [activeTab, userFilter]);
+
   useEffect(() => {
     if (!userData) return;
+
+    if (userData.role === 'review') {
+      setContacts([]);
+      setAllUtilities([]);
+      setAdminApps([]);
+      setAppCategories([]);
+      setUsers([]);
+      setActivityData([]);
+      setRoleDistribution([]);
+      setSiteStats({ today: 0, month: 0, year: 0, total: 0, last7Days: [] });
+      setAboutConfig({
+        introTitle: '', introDesc: '', heroBanner: '', adminName: '', adminBio: '', adminPhoto: '', webLogo: '',
+        facebook: '', github: '', youtube: '', email: '', phone: '', zalo: '', address: ''
+      });
+      setSeoConfig({ title: '', description: '', imageUrl: '', faviconUrl: '' });
+      setGoogleClientIdState('');
+      setIpWhitelistText('');
+      setAppVersion('');
+      setAdminPin('');
+      setLoading(false);
+      return;
+    }
 
     const isAdmin = userData.role === 'admin' || userData.role === 'superadmin' || userData.email === 'sonlyhongduc@gmail.com' || userData.email === 'sonlyhongduc1@ghn.vn';
 
@@ -337,7 +497,6 @@ export default function AdminDashboard() {
   }, []);
 
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isUploadingWebLogo, setIsUploadingWebLogo] = useState(false);
 
   const handleUploadAvatarToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (userData?.role === 'review') {
@@ -442,6 +601,58 @@ export default function AdminDashboard() {
       setUploadProgress(prev => {
         const next = { ...prev };
         delete next.webLogo;
+        return next;
+      });
+      e.target.value = '';
+    }
+  };
+
+  const handleUploadHeroBannerToGithub = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
+      return;
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const username = githubGlobalConfig.username || githubIntegrationConfig.username || '';
+    const token = githubGlobalConfig.token || githubIntegrationConfig.token || '';
+    const repo = imageUploadConfig.repo;
+    const branch = imageUploadConfig.branch || 'main';
+
+    if (!username || !token || !repo) {
+      toast.error('Chưa hoàn tất Cấu hình tài khoản hoặc Kho lưu trữ Hình ảnh ở tab Hệ thống');
+      return;
+    }
+
+    const ghConfig = { owner: username, token, repo, branch };
+    
+    setIsUploadingHeroBanner(true);
+    const toastId = toast.loading('Đang tải lên ảnh bìa Intro...');
+    
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `hero-${Date.now()}.${ext}`;
+      const uploadPath = `system/${filename}`;
+      
+      const result = await githubService.uploadFile(
+        ghConfig, 
+        file, 
+        uploadPath, 
+        `Update system hero banner ${file.name}`,
+        (progress) => setUploadProgress(prev => ({ ...prev, heroBanner: Math.round(progress) }))
+      );
+
+      setAboutConfig(prev => ({ ...prev, heroBanner: result.url }));
+      toast.success('Đã tải lên ảnh bìa thành công!', { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(`Lỗi tải ảnh bìa: ${e.message}`, { id: toastId });
+    } finally {
+      setIsUploadingHeroBanner(false);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.heroBanner;
         return next;
       });
       e.target.value = '';
@@ -1287,6 +1498,11 @@ export default function AdminDashboard() {
 
   const fetchUsers = async () => {
     setLoading(true);
+    if (userData?.role === 'review') {
+      setUsers([]);
+      setLoading(false);
+      return () => {};
+    }
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const usersData: UserData[] = [];
@@ -1426,6 +1642,154 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleDownloadUserTemplate = () => {
+    const templateData = [
+      {
+        'Gmail': 'example@gmail.com',
+        'Mật khẩu': '123456',
+        'Số điện thoại': '0901234567',
+        'Vai trò': 'user',
+        'Trạng thái': 'active',
+        'Họ tên': 'Nguyễn Văn A',
+        'Đăng nhập lần cuối': format(new Date(), 'dd/MM/yyyy HH:mm:ss'),
+        'IP': 'Auto',
+        'Vị trí': 'Auto'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Mau_Import_Tai_Khoan.xlsx");
+  };
+
+  const handleImportUsersExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingUsers(true);
+    const tid = toast.loading('Đang xử lý dữ liệu Excel...');
+
+    try {
+      // Get Importer IP and Location
+      let importerIp = 'Unknown';
+      let importerLocation = 'Unknown';
+      try {
+        const [ipRes, locRes] = await Promise.all([
+          fetch('https://api64.ipify.org?format=json').then(r => r.json()),
+          fetch('https://ipapi.co/json/').then(r => r.json())
+        ]);
+        importerIp = ipRes.ip || 'Unknown';
+        importerLocation = `${locRes.city || ''}, ${locRes.region || ''}, ${locRes.country_name || ''}`.replace(/^, /, '');
+      } catch (err) {
+        console.warn('Could not fetch importer info:', err);
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const bstr = event.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+          if (data.length === 0) {
+            toast.error('File Excel không có dữ liệu.', { id: tid });
+            setIsImportingUsers(false);
+            return;
+          }
+
+          // Step 1: Create accounts in Firebase Auth via Proxy API
+          toast.loading('Đang khởi tạo tài khoản trên hệ thống Auth...', { id: tid });
+          const usersToAuth = data.map(row => ({
+            email: row['Gmail'] || row['gmail'] || row['Email'] || '',
+            password: String(row['Mật khẩu'] || row['password'] || '123456'),
+            displayName: row['Họ tên'] || row['name'] || '',
+            phoneNumber: row['Số điện thoại'] || row['phone'] ? String(row['Số điện thoại'] || row['phone']) : ''
+          })).filter(u => u.email);
+
+          const apiRes = await fetch('/api/admin/bulk-create-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ users: usersToAuth })
+          });
+
+          if (!apiRes.ok) throw new Error('Máy chủ Auth không phản hồi. Vui lòng thử lại sau.');
+          const authData = await apiRes.json();
+          const authResults = authData.results || [];
+
+          // Step 2: Sync successfully created/updated users to Firestore
+          toast.loading('Đang đồng bộ dữ liệu người dùng vào Database...', { id: tid });
+          const { writeBatch } = await import('firebase/firestore');
+          const batchSize = 100; // Small batch for clarity
+          let importedCount = 0;
+          let failedCount = 0;
+
+          for (let i = 0; i < authResults.length; i += batchSize) {
+            const batch = writeBatch(db);
+            const chunk = authResults.slice(i, i + batchSize);
+
+            chunk.forEach((result: any) => {
+              if (result.status === 'success') {
+                const row = data.find(r => (r['Gmail'] || r['gmail'] || r['Email'] || '') === result.email);
+                if (!row) return;
+
+                const userId = result.uid;
+                const userRef = doc(db, 'users', userId);
+                
+                const phone = row['Số điện thoại'] || row['phone'] || '';
+                const role = row['Vai trò'] || row['role'] || 'user';
+                const status = row['Trạng thái'] || row['status'] || 'active';
+                const rowLastLogin = row['Đăng nhập lần cuối'] || row['lastLoginAt'];
+                const rowIp = row['IP'] || row['ip'];
+                const rowLocation = row['Vị trí'] || row['location'];
+
+                batch.set(userRef, {
+                  uid: userId,
+                  email: result.email,
+                  phoneNumber: phone || null,
+                  displayName: row['Họ tên'] || row['name'] || result.email.split('@')[0],
+                  role: role.toLowerCase(),
+                  status: status.toLowerCase(),
+                  lastLoginAt: rowLastLogin ? (isNaN(Date.parse(rowLastLogin)) ? Date.now() : Date.parse(rowLastLogin)) : Date.now(),
+                  importIp: (rowIp && rowIp !== 'Auto') ? rowIp : importerIp,
+                  importLocation: (rowLocation && rowLocation !== 'Auto') ? rowLocation : importerLocation,
+                  createdAt: Date.now(),
+                  isImported: true
+                }, { merge: true });
+                importedCount++;
+              } else {
+                failedCount++;
+                console.error(`Auth creation failed: ${result.email}`, result.message);
+              }
+            });
+
+            await batch.commit();
+          }
+
+          if (importedCount > 0) {
+            toast.success(`Đã chuẩn bị thành công ${importedCount} tài khoản! ${failedCount > 0 ? `(${failedCount} thất bại)` : ''}`, { id: tid });
+          } else {
+            toast.error(`Không có tài khoản nào được tạo. Có ${failedCount} lỗi xảy ra.`, { id: tid });
+          }
+        } catch (err: any) {
+          toast.error(`Lỗi xử lý file: ${err.message}`, { id: tid });
+        } finally {
+          setIsImportingUsers(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      };
+      reader.readAsBinaryString(file);
+    } catch (err: any) {
+      toast.error(`Lỗi chuẩn bị: ${err.message}`, { id: tid });
+      setIsImportingUsers(false);
+    }
+  };
   const handleQuickBanIp = async (ip: string) => {
     if (userData?.role === 'review') {
       toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác chỉnh sửa này.');
@@ -1575,6 +1939,11 @@ export default function AdminDashboard() {
   const [roleDistribution, setRoleDistribution] = useState<any[]>([]);
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setActivityData([]);
+      setRoleDistribution([]);
+      return;
+    }
     const unsubscribe = onSnapshot(query(collection(db, 'activities'), orderBy('timestamp', 'desc')), (snapshot) => {
       const activities = snapshot.docs.map(doc => doc.data());
       // Process activity for a simple daily chart
@@ -1641,6 +2010,16 @@ export default function AdminDashboard() {
         { id: 'forms', label: 'Folders & Biểu mẫu', icon: Files },
         { id: 'utilities', label: 'Cộng cụ Tiện ích', icon: Wrench },
         { id: 'ai_tools', label: 'AI Tools', icon: Sparkles },
+      ]
+    },
+    {
+      id: 'marketing',
+      title: 'Marketing & Quảng cáo',
+      shortTitle: 'Marketing',
+      icon: Gift,
+      color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+      items: [
+        { id: 'affiliate', label: 'Cấu hình Affiliate', icon: Gift },
       ]
     },
     {
@@ -1813,7 +2192,7 @@ export default function AdminDashboard() {
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/50 dark:border-white/5 pb-4">
           <div className="space-y-1">
             <h1 className="text-xl md:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight capitalize">
-              { activeTab === 'dashboard' ? 'Tổng quan hệ thống' : `Quản trị ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống Cơ cốt', versions: 'Phiên bản máy chủ', partners: 'Đối tác liên kết', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders Biểu mẫu', about: 'About Setup', admin_system: 'Hệ thống System Data', ai_tools: 'AI Tools Công nghệ'}[activeTab as any] }` }
+              { activeTab === 'dashboard' ? 'Tổng quan hệ thống' : `Quản trị ${ {users: 'Người dùng', apps: 'Ứng dụng Link', banned: 'IP Banned', security_sessions: 'Bảo mật Đăng nhập', system: 'Hệ thống System', versions: 'Phiên bản máy chủ', partners: 'Đối tác liên kết', utilities: 'Tiện ích', document_vault: 'Kho Văn Bản', contacts: 'Yêu cầu hỗ trợ', forms: 'Form & Folders Biểu mẫu', about: 'About Setup', admin_system: 'Hệ thống Data', ai_tools: 'AI Tools', affiliate: 'Quản lý Quảng cáo'}[activeTab as any] }` }
             </h1>
             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
               Khối xử lý: {activeTab} • Trạng thái sẵn sàng
@@ -1855,6 +2234,35 @@ export default function AdminDashboard() {
                       onChange={(e) => setAboutConfig({...aboutConfig, introTitle: e.target.value})}
                       className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1 ml-1 flex items-center justify-between">
+                      <span>Ảnh bìa Intro (Banner)</span>
+                      <label className="cursor-pointer text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                        <Upload size={12} />
+                        <span className="text-[10px]">Tải lên Banner</span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadHeroBannerToGithub} disabled={isUploadingHeroBanner} />
+                      </label>
+                    </label>
+                    <div className="relative group">
+                      <input 
+                        type="text" 
+                        value={aboutConfig.heroBanner}
+                        onChange={(e) => setAboutConfig({...aboutConfig, heroBanner: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white pr-12"
+                        placeholder="Link ảnh bìa hệ thống..."
+                      />
+                      {aboutConfig.heroBanner && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm pointer-events-none p-0.5 bg-white">
+                          <img src={aboutConfig.heroBanner} alt="Banner Prev" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {isUploadingHeroBanner && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-xl flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1 ml-1">Mô tả intro</label>
@@ -2039,8 +2447,30 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                 <MessageSquare className="w-5 h-5 text-rose-500" /> Hệ thống Phản hồi & Liên hệ
               </h2>
-              <div className="px-3 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full">
-                {contacts.length} hội thoại
+              <div className="flex items-center gap-4">
+                {contacts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleSelectAllContacts}
+                      className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 transition-all flex items-center gap-2"
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                      {selectedContactIds.length === contacts.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                    </button>
+                    {selectedContactIds.length > 0 && (
+                      <button
+                        onClick={handleBulkDeleteContacts}
+                        className="px-3 py-1.5 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Xóa ({selectedContactIds.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="px-3 py-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full">
+                  {contacts.length} hội thoại
+                </div>
               </div>
             </div>
             
@@ -2048,7 +2478,19 @@ export default function AdminDashboard() {
               {contacts.length > 0 ? (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {contacts.map((req) => (
-                    <div key={req.id} className="group relative bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 transition-all hover:bg-slate-100 dark:hover:bg-white-[0.07] overflow-hidden">
+                    <div key={req.id} className={cn(
+                      "group relative bg-slate-50 dark:bg-white/5 border rounded-3xl p-8 transition-all hover:bg-slate-100 dark:hover:bg-white-[0.07] overflow-hidden",
+                      selectedContactIds.includes(req.id) ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-lg" : "border-slate-200 dark:border-white/10"
+                    )}>
+                      {/* Select Checkbox */}
+                      <div className="absolute top-4 left-4 z-20">
+                        <input
+                          type="checkbox"
+                          checked={selectedContactIds.includes(req.id)}
+                          onChange={() => toggleSelectContact(req.id)}
+                          className="w-5 h-5 rounded-lg accent-indigo-600 border border-slate-300 dark:border-white/10 cursor-pointer"
+                        />
+                      </div>
                       {/* Decorative gradient */}
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
                       
@@ -2152,6 +2594,12 @@ export default function AdminDashboard() {
         </motion.div>
       )}
 
+      {activeTab === 'affiliate' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdminAffiliate />
+        </motion.div>
+      )}
+
       {activeTab === 'forms' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <AdminForms />
@@ -2172,6 +2620,28 @@ export default function AdminDashboard() {
                   <Users className="w-5 h-5 text-blue-500" /> Quản lý danh sách User
                 </h2>
                 <div className="flex items-center gap-4">
+                  <button 
+                    onClick={handleDownloadUserTemplate}
+                    className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Mẫu Excel
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImportingUsers}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    {isImportingUsers ? 'Đang nhập...' : 'Nhập Excel Tài khoản'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleImportUsersExcel} 
+                    accept=".xlsx, .xls" 
+                    className="hidden" 
+                  />
                   <select 
                     value={userFilter} 
                     onChange={(e: any) => setUserFilter(e.target.value)}
@@ -2198,19 +2668,45 @@ export default function AdminDashboard() {
               <table className="w-full text-left border-collapse min-w-[1200px]">
                 <thead className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">
                   <tr>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserUids.length === (userFilter === 'all' ? users : users.filter(u => u.role === 'review')).length && (userFilter === 'all' ? users : users.filter(u => u.role === 'review')).length > 0}
+                        onChange={toggleSelectAllUsers}
+                        className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                      />
+                    </th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Tài khoản</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Số điện thoại</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vai trò</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Đăng nhập lần cuối</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Địa chỉ IP</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap">Vị trí (Location)</th>
-                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal text-right whitespace-nowrap">Thông tin / Quản trị</th>
+                    <th className="px-6 py-5 text-[10px] font-medium tracking-normal whitespace-nowrap text-right">
+                      {selectedUserUids.length > 0 && (
+                        <button
+                          onClick={handleBulkDeleteUsers}
+                          className="px-3 py-1.5 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-all flex items-center gap-2 float-right"
+                        >
+                          <Trash2 size={12} /> Xóa ({selectedUserUids.length})
+                        </button>
+                      )}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/10 text-sm">
                   {(userFilter === 'all' ? users : users.filter(u => u.role === 'review')).map((u) => (
-                    <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                    <tr key={u.uid} className={cn(
+                      "hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group",
+                      selectedUserUids.includes(u.uid) && "bg-indigo-50/30 dark:bg-indigo-500/5 shadow-sm"
+                    )}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserUids.includes(u.uid)}
+                          onChange={() => toggleSelectUser(u.uid)}
+                          className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 border border-slate-300 dark:border-white/20">
@@ -2491,7 +2987,6 @@ export default function AdminDashboard() {
                 { key: 'utilities', label: 'Trang Tiện ích', icon: Wrench, page: 'Hệ thống' },
                 { key: 'apps', label: 'Trang Ứng dụng', icon: AppWindow, page: 'Hệ thống' },
                 { key: 'calendar', label: 'Lịch Làm Việc', icon: Calendar, page: 'Hệ thống' },
-                { key: 'hrm', label: 'Quản Lý Nhân Sự', icon: Users, page: 'Hệ thống' },
                 { key: 'guide', label: 'Hướng dẫn sử dụng', icon: BookOpen, page: 'Hệ thống' },
                 { key: 'ai_tools', label: 'AI Tools', icon: Sparkles, page: 'Trang chủ' },
               ].map((tab) => (
@@ -4036,18 +4531,46 @@ export default function AdminDashboard() {
                        <p className="text-xs text-slate-400 max-w-sm mt-1">Dùng bảng bên cạnh để đăng ký ứng dụng liên kết và phân phối lên Thực đơn phía người dùng.</p>
                      </div>
                    ) : (
-                      <div className="overflow-x-auto no-scrollbar scroll-smooth">
+                       <div className="overflow-x-auto no-scrollbar scroll-smooth">
                         <table className="w-full text-left border-collapse min-w-[1200px]">
                           <thead>
                             <tr className="border-b border-slate-200 dark:border-white/10 pb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest font-sans">
+                              <th className="py-3 px-2 whitespace-nowrap w-12 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAppIds.length === adminApps.length && adminApps.length > 0}
+                                  onChange={toggleSelectAllApps}
+                                  className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600"
+                                />
+                              </th>
                               <th className="py-3 px-2 whitespace-nowrap">Ứng dụng / Logo</th>
                               <th className="py-3 px-2 whitespace-nowrap">Đường dẫn mở</th>
-                              <th className="py-3 px-2 text-right whitespace-nowrap">Thao tác</th>
+                              <th className="py-3 px-2 text-right whitespace-nowrap">
+                                {selectedAppIds.length > 0 ? (
+                                  <button
+                                    onClick={handleBulkDeleteApps}
+                                    className="px-3 py-1 bg-red-500 text-white rounded-lg text-[10px] uppercase font-bold hover:bg-red-600 transition-all flex items-center gap-1.5 float-right"
+                                  >
+                                    <Trash2 size={12} /> Xóa ({selectedAppIds.length})
+                                  </button>
+                                ) : 'Thao tác'}
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {adminApps.map((app) => (
-                              <tr key={app.id} className="text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]">
+                              <tr key={app.id} className={cn(
+                                "text-sm text-slate-700 dark:text-zinc-300 group hover:bg-slate-50/50 dark:hover:bg-white/[0.01]",
+                                selectedAppIds.includes(app.id) && "bg-indigo-50/30 dark:bg-indigo-500/5 shadow-sm"
+                              )}>
+                                <td className="py-4 px-2 whitespace-nowrap text-center">
+                                   <input
+                                     type="checkbox"
+                                     checked={selectedAppIds.includes(app.id)}
+                                     onChange={() => toggleSelectApp(app.id)}
+                                     className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600 cursor-pointer"
+                                   />
+                                </td>
                                 <td className="py-4 px-2 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">

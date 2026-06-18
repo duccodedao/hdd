@@ -159,33 +159,34 @@
       },
       "required": ["name", "imageUrl", "active"]
     },
-    "HrmEmployee": {
-      "title": "Hrm Employee",
-      "description": "Official store employee personnel record details",
+    "Contact": {
+      "title": "Contact",
+      "description": "Administrative contact directory (UBND, Medical, Collaborators)",
       "type": "object",
       "properties": {
         "fullName": { "type": "string" },
-        "birthDate": { "type": "string" },
-        "gender": { "type": "string" },
-        "idCard": { "type": "string" },
         "phone": { "type": "string" },
-        "createdAt": { "type": "number" }
-      },
-      "required": ["fullName", "birthDate", "gender", "idCard", "phone"]
-    },
-    "HrmCollaborator": {
-      "title": "Hrm Collaborator",
-      "description": "Official store collaborator personnel record details",
-      "type": "object",
-      "properties": {
-        "fullName": { "type": "string" },
-        "birthDate": { "type": "string" },
-        "gender": { "type": "string" },
+        "position": { "type": "string" },
         "region": { "type": "string" },
-        "phone": { "type": "string" },
-        "createdAt": { "type": "number" }
+        "category": { "enum": ["ubnd", "tram_y_te", "ctv_y_te", "ctv_dan_so"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
       },
-      "required": ["fullName", "birthDate", "gender", "region", "phone"]
+      "required": ["fullName", "phone", "category"]
+    },
+    "HrmPopulation": {
+      "title": "Hrm Population",
+      "description": "Population distribution data by age range and gender",
+      "type": "object",
+      "properties": {
+        "fromAge": { "type": "number" },
+        "toAge": { "type": "number" },
+        "maleCount": { "type": "number" },
+        "femaleCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["fromAge", "toAge", "maleCount", "femaleCount"]
     },
     "GitHubConfig": {
       "title": "GitHub Config",
@@ -470,13 +471,13 @@
       "schema": "AvatarFrame",
       "description": "Store all custom avatar frames and campaign transparent overlays"
     },
-    "hrm_employees": {
-      "schema": "HrmEmployee",
-      "description": "Official store employee personnel record details"
+    "contacts": {
+      "schema": "Contact",
+      "description": "Administrative contact directory"
     },
-    "hrm_collaborators": {
-      "schema": "HrmCollaborator",
-      "description": "Official store collaborator personnel record details"
+    "hrm_population": {
+      "schema": "HrmPopulation",
+      "description": "Population distribution data by age range and gender"
     },
     "recurring_events": {
       "schema": "RecurringEvent",

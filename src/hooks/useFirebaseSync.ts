@@ -3,10 +3,35 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore, Notification } from '../store/notificationStore';
+import { syncTelemetryToFirestore, syncGuestTelemetry } from '../services/telemetryService';
 import toast from 'react-hot-toast';
 
 export function useFirebaseSync() {
   const { user, userData } = useAuthStore();
+
+  // Unified Centralized Telemetry Sync to Firestore / Zustand
+  useEffect(() => {
+    if (user?.uid) {
+      // Run immediately on sign-in/mount
+      syncTelemetryToFirestore(user.uid);
+
+      // Refresh every 5 minutes in background
+      const timer = setInterval(() => {
+        syncTelemetryToFirestore(user.uid);
+      }, 5 * 60 * 1000);
+
+      return () => clearInterval(timer);
+    } else {
+      // Guest telemetry loader - run once on mount!
+      syncGuestTelemetry();
+
+      const timer = setInterval(() => {
+        syncGuestTelemetry();
+      }, 5 * 60 * 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [user?.uid]);
 
   // Notifications Sync
   useEffect(() => {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
-import { Key, Eye, EyeOff, Save, Loader2, Users, Trash2, ShieldCheck, Mail, Calendar, Clock, AlertCircle, Clipboard } from 'lucide-react';
+import { Key, Eye, EyeOff, Save, Loader2, Users, Trash2, ShieldCheck, Mail, Calendar, Clock, AlertCircle, Clipboard, Square, CheckSquare } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useConfirmStore } from '../../store/confirmStore';
 
@@ -15,6 +15,7 @@ export default function AdminApiKeys() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showKeys, setShowKeys] = useState<{ [key: string]: boolean }>({});
+  const [selectedSecondaryIds, setSelectedSecondaryIds] = useState<string[]>([]);
   
   const [apiKeys, setApiKeys] = useState({
     geminiApiKey: '',
@@ -25,6 +26,11 @@ export default function AdminApiKeys() {
 
   useEffect(() => {
     const fetchKeys = async () => {
+      if (userData?.role === 'review') {
+        setApiKeys({ geminiApiKey: '' });
+        setLoading(false);
+        return;
+      }
       try {
         const apiSnap = await getDoc(doc(db, 'settings', 'apiKeys'));
         
@@ -44,6 +50,11 @@ export default function AdminApiKeys() {
   }, []);
 
   const fetchSecondaryKeys = async () => {
+    if (userData?.role === 'review') {
+      setSecondaryKeys([]);
+      setLoadingSecondary(false);
+      return;
+    }
     setLoadingSecondary(true);
     try {
       const q = query(collection(db, 'user_ai_keys'), orderBy('createdAt', 'desc'));
@@ -106,6 +117,46 @@ export default function AdminApiKeys() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleSelectSecondary = (id: string) => {
+    setSelectedSecondaryIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllSecondary = () => {
+    if (selectedSecondaryIds.length === secondaryKeys.length) {
+      setSelectedSecondaryIds([]);
+    } else {
+      setSelectedSecondaryIds(secondaryKeys.map(k => k.id));
+    }
+  };
+
+  const handleBulkDeleteSecondary = () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    if (selectedSecondaryIds.length === 0) return;
+    openConfirm({
+      title: `Xóa ${selectedSecondaryIds.length} API Key`,
+      message: `Bạn có chắc chắn muốn xóa ${selectedSecondaryIds.length} API Key đã chọn?`,
+      confirmText: 'Xóa vĩnh viễn',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          selectedSecondaryIds.forEach(id => {
+            batch.delete(doc(db, 'user_ai_keys', id));
+          });
+          await batch.commit();
+          setSecondaryKeys(prev => prev.filter(k => !selectedSecondaryIds.includes(k.id)));
+          setSelectedSecondaryIds([]);
+          toast.success(`Đã xóa ${selectedSecondaryIds.length} API Key`);
+        } catch (error) {
+          toast.error('Lỗi khi xóa hàng loạt');
+        }
+      }
+    });
   };
 
   const toggleShow = (id: string) => {
@@ -223,11 +274,29 @@ export default function AdminApiKeys() {
             className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm"
           >
             <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Users className="w-6 h-6 text-blue-500" /> API Key Phụ từ Người dùng
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">Danh sách các API Key Gemini do người dùng đóng góp hoặc tự nhập để sử dụng.</p>
+              <div className="flex items-center gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Users className="w-6 h-6 text-blue-500" /> API Key Phụ từ Người dùng
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">Danh sách các API Key Gemini do người dùng đóng góp hoặc tự nhập để sử dụng.</p>
+                </div>
+                {selectedSecondaryIds.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-3 px-3 py-1 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-full"
+                  >
+                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-widest">{selectedSecondaryIds.length} đã chọn</span>
+                    <button 
+                      onClick={handleBulkDeleteSecondary}
+                      className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-colors"
+                      title="Xóa tất cả đã chọn"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </motion.div>
+                )}
               </div>
               <button 
                 onClick={fetchSecondaryKeys}
@@ -250,6 +319,11 @@ export default function AdminApiKeys() {
                 <table className="w-full text-left border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <th className="px-6 py-4 w-12">
+                        <button onClick={toggleSelectAllSecondary} className="text-slate-400 hover:text-blue-600 transition-colors">
+                          {selectedSecondaryIds.length === secondaryKeys.length && secondaryKeys.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </button>
+                      </th>
                       <th className="px-6 py-4 whitespace-nowrap">Người dùng</th>
                       <th className="px-6 py-4 whitespace-nowrap">API Key</th>
                       <th className="px-6 py-4 whitespace-nowrap">Trạng thái</th>
@@ -260,7 +334,15 @@ export default function AdminApiKeys() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                     {secondaryKeys.map((item) => (
-                      <tr key={item.id} className="group hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                      <tr key={item.id} className={cn("group hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors", selectedSecondaryIds.includes(item.id) && "bg-blue-50/30 dark:bg-blue-500/5")}>
+                        <td className="px-6 py-4">
+                           <button 
+                             onClick={() => toggleSelectSecondary(item.id)}
+                             className={cn("transition-colors", selectedSecondaryIds.includes(item.id) ? "text-blue-600" : "text-slate-300 hover:text-slate-400")}
+                           >
+                              {selectedSecondaryIds.includes(item.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+                           </button>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center text-blue-600">

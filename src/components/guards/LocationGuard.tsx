@@ -119,7 +119,7 @@ export default function LocationGuard({ children }: LocationGuardProps) {
     return () => { mounted = false; };
   }, [user, userData, location]);
 
-  if (permission === 'granted') return <>{children}</>;
+  if (userData?.role === 'review' || permission === 'granted') return <>{children}</>;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-md flex items-center justify-center p-6">

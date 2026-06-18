@@ -21,6 +21,11 @@ export default function AdminUtilities() {
   const { openConfirm } = useConfirmStore();
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setUtilities([]);
+      setSystemTools({});
+      return;
+    }
     // Utilities listener
     const qUtils = query(collection(db, 'utilities'), orderBy('createdAt', 'desc'));
     const unsubUtils = onSnapshot(qUtils, (snapshot) => {
@@ -293,10 +298,7 @@ export default function AdminUtilities() {
               <colgroup>
                 <col className="w-12 text-center" />
                 <col className="w-56" />
-                <col className="w-72" />
-                <col className="w-32" />
-                <col className="w-32" />
-                <col className="w-64" />
+                <col className="w-auto" />
                 <col className="w-32 text-right" />
               </colgroup>
               <thead className="bg-slate-50/50 dark:bg-white/[0.02]">
@@ -312,9 +314,6 @@ export default function AdminUtilities() {
                   </th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Tên hiển thị</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Mô tả giới thiệu</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá gốc</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Giá bán</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Đường dẫn nguồn</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-right border-b border-slate-100 dark:border-white/5 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
@@ -335,11 +334,6 @@ export default function AdminUtilities() {
                       </div>
                     </td>
                     <td className="p-4 align-middle text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-2">{u.description}</td>
-                    <td className="p-4 align-middle font-mono text-xs text-slate-600 dark:text-slate-500">{u.price?.toLocaleString() || 0}</td>
-                    <td className="p-4 align-middle font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold">{u.salePrice?.toLocaleString() || 0}</td>
-                    <td className="p-4 align-middle text-blue-500 text-xs truncate max-w-xs">
-                      <a href={u.embedUrl} target="_blank" rel="noreferrer" className="hover:underline">{u.embedUrl}</a>
-                    </td>
                     <td className="whitespace-nowrap p-4 align-middle text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => startEdit(u)} className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all" title="Cập nhật"><Edit className="w-4 h-4" /></button>

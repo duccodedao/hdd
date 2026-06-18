@@ -126,6 +126,11 @@ export default function AdminDocumentVault() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setCategories([]);
+      setDocuments([]);
+      return;
+    }
     // Config listener
     const unsubConfig = onSnapshot(doc(db, 'settings', 'github_integration'), (docSn) => {
       if (docSn.exists()) {

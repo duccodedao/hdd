@@ -5,7 +5,7 @@ import {
   Home, Grid, UserCircle, Shield, ChevronDown, Wrench, Files,
   Zap, Info, Laptop, FolderOpen, Scan, FileImage, FileText, Box, ChevronRight, AppWindow, CheckSquare,
   Image as ImageIcon, Calendar, Users, BookOpen, FilePlus, FileArchive, Scissors, Mail, Sparkles,
-  Wallet, ShoppingBag, Star, Bookmark, Globe
+  Wallet, ShoppingBag, Star, Bookmark, Globe, Phone
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
@@ -32,6 +32,7 @@ export default function Sidebar({ className }: { className?: string }) {
   const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['Tổng quan', 'Nền tảng']);
   const [utilitiesExpanded, setUtilitiesExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
   const [dynamicUtils, setDynamicUtils] = useState<any[]>([]);
   const [systemTools, setSystemTools] = useState<any>({});
 
@@ -71,6 +72,9 @@ export default function Sidebar({ className }: { className?: string }) {
   useEffect(() => {
     if (location.pathname.startsWith('/utilities')) {
       setUtilitiesExpanded(true);
+    }
+    if (location.pathname.startsWith('/danh-ba')) {
+      setInternalExpanded(true);
     }
   }, [location.pathname]);
 
@@ -240,32 +244,73 @@ export default function Sidebar({ className }: { className?: string }) {
                   </NavLink>
                 )}
 
-                {/* Personnel / HR Tab */}
+                {/* Danh bạ / Quản lý Group */}
                 {(!systemTools['hrm']?.internal || isAdmin || isSuperAdmin) && (
-                  <NavLink
-                    to="/nhan-su"
-                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                    className={({ isActive }) => cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
-                      isActive 
-                        ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm" 
-                        : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Users className={cn("w-4 h-4 transition-colors duration-300", location.pathname.startsWith('/nhan-su') ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
-                      <span className={cn(location.pathname.startsWith('/nhan-su') && "font-semibold")}>Nhân sự</span>
-                    </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setInternalExpanded(!internalExpanded)}
+                      className={cn(
+                        "flex items-center justify-between w-full px-3 py-2 rounded-md transition-all text-[13px] font-medium group",
+                        (location.pathname.startsWith('/danh-ba') || location.pathname.startsWith('/dan-so') || location.pathname.startsWith('/benh-khong-lay-nhiem'))
+                          ? "text-blue-700 bg-blue-50/50 dark:text-white dark:bg-white/5 shadow-sm"
+                          : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Users className={cn("w-4 h-4 transition-colors duration-300", (location.pathname.startsWith('/danh-ba')) ? "text-blue-600 dark:text-indigo-400" : "text-slate-400 dark:text-zinc-600")} />
+                        <span className={cn((location.pathname.startsWith('/danh-ba')) && "font-semibold")}>Danh mục Quản lý</span>
+                      </div>
+                      <ChevronDown className={cn("w-3 h-3 transition-transform duration-300", internalExpanded && "rotate-180")} />
+                    </button>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {systemTools['hrm']?.internal && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" title="Nội bộ" />
+                    <AnimatePresence>
+                      {internalExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="pl-9 space-y-1 overflow-hidden"
+                        >
+                          <NavLink
+                            to="/danh-ba"
+                            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                            className={({ isActive }) => cn(
+                              "block px-2 py-1.5 rounded-md text-[12px] transition-all",
+                              isActive
+                                ? "text-blue-600 dark:text-indigo-400 font-bold"
+                                : "text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-300"
+                            )}
+                          >
+                            Danh bạ điện thoại
+                          </NavLink>
+                          <NavLink
+                            to="/dan-so"
+                            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                            className={({ isActive }) => cn(
+                              "block px-2 py-1.5 rounded-md text-[12px] transition-all",
+                              isActive
+                                ? "text-blue-600 dark:text-indigo-400 font-bold"
+                                : "text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-300"
+                            )}
+                          >
+                            Dữ liệu dân số
+                          </NavLink>
+                          <NavLink
+                            to="/benh-khong-lay-nhiem"
+                            onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                            className={({ isActive }) => cn(
+                              "block px-2 py-1.5 rounded-md text-[12px] transition-all",
+                              isActive
+                                ? "text-blue-600 dark:text-indigo-400 font-bold"
+                                : "text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-zinc-300"
+                            )}
+                          >
+                            Bệnh không lây nhiễm
+                          </NavLink>
+                        </motion.div>
                       )}
-                      {maintenanceTabs['hrm'] && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 shrink-0 shadow-[0_0_6px_rgba(244,63,94,0.7)] animate-pulse" title="Đang bảo trì" />
-                      )}
-                    </div>
-                  </NavLink>
+                    </AnimatePresence>
+                  </div>
                 )}
 
                 {/* Tiện ích Item (Simple link, no dropdown) */}

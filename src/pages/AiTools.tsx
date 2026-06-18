@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Sparkles, ExternalLink, Search, X } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 
 export default function AiTools() {
   const [tools, setTools] = useState<any[]>([]);
@@ -10,6 +11,11 @@ export default function AiTools() {
   const [selectedTool, setSelectedTool] = useState<any | null>(null);
 
   useEffect(() => {
+    if (useAuthStore.getState().userData?.role === 'review') {
+      setTools([]);
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'ai_tools'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       // Sort in-memory instead of firestore query ordering

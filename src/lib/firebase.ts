@@ -21,9 +21,16 @@ export const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+let database;
+try {
+  database = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+} catch (e) {
+  console.warn("Retrying database with default ID due to error:", e);
+  database = getFirestore(app);
+}
+export const db = database;
 export const storage = getStorage(app);
 
 // Initialize Analytics conditionally (only in browser)

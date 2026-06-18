@@ -40,7 +40,9 @@ import UtilitiesPage from './pages/UtilitiesPage';
 import AppsPage from './pages/AppsPage';
 import AiTools from './pages/AiTools';
 import CalendarPage from './pages/CalendarPage';
-import HrmPage from './pages/HrmPage';
+import ContactsPage from './pages/ContactsPage';
+import PopulationPage from './pages/PopulationPage';
+import NcdPage from './pages/NcdPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -66,6 +68,7 @@ import FloatingAdminButton from './components/layout/FloatingAdminButton';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 
 import HomePage from './pages/HomePage';
+import IntroLandingPage from './pages/IntroLandingPage';
 import PortalPage from './pages/PortalPage';
 
 import { useAudioStore } from './store/audioStore';
@@ -139,7 +142,7 @@ export default function App() {
   useEffect(() => {
     if (!user || !userData) return;
     
-    const isUserAdmin = userData.role === 'admin' || userData.role === 'superadmin' || isAdmin;
+    const isUserAdmin = (userData.role === 'admin' || userData.role === 'superadmin' || isAdmin) && userData.role !== 'review';
     if (!isUserAdmin) return;
     
     let isSubscribed = true;
@@ -445,12 +448,16 @@ export default function App() {
       console.error("Could not fetch SEO settings", err?.message || "Unknown error");
     });
 
-    // Real-time about settings listener for Web Logo
+    // Real-time about settings listener for Web Logo & Hero Banner
     const unsubscribeAbout = onSnapshot(doc(db, 'settings', 'about'), (aboutDoc) => {
       if (aboutDoc.exists()) {
         const data = aboutDoc.data();
         if (data.webLogo) {
           setWebLogo(data.webLogo);
+        }
+        if (data.heroBanner) {
+          const bannerVal = typeof data.heroBanner === 'string' ? data.heroBanner : '';
+          useAppStore.setState({ heroBanner: bannerVal });
         }
       }
     }, (err) => {
@@ -543,7 +550,7 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  if (isUserAdmin && !pinVerified) {
+  if (isUserAdmin && !pinVerified && userData?.role !== 'review') {
     return (
       <AdminPinLockScreen 
         expectedPin={expectedPin} 
@@ -555,7 +562,7 @@ export default function App() {
     );
   }
 
-  if (maintenanceMode && !isSuperAdmin) {
+  if (maintenanceMode && !isSuperAdmin && userData?.role !== 'review') {
     return <MaintenancePage />;
   }
 
@@ -604,33 +611,48 @@ export default function App() {
       <Toaster 
         position="top-right" 
         containerStyle={{
-          display: userData?.role === 'review' ? 'none' : 'block'
+          display: userData?.role === 'review' ? 'none' : 'block',
+          top: 30,
+          right: 30,
         }}
+        gutter={12}
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#0a0f1d',
+            background: 'rgba(10, 15, 30, 0.85)',
             color: '#f8fafc',
             borderRadius: '1.25rem',
-            padding: '12px 20px',
+            padding: '14px 22px',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)',
+            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.15)',
             fontSize: '13px',
-            fontWeight: '550',
+            fontWeight: '600',
             fontFamily: '"Inter", sans-serif',
-            backdropFilter: 'blur(8px)',
-            maxWidth: '380px',
+            backdropFilter: 'blur(12px)',
+            maxWidth: '400px',
+            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
           },
           success: {
+            style: {
+              borderLeft: '4px solid #10b981',
+              boxShadow: '0 15px 35px rgba(16, 185, 129, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+            },
             iconTheme: {
               primary: '#10b981',
-              secondary: '#0a0f1d',
+              secondary: 'rgba(16, 185, 129, 0.1)',
             }
           },
           error: {
+            style: {
+              borderLeft: '4px solid #ef4444',
+              boxShadow: '0 15px 35px rgba(239, 68, 68, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+            },
             iconTheme: {
               primary: '#ef4444',
-              secondary: '#0a0f1d',
+              secondary: 'rgba(239, 68, 68, 0.1)',
             }
           }
         }}
@@ -640,7 +662,8 @@ export default function App() {
         <ErrorBoundary>
           <Routes>
             {/* Landing Page */}
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<IntroLandingPage />} />
+            <Route path="/trang-chu" element={<HomePage />} />
             
             {/* Standalone Form Page */}
             <Route path="/form/:slug" element={<FormView />} />
@@ -664,7 +687,9 @@ export default function App() {
               <Route path="/ai-tools" element={<TabGuard tabKey="ai_tools"><AiTools /></TabGuard>} />
               <Route path="/tasks" element={<Navigate to="/calendar" replace />} />
               <Route path="/calendar" element={<TabGuard tabKey="calendar"><CalendarPage /></TabGuard>} />
-              <Route path="/nhan-su" element={<TabGuard tabKey="hrm"><HrmPage /></TabGuard>} />
+              <Route path="/danh-ba" element={<TabGuard tabKey="contacts"><ContactsPage /></TabGuard>} />
+              <Route path="/dan-so" element={<TabGuard tabKey="hrm"><PopulationPage /></TabGuard>} />
+              <Route path="/benh-khong-lay-nhiem" element={<TabGuard tabKey="hrm"><NcdPage /></TabGuard>} />
               <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/portal" element={<PortalPage />} />

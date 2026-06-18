@@ -1,4 +1,4 @@
-import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity, Bookmark as BookmarkIcon, Star, Trash2 } from 'lucide-react';
+import { Menu, Sun, CloudRain, Cloud, CloudLightning, Snowflake, Moon, Bell, MapPin, Search, User, LogOut, ChevronDown, Maximize, Minimize, Music, Play, Pause, Volume2, RefreshCw, AlertCircle, Wifi, Activity, Bookmark as BookmarkIcon, Star, Trash2, Shield } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
@@ -30,12 +30,50 @@ const formatRelativeTime = (time: number) => {
   }
 };
 
+import { syncTelemetryToFirestore, syncGuestTelemetry } from '../../services/telemetryService';
+
 export default function Topbar() {
-  const { sidebarOpen, toggleSidebar, darkMode, toggleDarkMode } = useAppStore();
+  const { 
+    sidebarOpen, 
+    toggleSidebar, 
+    darkMode, 
+    toggleDarkMode,
+    sharedLocationName,
+    setSharedLocationName,
+    sharedWeather,
+    setSharedWeather,
+    sharedNetworkSpeed,
+    setSharedNetworkSpeed: setNetworkSpeed
+  } = useAppStore();
   const { user, userData, isAdmin, isSuperAdmin } = useAuthStore();
+
+  // Centralized telemetry priority: userData (Firestore) -> appStore
+  const locationName = userData?.location?.address || sharedLocationName || 'Đang định vị...';
+
+  const weather = userData?.weather
+    ? {
+        temp: userData.weather.temp,
+        code: userData.weather.code,
+        description: userData.weather.description
+      }
+    : sharedWeather
+      ? {
+          temp: sharedWeather.temp,
+          code: sharedWeather.code,
+          description: sharedWeather.description
+        }
+      : null;
+
+  const networkSpeed = userData?.networkSpeed
+    ? {
+        ping: userData.networkSpeed.ping,
+        downlink: userData.networkSpeed.downlink
+      }
+    : {
+        ping: sharedNetworkSpeed.ping,
+        downlink: sharedNetworkSpeed.downlink
+      };
   const [time, setTime] = useState(new Date());
-  const [weather, setWeather] = useState<{ temp: number; code: number; description: string } | null>(null);
-  const [networkSpeed, setNetworkSpeed] = useState<{ ping: number | null, downlink: number | null }>({ ping: null, downlink: null });
 
   useEffect(() => {
     let isMounted = true;
@@ -99,7 +137,6 @@ export default function Topbar() {
       clearInterval(interval);
     };
   }, []);
-  const [locationName, setLocationName] = useState<string>('');
   const [resettingLocation, setResettingLocation] = useState(false);
 
   const handleResetLocation = async () => {
@@ -107,85 +144,19 @@ export default function Topbar() {
     setResettingLocation(true);
     const toastId = toast.loading('Đang cập nhật vị trí thiết bị...');
     
-    if (!navigator.geolocation) {
-      toast.error('Trình duyệt không hỗ trợ xác định vị trí hiện tại.', { id: toastId });
+    try {
+      if (user?.uid) {
+        await syncTelemetryToFirestore(user.uid);
+        toast.success('Đã làm mới vị trí & thời tiết thành công!', { id: toastId });
+      } else {
+        await syncGuestTelemetry();
+        toast.success('Đã làm mới vị trí & thời tiết thành công!', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error('Lỗi khi lưu vị trí: ' + (err.message || String(err)), { id: toastId });
+    } finally {
       setResettingLocation(false);
-      return;
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          
-          // Fetch reverse address
-          const gRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, 
-            { headers: { 'Accept-Language': 'vi' } }
-          );
-          const gData = await gRes.json();
-          let address = 'Việt Nam';
-          
-          if (gData?.address) {
-            const addr = gData.address;
-            const parts = [];
-            const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
-            const district = addr.city_district || addr.county || addr.district || addr.town;
-            const city = addr.city || addr.state || addr.province;
-            if (ward) parts.push(ward);
-            if (district) parts.push(district);
-            if (city) parts.push(city);
-            address = parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Việt Nam');
-          } else if (gData?.display_name) {
-            address = gData.display_name;
-          }
-
-          if (user?.uid) {
-            // Update Firestore so it propagates globally and updates other listeners
-            await setDoc(doc(db, 'users', user.uid), {
-              location: {
-                lat: latitude,
-                lng: longitude,
-                address: address,
-                updatedAt: Date.now()
-              }
-            }, { merge: true });
-          } else {
-            // Unauthenticated user - fall back to local state
-            setLocationName(address);
-          }
-
-          // Trigger weather reload manually as well
-          const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-          const wData = await wRes.json();
-          if (wData?.current_weather) {
-            const getWeatherDescription = (code: number) => {
-              const descriptions: { [key: number]: string } = {
-                0: 'Trời quang', 1: 'Có mây', 2: 'Nhiều mây', 3: 'U ám', 45: 'Sương mù', 
-                61: 'Có mưa', 63: 'Có mưa', 65: 'Mưa lớn', 71: 'Có tuyết', 95: 'Có bão'
-              };
-              return descriptions[code] || 'Trời quang';
-            };
-            setWeather({
-              temp: Math.round(wData.current_weather.temperature),
-              code: wData.current_weather.weathercode,
-              description: getWeatherDescription(wData.current_weather.weathercode)
-            });
-          }
-
-          toast.success('Đã làm mới vị trí & thời tiết thành công!', { id: toastId });
-        } catch (err: any) {
-          toast.error('Lỗi khi lưu vị trí: ' + (err.message || String(err)), { id: toastId });
-        } finally {
-          setResettingLocation(false);
-        }
-      },
-      (err) => {
-        toast.error('Bạn đã từ chối quyền truy cập vị trí hoặc có lỗi định vị.', { id: toastId });
-        setResettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
   };
 
   const [initialLoad, setInitialLoad] = useState(true);
@@ -304,72 +275,12 @@ export default function Topbar() {
     return () => clearInterval(timer);
   }, []);
 
+  // Trigger centralized telemetry once if not already populated for the logged-in user
   useEffect(() => {
-    const getWeatherDescription = (code: number) => {
-      const descriptions: { [key: number]: string } = {
-        0: 'Trời quang', 1: 'Có mây', 2: 'Nhiều mây', 3: 'U ám', 45: 'Sương mù', 
-        61: 'Có mưa', 63: 'Có mưa', 65: 'Mưa lớn', 71: 'Có tuyết', 95: 'Có bão'
-      };
-      return descriptions[code] || 'Trời quang';
-    };
-
-    const fetchWeatherAndAddress = async (latitude: number, longitude: number) => {
-      try {
-        const [wRes, gRes] = await Promise.all([
-          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`),
-          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&email=sonlyhongduc@gmail.com`, { headers: { 'Accept-Language': 'vi' } })
-        ]);
-        const wData = await wRes.json();
-        const gData = await gRes.json();
-        if (wData?.current_weather) {
-          setWeather({
-            temp: Math.round(wData.current_weather.temperature),
-            code: wData.current_weather.weathercode,
-            description: getWeatherDescription(wData.current_weather.weathercode)
-          });
-        }
-        if (gData?.address) {
-          const addr = gData.address;
-          const parts = [];
-          const ward = addr.quarter || addr.suburb || addr.village || addr.hamlet || addr.neighbourhood;
-          const district = addr.city_district || addr.county || addr.district || addr.town;
-          const city = addr.city || addr.state || addr.province;
-          if (ward) parts.push(ward);
-          if (district) parts.push(district);
-          if (city) parts.push(city);
-          
-          setLocationName(parts.length > 0 ? parts.join(', ') : (gData.display_name || 'Trái đất'));
-        }
-      } catch {}
-    };
-
-    if (userData?.location?.lat && userData?.location?.lng) {
-      if (userData.location.address) {
-        setLocationName(userData.location.address);
-        // Only fetch weather and let coordinates populate weather stats
-        (async () => {
-          try {
-            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userData.location!.lat}&longitude=${userData.location!.lng}&current_weather=true`);
-            const wData = await wRes.json();
-            if (wData?.current_weather) {
-              setWeather({
-                temp: Math.round(wData.current_weather.temperature),
-                code: wData.current_weather.weathercode,
-                description: getWeatherDescription(wData.current_weather.weathercode)
-              });
-            }
-          } catch {}
-        })();
-      } else {
-        fetchWeatherAndAddress(userData.location.lat, userData.location.lng);
-      }
-    } else if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        fetchWeatherAndAddress(latitude, longitude);
-      }, () => setLocationName('Việt Nam'));
+    if (user?.uid && (!userData?.location?.address || !userData?.weather || !userData?.ip)) {
+      syncTelemetryToFirestore(user.uid);
     }
-  }, [userData?.location?.lat, userData?.location?.lng, userData?.location?.address]);
+  }, [user?.uid, userData?.location?.address, userData?.weather, userData?.ip]);
 
   const getWeatherIcon = (code: number) => {
     if (code === 0 || code === 1) return <Sun className="w-3.5 h-3.5 text-amber-400" />;
@@ -735,6 +646,19 @@ export default function Topbar() {
                     </div>
                     
                     <div className="p-1.5 space-y-0.5">
+                      {(isAdmin || isSuperAdmin || userData?.role === 'review') && (
+                        <button 
+                          onClick={() => {
+                            navigate('/admin');
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md transition-all text-[11px] font-semibold border-b border-slate-150/40 dark:border-white/5 pb-2 cursor-pointer"
+                        >
+                          <Shield className="w-3.5 h-3.5 text-indigo-500" />
+                          Trung tâm Quản trị
+                        </button>
+                      )}
+
                       <button 
                         onClick={() => {
                           navigate('/profile');

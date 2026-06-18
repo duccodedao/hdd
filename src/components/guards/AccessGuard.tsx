@@ -23,7 +23,7 @@ export const AccessGuard = ({ children }: AccessGuardProps) => {
 
   useEffect(() => {
     const checkBanStatus = async () => {
-      if (userData?.status === 'banned' || userData?.isBanned) {
+      if ((userData?.status === 'banned' || userData?.isBanned) && userData?.role !== 'review') {
         setIsIpBlocked(true);
         setChecking(false);
         return;

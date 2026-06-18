@@ -36,6 +36,12 @@ export default function AppsPage() {
   const { maintenanceTabs, maintenanceStampConfig } = useAppStore();
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setApps([]);
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
     const unsubApps = onSnapshot(query(collection(db, 'apps'), orderBy('createdAt', 'desc')), (snapshot) => {
       const items: AppItem[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppItem));
       setApps(items);

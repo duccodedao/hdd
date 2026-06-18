@@ -29,6 +29,11 @@ export default function AdminAiTools() {
   });
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setTools([]);
+      setLoading(false);
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'ai_tools'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       // Sort in-memory instead of firestore query ordering

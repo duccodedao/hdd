@@ -11,7 +11,7 @@ export const OnboardingGuard = ({ children }: { children: React.ReactNode }) => 
   if (!user) return <>{children}</>;
 
   // If onboarding is explicitly false and we are not on the onboarding page, redirect
-  if (userData && userData.onboardingCompleted === false && location.pathname !== '/onboarding') {
+  if (userData && userData.role !== 'review' && userData.onboardingCompleted === false && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 

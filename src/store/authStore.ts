@@ -27,6 +27,8 @@ export interface UserData {
   balance?: number;
   location?: { lat: number, lng: number, address?: string };
   ip?: string;
+  weather?: { temp: number; code: number; description: string };
+  networkSpeed?: { ping: number | null, downlink: number | null };
   assignedUtilities?: string[];
   notificationPreferences?: {
     system: boolean;

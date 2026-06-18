@@ -17,6 +17,10 @@ export default function AdminIpBlocking() {
   const { userData } = useAuthStore();
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setBannedIps([]);
+      return;
+    }
     const q = query(collection(db, 'blockedIps'), orderBy('blockedAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setBannedIps(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));

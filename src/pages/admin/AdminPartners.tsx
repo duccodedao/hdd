@@ -16,6 +16,10 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
   const { openConfirm } = useConfirmStore();
 
   useEffect(() => {
+    if (userData?.role === 'review') {
+      setPartners([]);
+      return;
+    }
     const unsub = onSnapshot(collection(db, 'partners'), (snapshot) => {
       setPartners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any));
     });
@@ -70,6 +74,47 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
     }
   };
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === partners.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(partners.map(p => p.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    openConfirm({
+      title: 'Xóa hàng loạt đối tác',
+      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} đối tác đã chọn? Hành động này không thể hoàn tác.`,
+      confirmText: 'Xóa hàng loạt',
+      cancelText: 'Hủy',
+      onConfirm: async () => {
+        try {
+          const { doc, writeBatch } = await import('firebase/firestore');
+          const batch = writeBatch(db);
+          selectedIds.forEach(id => {
+            batch.delete(doc(db, 'partners', id));
+          });
+          await batch.commit();
+          setSelectedIds([]);
+          toast.success('Đã xóa các đối tác được chọn');
+        } catch (e) {
+          toast.error('Lỗi khi xóa hàng loạt');
+        }
+      }
+    });
+  };
+
   const deletePartner = (id: string, name: string) => {
     if (userData?.role === 'review') {
       toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
@@ -98,6 +143,25 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
           <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
             <LinkIcon className="w-5 h-5 text-indigo-500" /> Quản lý Đối tác
           </h2>
+          {partners.length > 0 && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleSelectAll}
+                className="px-4 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-50 transition-all flex items-center gap-2"
+              >
+                {selectedIds.length === partners.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+              </button>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-lg shadow-red-500/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Xóa ({selectedIds.length})
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -146,8 +210,16 @@ export default function AdminPartners({ ghConfig }: { ghConfig: any }) {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10 relative group flex flex-col items-center justify-center"
+              className={`bg-white dark:bg-white/5 rounded-2xl p-4 border transition-all relative group flex flex-col items-center justify-center ${selectedIds.includes(partner.id) ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-lg' : 'border-slate-200 dark:border-white/10'}`}
             >
+              <div className="absolute top-2 left-2 z-10">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(partner.id)}
+                  onChange={() => toggleSelect(partner.id)}
+                  className="w-4 h-4 rounded border-slate-300 dark:border-white/10 accent-indigo-600 cursor-pointer"
+                />
+              </div>
               <button 
                 onClick={() => deletePartner(partner.id, partner.name)}
                 className="absolute top-2 right-2 p-1.5 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
