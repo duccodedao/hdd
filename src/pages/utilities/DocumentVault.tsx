@@ -851,29 +851,20 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                      <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap bg-white dark:bg-zinc-950/30 transition-colors">
-                       <div className="flex justify-center">
-                         {expandedRow === docItem.id ? (
-                           <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">
-                             {!docItem.isVip || isAdmin ? (
-                               <button onClick={() => handlePreview(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
-                             ) : (
-                               <div className="p-1.5 md:p-2 text-slate-300 cursor-not-allowed" title="VIP-Lock"><Shield size={16} /></div>
-                             )}
-                             <button onClick={() => handleDownload(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
-                             <button onClick={() => shareLink(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
-                             {isAdmin && (
-                               <>
-                                 <button onClick={() => handleEditInit(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
-                                 <button onClick={() => handleDelete(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
-                               </>
-                             )}
-                             <button onClick={() => setExpandedRow(null)} className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 transition-colors" title="Đóng"><X size={16} /></button>
-                           </div>
+                     <td className="px-2 md:px-4 py-4 text-right w-32 whitespace-nowrap transition-colors">
+                       <div className="flex justify-end gap-1 md:gap-2">
+                         {!docItem.isVip || isAdmin ? (
+                           <button onClick={(e) => { e.stopPropagation(); handlePreview(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
                          ) : (
-                           <button onClick={() => setExpandedRow(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tác vụ">
-                             <MoreHorizontal size={16} />
-                           </button>
+                           <div className="p-1 md:p-1.5 text-slate-300 cursor-not-allowed" title="VIP-Lock"><Shield size={16} /></div>
+                         )}
+                         <button onClick={(e) => { e.stopPropagation(); handleDownload(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                         <button onClick={(e) => { e.stopPropagation(); shareLink(docItem.id); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
+                         {isAdmin && (
+                           <>
+                             <button onClick={(e) => { e.stopPropagation(); handleEditInit(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
+                             <button onClick={(e) => { e.stopPropagation(); handleDelete(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                           </>
                          )}
                        </div>
                      </td>

@@ -31,7 +31,6 @@ import AuthActionPage from './pages/AuthActionPage';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
-import ComingSoon from './pages/ComingSoon';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import GuidePage from './pages/GuidePage';
@@ -49,7 +48,6 @@ import PrivacyPage from './pages/PrivacyPage';
 import PolicyPage from './pages/PolicyPage';
 import ReleaseNotesPage from './pages/ReleaseNotesPage';
 import Onboarding from './pages/Onboarding';
-import LandingPage from './pages/LandingPage';
 import FormView from './pages/FormView';
 import NotFoundPage from './pages/NotFoundPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -278,21 +276,25 @@ export default function App() {
               if (createdAtMs && createdAtMs > listenerStartTime && data.id !== currentSessionId) {
                 if (!data.approved) {
                   toast.error(
-                    <div className="flex flex-col gap-1 text-left border-l-2 border-amber-500 pl-2">
-                      <span className="font-bold text-amber-500 flex items-center gap-1.5 animate-pulse">
-                        ⚠️ ĐĂNG NHẬP ADMIN MỚI CHƯA DUYỆT
-                      </span>
-                      <span className="text-xs text-slate-800 dark:text-zinc-200">
-                        Phát hiện truy cập cổng quản trị từ IP: <strong className="font-mono bg-amber-500/10 px-1 py-0.5 rounded text-amber-600 dark:text-amber-400">{data.ip}</strong>
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        Email: {data.email} | Thiết bị: {data.device}
-                      </span>
-                      <span className="text-[10px] text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded self-start mt-0.5 uppercase tracking-wide">
-                        Vị trí: {data.location || 'Chưa xác định'}
-                      </span>
+                    <div className="flex flex-col gap-2 text-left w-full pl-2 border-l-2 border-amber-500 py-1">
+                      <div className="flex items-center gap-2 text-amber-500">
+                        <ShieldAlert size={14} className="animate-pulse" />
+                        <span className="font-bold text-[11px] tracking-widest uppercase">Admin đang chờ duyệt</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 dark:text-zinc-300 font-medium">
+                        Phát hiện phiên đăng nhập quản trị từ thiết bị mới. Hệ thống tạm khóa.
+                      </p>
+                      <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 rounded-lg p-2.5 text-[10px] font-mono mt-1 text-slate-500 space-y-1">
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">IP:</span> <strong className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded">{data.ip}</strong></div>
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">Tài khoản:</span> <span>{data.email}</span></div>
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">Vị trí:</span> <span>{data.location || 'N/A'}</span></div>
+                      </div>
                     </div>,
-                    { duration: 10000, position: 'top-right' }
+                    { 
+                      duration: 12000, 
+                      position: 'top-right', 
+                      className: '!bg-white dark:!bg-[#0A0A0B] !text-slate-800 dark:!text-white !border !border-amber-100 dark:!border-white/5 !shadow-2xl !p-3' 
+                    }
                   );
                 } else {
                   toast.success(

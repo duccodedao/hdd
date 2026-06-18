@@ -447,26 +447,7 @@ export default function Topbar() {
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
-          {/* Notifications Control */}
-          {user && (
-            <div className="relative">
-              <button
-                onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }}
-                className={cn(
-                  "relative w-9 h-9 flex items-center justify-center rounded-lg transition-all",
-                  showNotifications
-                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
-                )}
-                title="Hộp thông báo"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 bg-rose-600 dark:bg-rose-500 rounded-full text-[8.5px] font-black text-white items-center justify-center shadow-lg animate-pulse">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
+          
 
               <AnimatePresence>
                 {showNotifications && (
@@ -574,8 +555,6 @@ export default function Topbar() {
                   </>
                 )}
               </AnimatePresence>
-            </div>
-          )}
 
           <button
             onClick={handleResetVersion}
@@ -692,8 +671,7 @@ export default function Topbar() {
             Đăng nhập
           </Link>
         )}
-      </div>
-
+      
       {createPortal(
         <AnimatePresence>
           {showResetConfirm && (
@@ -751,6 +729,7 @@ export default function Topbar() {
         isOpen={showAdminNotification}
         onClose={() => setShowAdminNotification(false)}
       />
+      </div>
     </header>
   );
 }

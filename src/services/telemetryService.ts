@@ -2,6 +2,35 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAppStore } from '../store/appStore';
 
+// Simple in-memory cache to prevent excessive API calls.
+// 5 minutes cooldown
+const COOLDOWN_MS = 5 * 60 * 1000;
+let lastUpdate = 0;
+
+async function getIpData() {
+  const now = Date.now();
+  if (now - lastUpdate < COOLDOWN_MS) return null;
+  
+  try {
+    const ipRes = await fetch('https://ipapi.co/json/');
+    if (ipRes.ok) {
+      lastUpdate = now;
+      return await ipRes.json();
+    }
+  } catch {}
+
+  try {
+    const ipRes2 = await fetch('https://ip-api.com/json/');
+    if (ipRes2.ok) {
+      lastUpdate = now;
+      return await ipRes2.json();
+    }
+  } catch (e2) {
+    console.warn("IP geolocation lookup failed", e2);
+  }
+  return null;
+}
+
 export async function syncGuestTelemetry() {
   try {
     const store = useAppStore.getState();
@@ -12,31 +41,13 @@ export async function syncGuestTelemetry() {
     let lon = 106.7004;
     let address = store.sharedLocationName || 'Đang định vị...';
 
-    try {
-      const ipRes = await fetch('https://ipapi.co/json/');
-      if (ipRes.ok) {
-        const ipData = await ipRes.json();
-        ip = ipData.ip || ip;
-        lat = ipData.latitude || 10.7756;
-        lon = ipData.longitude || 106.7004;
-        if (ipData.city && ipData.country_name) {
-          address = `${ipData.city}, ${ipData.country_name}`;
-        }
-      }
-    } catch {
-      try {
-        const ipRes2 = await fetch('https://ip-api.com/json/');
-        if (ipRes2.ok) {
-          const ipData2 = await ipRes2.json();
-          ip = ipData2.query || ip;
-          lat = ipData2.lat || 21.0285;
-          lon = ipData2.lon || 105.8542;
-          if (ipData2.city && ipData2.country) {
-            address = `${ipData2.city}, ${ipData2.country}`;
-          }
-        }
-      } catch (e2) {
-        console.warn("Guest IP geolocation lookup failed", e2);
+    const ipData = await getIpData();
+    if (ipData) {
+      ip = ipData.ip || ipData.query || ip;
+      lat = ipData.latitude || ipData.lat || 10.7756;
+      lon = ipData.longitude || ipData.lon || 106.7004;
+      if (ipData.city && (ipData.country_name || ipData.country)) {
+        address = `${ipData.city}, ${ipData.country_name || ipData.country}`;
       }
     }
 
@@ -138,34 +149,16 @@ export async function syncTelemetryToFirestore(uid: string) {
     let lon = 106.7004;
     let address = 'Đang định vị...';
 
-    try {
-      const ipRes = await fetch('https://ipapi.co/json/');
-      if (ipRes.ok) {
-        const ipData = await ipRes.json();
-        ip = ipData.ip || 'Unknown';
-        lat = ipData.latitude || 10.7756;
-        lon = ipData.longitude || 106.7004;
-        if (ipData.city && ipData.country_name) {
-          address = `${ipData.city}, ${ipData.country_name}`;
-        }
-      }
-    } catch {
-      try {
-        const ipRes2 = await fetch('https://ip-api.com/json/');
-        if (ipRes2.ok) {
-          const ipData2 = await ipRes2.json();
-          ip = ipData2.query || 'Unknown';
-          lat = ipData2.lat || 21.0285;
-          lon = ipData2.lon || 105.8542;
-          if (ipData2.city && ipData2.country) {
-            address = `${ipData2.city}, ${ipData2.country}`;
-          }
-        }
-      } catch (e2) {
-        console.warn("IP geolocation lookup failed", e2);
+    const ipData = await getIpData();
+    if (ipData) {
+      ip = ipData.ip || ipData.query || ip;
+      lat = ipData.latitude || ipData.lat || 10.7756;
+      lon = ipData.longitude || ipData.lon || 106.7004;
+      if (ipData.city && (ipData.country_name || ipData.country)) {
+        address = `${ipData.city}, ${ipData.country_name || ipData.country}`;
       }
     }
-
+    
     // 2. Query browser-side precise GPS if browser geolocation is supported
     if (navigator.geolocation) {
       const getGps = () => new Promise<GeolocationPosition | null>((resolve) => {

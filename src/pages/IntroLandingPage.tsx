@@ -6,7 +6,7 @@ import { Helmet } from 'react-helmet-async';
 import { 
   User, Shield, Wifi, Globe, MapPin, 
   CloudSun, Activity, LogIn, AppWindow, Calendar, Contact, 
-  Heart, Users, LayoutDashboard, Clock, ArrowRight, Sparkles, 
+  Heart, Users, LayoutDashboard, Clock, ArrowRight, ChevronsRight, Sparkles, 
   Navigation, Signal, Bot, Lock, Sun, Moon, RefreshCw, LogOut, Laptop
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -250,6 +250,7 @@ export default function IntroLandingPage() {
         <title>BMASS | Trung tâm điều hành & Cổng thông tin thông minh</title>
       </Helmet>
 
+
       {/* Background visual graphics */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-grid-pattern opacity-[0.03] dark:opacity-10" />
       
@@ -489,7 +490,7 @@ export default function IntroLandingPage() {
                     <button 
                       id="nav-utilities-direct"
                       onClick={() => navigate('/utilities')}
-                      className="flex items-center justify-center gap-1.5 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-2xl tracking-wider transition-all uppercase shadow-md shadow-indigo-500/10"
+                      className="flex items-center justify-center gap-1.5 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-2xl tracking-widest transition-all uppercase shadow-lg shadow-indigo-500/30 ring-2 ring-offset-2 ring-indigo-500/20"
                     >
                       <AppWindow className="w-4 h-4 text-white" />
                       Truy cập

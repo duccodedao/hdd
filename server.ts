@@ -1625,8 +1625,8 @@ app.use(cookieParser());
     // Serve static files
     app.use(express.static(distPath, { index: false }));
 
-    // SPA catch-all for undefined GET requests
-    app.get('*', (req, res, next) => {
+    // SPA catch-all for undefined GET requests (Express 5 compatible)
+    app.get('*all', (req, res, next) => {
       // Don't intercept API or webhook routes
       if (req.path.startsWith('/api/') || req.path.startsWith('/hooks/')) {
         return next();

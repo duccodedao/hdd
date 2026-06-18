@@ -1,119 +1,76 @@
 import React from 'react';
-import { Ghost, ArrowLeft, Home, Monitor, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Home, Link2Off } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-white dark:bg-black p-6 text-center relative overflow-hidden font-sans selection:bg-indigo-500/30">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#0A0A0B] p-6 text-center relative overflow-hidden font-sans">
       
-      {/* Cinematic Background */}
+      {/* Background elements */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[120vw] h-[120vw] bg-gradient-to-br from-indigo-500/10 via-transparent to-rose-500/5 blur-[120px] opacity-50 dark:opacity-40" />
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
+        <div className="absolute top-[20%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[50vw] h-[50vw] bg-rose-500/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className="relative z-10 w-full max-w-4xl space-y-16">
+      <div className="relative z-10 space-y-10 w-full max-w-2xl px-4">
         
-        {/* Error Code Display */}
-        <div className="relative inline-block">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-            className="text-[12rem] md:text-[20rem] font-display font-black leading-none tracking-tighter text-slate-900/5 dark:text-white/5 select-none"
-          >
-            404
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
-              <div className="relative w-32 h-32 md:w-40 md:h-40 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl flex items-center justify-center group overflow-hidden">
-                <ShieldAlert size={48} className="text-rose-500 md:w-16 md:h-16" strokeWidth={1} />
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        <div className="flex flex-col items-center gap-10">
-          <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, letterSpacing: '0.5em' }}
-              animate={{ opacity: 1, letterSpacing: '0.3em' }}
-              transition={{ delay: 0.8, duration: 1 }}
-              className="inline-flex items-center gap-3 px-6 py-2 bg-rose-500/5 border border-rose-500/20 rounded-full"
-            >
-              <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />
-              <span className="text-[10px] font-black uppercase text-rose-500">Address Not Found</span>
-            </motion.div>
-            
-            <div className="space-y-4">
-              <motion.h1 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1, duration: 1 }}
-                className="text-5xl md:text-7xl font-display font-light text-slate-900 dark:text-white tracking-widest uppercase italic"
-              >
-                Vùng tối <span className="font-bold text-indigo-600 dark:text-indigo-400">BMASS.</span>
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.2, duration: 1 }}
-                className="text-slate-400 dark:text-zinc-500 text-lg font-medium max-w-xl mx-auto leading-relaxed italic"
-              >
-                Liên kết định danh bạn đang truy xuất đã bị ngắt kết nối hoặc không tồn tại trong cấu trúc dữ liệu của BMASS Platform.
-              </motion.p>
-            </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex flex-col items-center gap-6"
+        >
+          <div className="w-24 h-24 rounded-[32px] bg-white/5 border border-white/10 shadow-2xl flex items-center justify-center relative">
+            <div className="absolute inset-0 bg-indigo-400/20 blur-[20px] rounded-full" />
+            <Link2Off size={40} className="text-white relative z-10" />
           </div>
+          
+          <h1 className="text-[120px] font-black leading-none text-white tracking-tighter">404</h1>
+          <div className="space-y-4">
+            <h2 className="text-xl md:text-2xl font-bold text-white uppercase tracking-widest">
+              Lạc hướng định tuyến
+            </h2>
+            <p className="text-sm text-zinc-400 max-w-md mx-auto leading-relaxed">
+              Trang bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển sang một liên kết khác trên hệ thống.
+            </p>
+          </div>
+        </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.4, duration: 1 }}
-            className="flex flex-col sm:flex-row items-center gap-6"
+        <motion.div
+           initial={{ opacity: 0 }}
+           animate={{ opacity: 1 }}
+           transition={{ delay: 0.5, duration: 0.5 }}
+           className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8"
+        >
+          <button 
+            onClick={() => navigate(-1)} 
+            className="w-full sm:w-auto h-12 px-8 bg-white/5 border border-white/10 hover:border-white/20 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
           >
-            <button 
-              onClick={() => navigate(-1)} 
-              className="h-16 px-12 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl font-bold text-[10px] uppercase tracking-[0.3em] hover:bg-slate-50 dark:hover:bg-white/10 active:scale-95 transition-all flex items-center gap-3 group shadow-xl shadow-slate-200/50 dark:shadow-none"
-            >
-              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
-              Quay lại
-            </button>
-            <button 
-              onClick={() => navigate('/')} 
-              className="h-16 px-12 bg-slate-950 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-[10px] uppercase tracking-[0.3em] active:scale-95 transition-all flex items-center gap-3 shadow-2xl shadow-indigo-500/20"
-            >
-              <Home size={16} /> 
-              Về Trang Chủ
-            </button>
-          </motion.div>
-        </div>
+            <ArrowLeft size={16} /> 
+            Quay lại
+          </button>
+          <button 
+            onClick={() => navigate('/')} 
+            className="w-full sm:w-auto h-12 px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+          >
+            <Home size={16} /> 
+            Trang chủ
+          </button>
+        </motion.div>
 
-        {/* Technical Metadata */}
         <motion.div 
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.4 }}
-          transition={{ delay: 1.8, duration: 1 }}
-          className="pt-20 flex flex-col items-center gap-8"
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1, duration: 1 }}
+          className="pt-12"
         >
-          <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-zinc-600">
-            <span>Protocol: NULL</span>
-            <span>•</span>
-            <span>Target: {window.location.pathname}</span>
-            <span>•</span>
-            <span>Ref: {Math.random().toString(36).substring(7).toUpperCase()}</span>
-          </div>
-          <div className="w-px h-24 bg-gradient-to-b from-slate-200 dark:from-white/10 to-transparent" />
+          <div className="h-[1px] w-16 bg-white/10 mx-auto" />
+          <p className="text-[10px] text-zinc-600 uppercase tracking-widest mt-6">
+            BmassHD Ecosystem
+          </p>
         </motion.div>
       </div>
     </div>
