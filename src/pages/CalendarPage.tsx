@@ -666,7 +666,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-50/50 dark:bg-black/20 overflow-y-auto no-scrollbar relative min-h-screen">
+    <div className="flex-1 flex flex-col h-full bg-slate-50/50 dark:bg-black/20 overflow-y-auto no-scrollbar relative min-h-screen font-sans antialiased">
       <div className="p-4 md:p-8 max-w-[1750px] mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Header */}

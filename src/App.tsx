@@ -6,7 +6,7 @@ import { auth, db, OperationType, handleFirestoreError } from './lib/firebase';
 import { statsService } from './services/statsService';
 import { useAuthStore, UserData } from './store/authStore';
 import { useAppStore } from './store/appStore';
-import { Toaster, toast } from 'react-hot-toast';
+import { Toaster, toast, ToastBar } from 'react-hot-toast';
 import { ShieldAlert, X } from 'lucide-react';
 import AdminPinLockScreen from './components/auth/AdminPinLockScreen';
 import CommandPalette from './components/ui/CommandPalette';
@@ -31,25 +31,25 @@ import AuthActionPage from './pages/AuthActionPage';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
-import ComingSoon from './pages/ComingSoon';
 import ContactPage from './pages/ContactPage';
 import AboutPage from './pages/AboutPage';
 import GuidePage from './pages/GuidePage';
 import MaintenancePage from './pages/MaintenancePage';
 import UtilitiesPage from './pages/UtilitiesPage';
+import DocumentVault from './pages/utilities/DocumentVault';
 import AppsPage from './pages/AppsPage';
 import AiTools from './pages/AiTools';
 import CalendarPage from './pages/CalendarPage';
 import ContactsPage from './pages/ContactsPage';
 import PopulationPage from './pages/PopulationPage';
 import NcdPage from './pages/NcdPage';
+import HealthPage from './pages/HealthPage';
 import BlockedPage from './pages/BlockedPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import PolicyPage from './pages/PolicyPage';
 import ReleaseNotesPage from './pages/ReleaseNotesPage';
 import Onboarding from './pages/Onboarding';
-import LandingPage from './pages/LandingPage';
 import FormView from './pages/FormView';
 import NotFoundPage from './pages/NotFoundPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -278,21 +278,25 @@ export default function App() {
               if (createdAtMs && createdAtMs > listenerStartTime && data.id !== currentSessionId) {
                 if (!data.approved) {
                   toast.error(
-                    <div className="flex flex-col gap-1 text-left border-l-2 border-amber-500 pl-2">
-                      <span className="font-bold text-amber-500 flex items-center gap-1.5 animate-pulse">
-                        ⚠️ ĐĂNG NHẬP ADMIN MỚI CHƯA DUYỆT
-                      </span>
-                      <span className="text-xs text-slate-800 dark:text-zinc-200">
-                        Phát hiện truy cập cổng quản trị từ IP: <strong className="font-mono bg-amber-500/10 px-1 py-0.5 rounded text-amber-600 dark:text-amber-400">{data.ip}</strong>
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        Email: {data.email} | Thiết bị: {data.device}
-                      </span>
-                      <span className="text-[10px] text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded self-start mt-0.5 uppercase tracking-wide">
-                        Vị trí: {data.location || 'Chưa xác định'}
-                      </span>
+                    <div className="flex flex-col gap-2 text-left w-full pl-2 border-l-2 border-amber-500 py-1">
+                      <div className="flex items-center gap-2 text-amber-500">
+                        <ShieldAlert size={14} className="animate-pulse" />
+                        <span className="font-bold text-[11px] tracking-widest uppercase">Admin đang chờ duyệt</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 dark:text-zinc-300 font-medium">
+                        Phát hiện phiên đăng nhập quản trị từ thiết bị mới. Hệ thống tạm khóa.
+                      </p>
+                      <div className="bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-white/5 rounded-lg p-2.5 text-[10px] font-mono mt-1 text-slate-500 space-y-1">
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">IP:</span> <strong className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded">{data.ip}</strong></div>
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">Tài khoản:</span> <span>{data.email}</span></div>
+                        <div className="flex justify-between items-center"><span className="uppercase tracking-widest opacity-70">Vị trí:</span> <span>{data.location || 'N/A'}</span></div>
+                      </div>
                     </div>,
-                    { duration: 10000, position: 'top-right' }
+                    { 
+                      duration: 12000, 
+                      position: 'top-right', 
+                      className: '!bg-white dark:!bg-[#0A0A0B] !text-slate-800 dark:!text-white !border !border-amber-100 dark:!border-white/5 !shadow-2xl !p-3' 
+                    }
                   );
                 } else {
                   toast.success(
@@ -619,17 +623,17 @@ export default function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: 'rgba(10, 15, 30, 0.85)',
+            background: 'rgba(10, 15, 30, 0.95)',
             color: '#f8fafc',
             borderRadius: '1.25rem',
-            padding: '14px 22px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.15)',
+            padding: '10px 16px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.20)',
             fontSize: '13px',
             fontWeight: '600',
             fontFamily: '"Inter", sans-serif',
-            backdropFilter: 'blur(12px)',
-            maxWidth: '400px',
+            backdropFilter: 'blur(16px)',
+            maxWidth: '420px',
             transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             display: 'inline-flex',
             alignItems: 'center',
@@ -638,7 +642,7 @@ export default function App() {
           success: {
             style: {
               borderLeft: '4px solid #10b981',
-              boxShadow: '0 15px 35px rgba(16, 185, 129, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 15px 35px rgba(16, 185, 129, 0.18), 0 0 1px rgba(255, 255, 255, 0.20)',
             },
             iconTheme: {
               primary: '#10b981',
@@ -648,7 +652,7 @@ export default function App() {
           error: {
             style: {
               borderLeft: '4px solid #ef4444',
-              boxShadow: '0 15px 35px rgba(239, 68, 68, 0.15), 0 0 1px rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 15px 35px rgba(239, 68, 68, 0.18), 0 0 1px rgba(255, 255, 255, 0.20)',
             },
             iconTheme: {
               primary: '#ef4444',
@@ -656,7 +660,27 @@ export default function App() {
             }
           }
         }}
-      />
+      >
+        {(t) => (
+          <ToastBar toast={t} style={{ ...t.style, padding: '4px 8px 4px 12px' }}>
+            {({ icon, message }) => (
+              <>
+                {icon}
+                <div className="flex-1 text-slate-100 pr-1 break-words">{message}</div>
+                {t.type !== 'loading' && (
+                  <button 
+                    onClick={() => toast.dismiss(t.id)}
+                    className="p-1 px-1.5 ml-1 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all active:scale-90 flex items-center justify-center shrink-0"
+                    title="Đóng"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
       <ConfirmModal />
       <AccessGuard>
         <ErrorBoundary>
@@ -680,6 +704,7 @@ export default function App() {
 
             {/* Main App Routes */}
             <Route element={<DeviceGuard><LocationGuard><OnboardingGuard><MainLayout /></OnboardingGuard></LocationGuard></DeviceGuard>}>
+              <Route path="/kho-van-ban" element={<TabGuard tabKey="kho-van-ban"><DocumentVault /></TabGuard>} />
               <Route path="/utilities" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/:utilityId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
               <Route path="/utilities/chat/:sessionId" element={<TabGuard tabKey="utilities"><UtilitiesPage /></TabGuard>} />
@@ -690,6 +715,7 @@ export default function App() {
               <Route path="/danh-ba" element={<TabGuard tabKey="contacts"><ContactsPage /></TabGuard>} />
               <Route path="/dan-so" element={<TabGuard tabKey="hrm"><PopulationPage /></TabGuard>} />
               <Route path="/benh-khong-lay-nhiem" element={<TabGuard tabKey="hrm"><NcdPage /></TabGuard>} />
+              <Route path="/suc-khoe" element={<HealthPage />} />
               <Route path="/guide" element={<TabGuard tabKey="guide"><GuidePage /></TabGuard>} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/portal" element={<PortalPage />} />

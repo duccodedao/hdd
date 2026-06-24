@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   FileText, Search, Filter, Download, Share2, Eye, 
   Trash2, Edit2, Plus, X, Upload, Check, AlertCircle,
   FolderOpen, FileArchive, Settings, ChevronRight, Save,
   MoreVertical, FileIcon, FileSpreadsheet, FileQuestion, 
-  BookOpen, LayoutGrid, List as ListIcon, Shield, ExternalLink,
+  BookOpen, LayoutGrid, List as ListIcon, Shield, ExternalLink, ShieldCheck, FileSearch,
   ArrowLeft, RefreshCw, Zap, Monitor, ArrowRight, CheckSquare, MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -55,7 +56,7 @@ const TruncatedName = ({ name, maxLength = 30 }: { name: string; maxLength?: num
 };
 
 interface DocumentVaultProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 interface UploadItem {
@@ -68,6 +69,8 @@ interface UploadItem {
 }
 
 export default function DocumentVault({ onBack }: DocumentVaultProps) {
+  const navigate = useNavigate();
+  const defaultOnBack = onBack || (() => navigate('/utilities'));
   const { user, isAdmin } = useAuthStore();
   const [documents, setDocuments] = useState<AdminDocument[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -76,6 +79,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [secondaryDocId, setSecondaryDocId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'normal' | 'vip' | 'paid'>('normal');
   const [purchasedDocIds, setPurchasedDocIds] = useState<string[]>([]);
@@ -86,7 +90,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [editingDoc, setEditingDoc] = useState<AdminDocument | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(true);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: '', categoryId: '', note: '', hidden: false });
   const [vipDialog, setVipDialog] = useState<{ isOpen: boolean; doc: AdminDocument | null; code: string; onConfirm: () => void; error?: string }>({
@@ -132,7 +136,20 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     );
     
     const unsubDocs = onSnapshot(qDocs, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AdminDocument));
+      const docs = snapshot.docs.map(d => {
+        const data = d.data();
+        // Sanitize data to remove any cyclic DocumentReference objects
+        const sanitized: any = { id: d.id };
+        for (const key in data) {
+          const val = data[key];
+          if (val && typeof val === 'object' && val.constructor.name === 'DocumentReference') {
+            sanitized[key] = val.path;
+          } else {
+            sanitized[key] = val;
+          }
+        }
+        return sanitized as AdminDocument;
+      });
       setDocuments(docs);
       setLastDoc(snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot || null);
       setHasMore(snapshot.docs.length === DOCS_PER_PAGE);
@@ -265,9 +282,16 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
   const handlePreview = async (docObj: AdminDocument) => {
     const ext = docObj.githubPath.split('.').pop()?.toLowerCase() || '';
     const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
-    const url = isOffice 
-      ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(docObj.githubUrl)}`
-      : docObj.githubUrl;
+    const isPdf = ext === 'pdf';
+    
+    let url = docObj.githubUrl;
+    
+    if (isOffice) {
+      url = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(docObj.githubUrl)}`;
+    } else if (isPdf) {
+      // Use Google Docs viewer for PDFs to ensure inline preview without forced download
+      url = `https://docs.google.com/viewer?url=${encodeURIComponent(docObj.githubUrl)}&embedded=true`;
+    }
     
     window.open(url, '_blank');
     await updateDoc(doc(db, 'documents', docObj.id), { views: increment(1) });
@@ -389,8 +413,12 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
     // Sync with admin side: filter deleted
     if (doc.isDeleted) return false;
 
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          doc.note.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = doc.name.toLowerCase().includes(searchLower) || 
+                          (doc.documentNumber && doc.documentNumber.toLowerCase().includes(searchLower)) ||
+                          (doc.note && doc.note.toLowerCase().includes(searchLower)) ||
+                          (doc.issuingUnit && doc.issuingUnit.toLowerCase().includes(searchLower));
+
     const khacCat = categories.find(c => c.name === 'Khác');
     const matchesCategory = selectedCategory === 'all' || 
                             doc.categoryId === selectedCategory ||
@@ -455,33 +483,7 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
   return (
     <div className="max-w-[1920px] mx-auto px-6 lg:px-12 py-8 lg:py-12 relative min-h-screen">
-      {/* Back Button */}
-      <button 
-        onClick={onBack} 
-        className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-white/5 mb-10 group w-fit"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay Lại
-      </button>
-
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
-        {/* Header Section */}
-        <div className="space-y-4 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-full">
-            <FolderOpen className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-[8px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Nucleus File Storage</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-display font-medium text-slate-900 dark:text-white tracking-tighter uppercase italic leading-none">
-            Kho <span className="text-indigo-600 dark:text-indigo-400">Văn Bản.</span>
-          </h1>
-          <p className="text-slate-600 dark:text-zinc-400 text-sm md:text-base font-medium leading-relaxed">
-            Hệ thống quản lý tài liệu, biểu mẫu, và văn bản chia sẻ nội bộ bằng Github Storage Repository.
-          </p>
-        </div>
-
-        {/* Global Actions Removed */}
-      </div>
-
-      {/* Filter and Search Bar */}
+      {/* Header and Search Bar Section */}
       <ConfirmModal
         isOpen={confirmState.isOpen}
         onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
@@ -490,103 +492,59 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         message={confirmState.message}
         type={confirmState.type}
       />
-      <div 
-        className={cn(
-          "sticky top-0 z-50 transition-all duration-500",
-          isScrolled 
-            ? "py-2 -mx-6 lg:-mx-12 px-6 lg:px-12 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-white/5 shadow-2xl shadow-indigo-500/5 mt-0" 
-            : "py-2 lg:py-0 bg-transparent mt-0 lg:-mt-4 mb-4"
-        )}
-      >
-        <div 
-          className={cn(
-            "transition-all duration-500",
-            isScrolled ? "max-w-2xl mx-auto" : "max-w-2xl mx-auto"
-          )}
+
+      <div className="flex flex-col md:flex-row items-center gap-4 mb-8">
+        <button 
+          onClick={defaultOnBack} 
+          className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white transition-colors px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-white/5 group w-fit shrink-0"
         >
-          <div className={cn(
-            "premium-card transition-all duration-500 flex flex-col md:flex-row items-center gap-2",
-            isScrolled 
-              ? "p-2 bg-white/40 dark:bg-white/[0.02] border-none shadow-none rounded-2xl" 
-              : "p-2 bg-slate-50/50 dark:bg-zinc-900/20 rounded-2xl border border-slate-200/50 dark:border-white/5"
-          )}>
-            <div className="relative flex-1 w-full group">
-              <Search className={cn(
-                "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors",
-                isScrolled ? "text-indigo-500" : "text-slate-400 dark:text-zinc-500"
-              )} />
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm văn bản, biểu mẫu..."
-                className={cn(
-                  "w-full pl-9 pr-4 transition-all duration-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white",
-                  isScrolled 
-                    ? "py-2 bg-transparent border-none" 
-                    : "py-2 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl"
-                )}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            <div className={cn(
-              "flex items-center gap-2 w-full md:w-auto transition-all duration-500",
-              isScrolled ? "opacity-90" : "opacity-100"
-            )}>
-              <div className="relative flex-1 md:w-40 group">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
-                <select 
-                  className={cn(
-                    "w-full pl-9 pr-8 transition-all duration-500 text-xs appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider",
-                    isScrolled 
-                      ? "py-2 bg-transparent border-none" 
-                      : "py-2 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl"
-                  )}
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    setSelectedCategory(e.target.value);
-                    if (viewMode === 'explorer') setExplorerCategory(null);
-                  }}
-                >
-                  <option value="all">Tất cả</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                  {!categories.some(c => c.name === 'Khác') && (
-                    <option value="">Chưa phân loại</option>
-                  )}
-                </select>
-                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none opacity-50" />
-              </div>
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay Lại
+        </button>
 
-              <div className={cn(
-                "hidden md:flex p-1 rounded-xl shrink-0 transition-all duration-500 bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-white/10",
-                isScrolled ? "scale-90" : ""
-              )}>
-                 <div className="p-2 text-indigo-400">
-                   <FolderOpen size={16} />
-                 </div>
-              </div>
-            </div>
-          </div>
+        {/* Dynamic single search bar */}
+        <div className="relative flex-1 w-full group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500 group-focus-within:text-indigo-500 transition-colors" />
+          <input 
+            type="text"
+            placeholder="Tìm kiếm theo tên tài liệu, số ký hiệu, trích yếu, đơn vị ban hành..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-10 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-sm"
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')} 
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/5"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
-        {/* Selection mode toggle button */}
-        <div className="max-w-2xl mx-auto mt-6 mb-2 flex items-center justify-center gap-1">
-           <button
-             onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}
-             className={cn(
-               "flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-bold transition-all border",
-               isSelectionMode 
-                 ? "bg-indigo-50 border-indigo-250 text-indigo-600 dark:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-400" 
-                 : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-zinc-900 dark:border-white/10 dark:text-zinc-500 dark:hover:bg-white/5"
-             )}
-           >
-             <CheckSquare size={14} />
-             {isSelectionMode ? "Tắt chọn nhiều" : "Bật chọn nhiều"}
-           </button>
+        {/* Clean category dropdown */}
+        <div className="relative w-full md:w-48 shrink-0 group">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
+          <select 
+            className="w-full pl-9 pr-8 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm cursor-pointer"
+            value={selectedCategory}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              if (viewMode === 'explorer') setExplorerCategory(null);
+            }}
+          >
+            <option value="all">Tất cả danh mục</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+            {!categories.some(c => c.name === 'Khác') && (
+              <option value="">Chưa phân loại</option>
+            )}
+          </select>
+          <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none opacity-50" />
         </div>
+      </div>
 
+      <div className="sticky top-0 z-50">
         {selectedIds.length > 0 && (
           <div className="max-w-4xl mx-auto flex items-center gap-4 p-4 mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl animate-in fade-in slide-in-from-top-4">
             <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
@@ -781,9 +739,9 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
         </div>
       ) : (
         <div className="space-y-10">
-          <div className="overflow-x-auto">
+          <div className="overflow-auto relative border border-slate-100 dark:border-white/5 rounded-2xl shadow-sm">
              <table className="min-w-[850px] w-full text-left table-auto">
-               <thead>
+               <thead className="sticky top-0 bg-white dark:bg-zinc-950 z-10 shadow-sm">
                  <tr className="border-b border-slate-100 dark:border-white/5">
                     {isSelectionMode && <th className="w-12 px-4 py-4 whitespace-nowrap">
                       <label className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-300 dark:border-white/20 bg-slate-50 dark:bg-zinc-800 cursor-pointer transition-all hover:border-indigo-500 group relative">
@@ -808,17 +766,25 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                        </label>
                     </th>}
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Định dạng</th>
-                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên hiển thị</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Tên văn bản</th>
+                   <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Số ký hiệu</th>
+                   <th className="hidden xl:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Đơn vị ban hành</th>
+                   <th className="hidden xl:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Ngày ban hành</th>
                    <th className="px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Danh mục</th>
 
-                   <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ngày tạo</th>
+
+                   {isAdmin && <th className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ngày tạo</th>}
                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-slate-50 dark:bg-zinc-950/20">Thao tác</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                  {filteredDocs.map((docItem) => (
-                   <tr key={docItem.id} className={cn("hover:bg-slate-50 dark:hover:bg-white/5 transition-colors", selectedIds.includes(docItem.id) && "bg-indigo-50/50 dark:bg-indigo-500/5")}>
-                     {isSelectionMode && <td className="px-4 py-4">
+                    <React.Fragment key={docItem.id}>
+                   <tr key={docItem.id} className={cn("transition-colors cursor-pointer", selectedIds.includes(docItem.id) && "bg-indigo-50/50 dark:bg-indigo-500/5", expandedRow === docItem.id && "bg-slate-50 dark:bg-white/5")} onClick={() => {
+                     setExpandedRow(expandedRow === docItem.id ? null : docItem.id);
+                     setSecondaryDocId(null);
+                   }}>
+                     {isSelectionMode && <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                        <label className="flex items-center justify-center w-5 h-5 rounded-md border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-900 cursor-pointer transition-all hover:border-indigo-500 group relative">
                          <input 
                             type="checkbox"
@@ -841,43 +807,76 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
                          {docItem.githubPath.split('.').pop()?.toUpperCase()}
                        </span>
                      </td>
-                     <td className={cn("px-2 md:px-4 py-4 font-bold text-[13px] md:text-sm text-slate-800 dark:text-zinc-200 whitespace-nowrap", (!docItem.isVip || isAdmin) && "cursor-pointer hover:text-indigo-600")} onClick={() => (!docItem.isVip || isAdmin) && handlePreview(docItem)}>
-                       <span className="whitespace-nowrap">{docItem.name}</span>
+                     <td className={cn("px-2 md:px-4 py-4 font-bold text-[13px] md:text-sm text-slate-800 dark:text-zinc-200")}>
+                       <div className="max-w-[400px] break-words">{docItem.name}</div>
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-[11px] md:text-sm text-slate-500 text-left w-40 md:w-44 truncate" title={docItem.categoryName || 'Chưa phân loại'}>
-                       {docItem.categoryName || 'Chưa phân loại'}
+                     <td className="px-2 md:px-4 py-4 text-left">
+                       {docItem.documentNumber ? (
+                         <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                           {docItem.documentNumber}
+                         </span>
+                       ) : (
+                         <span className="text-[10px] text-slate-300">---</span>
+                       )}
+                     </td>
+                     <td className="hidden xl:table-cell px-2 md:px-4 py-4 text-[10px] text-slate-500 text-left">
+                       {docItem.issuingUnit || <span className="text-slate-300">---</span>}
+                     </td>
+                     <td className="hidden xl:table-cell px-2 md:px-4 py-4 text-[10px] text-slate-500 text-left">
+                       {docItem.issuanceDate || <span className="text-slate-300">---</span>}
+                     </td>
+                     <td className="px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-500 text-left">
+                       <span className="font-bold text-indigo-500">{docItem.categoryName || 'Chưa phân loại'}</span>
                      </td>
 
-                     <td className="hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap">
+                     <td className={cn(isAdmin ? "hidden lg:table-cell px-2 md:px-4 py-4 text-[10px] md:text-xs text-slate-400 text-right w-48 whitespace-nowrap" : "hidden")}>
                         {docItem.createdAt ? new Date(docItem.createdAt?.seconds * 1000).toLocaleString() : 'N/A'}
                      </td>
-                     <td className="px-2 md:px-4 py-4 text-right w-20 whitespace-nowrap bg-white dark:bg-zinc-950/30 transition-colors">
-                       <div className="flex justify-center">
-                         {expandedRow === docItem.id ? (
-                           <div className="flex justify-end gap-1 md:gap-2 absolute right-full top-1/2 -translate-y-1/2 mr-2 bg-white dark:bg-[#0A0A0B] p-2 rounded-xl shadow-lg border border-slate-100 dark:border-white/5">
-                             {!docItem.isVip || isAdmin ? (
-                               <button onClick={() => handlePreview(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
-                             ) : (
-                               <div className="p-1.5 md:p-2 text-slate-300 cursor-not-allowed" title="VIP-Lock"><Shield size={16} /></div>
-                             )}
-                             <button onClick={() => handleDownload(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
-                             <button onClick={() => shareLink(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
-                             {isAdmin && (
-                               <>
-                                 <button onClick={() => handleEditInit(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
-                                 <button onClick={() => handleDelete(docItem)} className="p-1.5 md:p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
-                               </>
-                             )}
-                             <button onClick={() => setExpandedRow(null)} className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 transition-colors" title="Đóng"><X size={16} /></button>
-                           </div>
+                     <td className="px-2 md:px-4 py-4 text-right w-32 whitespace-nowrap transition-colors">
+                       <div className="flex justify-end gap-1 md:gap-2">
+                         {!docItem.isVip || isAdmin ? (
+                           <button onClick={(e) => { e.stopPropagation(); handlePreview(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Xem trước"><Eye size={16} /></button>
                          ) : (
-                           <button onClick={() => setExpandedRow(docItem.id)} className="p-1.5 md:p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Tác vụ">
-                             <MoreHorizontal size={16} />
-                           </button>
+                           <div className="p-1 md:p-1.5 text-slate-300 cursor-not-allowed" title="VIP-Lock"><Shield size={16} /></div>
+                         )}
+                         <button onClick={(e) => { e.stopPropagation(); handleDownload(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Tải xuống"><Download size={16} /></button>
+                         <button onClick={(e) => { e.stopPropagation(); shareLink(docItem.id); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Chia sẻ"><Share2 size={16} /></button>
+                         {isAdmin && (
+                           <>
+                             <button onClick={(e) => { e.stopPropagation(); handleEditInit(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-indigo-500 transition-colors" title="Chỉnh sửa"><Edit2 size={16} /></button>
+                             <button onClick={(e) => { e.stopPropagation(); handleDelete(docItem); }} className="p-1 md:p-1.5 text-slate-400 hover:text-rose-600 transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                           </>
                          )}
                        </div>
                      </td>
-                   </tr>
+                    </tr>
+                    {expandedRow === docItem.id && (
+                      <tr key={`expanded-${docItem.id}`}>
+                        <td colSpan={isSelectionMode ? 10 : 9} className="p-0 border-t border-slate-100 dark:border-white/5">
+                           <div className="p-4 md:p-8 bg-slate-50/50 dark:bg-white/[0.02] animate-in fade-in slide-in-from-top-2 duration-300">
+                               <RelatedDocumentsSection 
+                                doc={docItem} 
+                                allDocuments={documents} 
+                                onPreview={handlePreview}
+                                onDownload={handleDownload}
+                                secondaryDocId={secondaryDocId}
+                                setSecondaryDocId={setSecondaryDocId}
+                                onClose={() => setExpandedRow(null)}
+                                onExpand={(id) => {
+                                  setExpandedRow(id);
+                                  setSecondaryDocId(null);
+                                  // Find the element for the row we're jumping to
+                                  setTimeout(() => {
+                                    const el = document.getElementById(`doc-row-${id}`);
+                                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }, 100);
+                                }}
+                              />
+                           </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                  ))}
                </tbody>
              </table>
@@ -963,6 +962,227 @@ export default function DocumentVault({ onBack }: DocumentVaultProps) {
 
 // Minimal Components
 
+const RelatedDocumentsSection = ({ 
+  doc, 
+  allDocuments, 
+  onPreview, 
+  onDownload, 
+  onExpand,
+  secondaryDocId,
+  setSecondaryDocId,
+  onClose
+}: { 
+  doc: AdminDocument; 
+  allDocuments: AdminDocument[]; 
+  onPreview: (d: AdminDocument) => void; 
+  onDownload: (d: AdminDocument) => void; 
+  onExpand: (id: string) => void;
+  secondaryDocId: string | null;
+  setSecondaryDocId: (id: string | null) => void;
+  onClose: () => void;
+}) => {
+  // BFS to find all documents in the same chain
+  const getChain = (startDoc: AdminDocument) => {
+    const visited = new Set<string>();
+    const queue = [startDoc.id];
+    const chain: AdminDocument[] = [];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (!visited.has(currentId)) {
+        visited.add(currentId);
+        const currentDoc = allDocuments.find(d => d.id === currentId);
+        if (currentDoc) {
+          if (currentDoc.id !== startDoc.id) {
+            chain.push(currentDoc);
+          }
+          
+          // Add all neighbors
+          const neighbors = [
+            currentDoc.parentId,
+            currentDoc.replacesId,
+            ...(currentDoc.relatedDocIds || [])
+          ].filter(Boolean) as string[];
+          
+          // Also check for documents pointing to this one
+          allDocuments.forEach(d => {
+            if (d.parentId === currentId || d.replacesId === currentId || d.relatedDocIds?.includes(currentId)) {
+              neighbors.push(d.id);
+            }
+          });
+          
+          for (const neighbor of neighbors) {
+            if (!visited.has(neighbor)) {
+              queue.push(neighbor);
+            }
+          }
+        }
+      }
+    }
+    return chain.filter((d, i, self) => self.findIndex(t => t.id === d.id) === i); // Unique
+  };
+
+  const related = getChain(doc);
+  const hasRelated = related.length > 0;
+  const secondaryDoc = allDocuments.find(d => d.id === secondaryDocId);
+
+  const DocRow = ({ document, iconColor }: { document: AdminDocument; iconColor: string }) => (
+    <div 
+      onClick={() => setSecondaryDocId(secondaryDocId === document.id ? null : document.id)}
+      className={cn(
+        "flex flex-col p-4 bg-white dark:bg-zinc-900 rounded-2xl border transition-all group cursor-pointer h-full min-h-[100px] justify-between",
+        secondaryDocId === document.id ? "border-indigo-500 ring-4 ring-indigo-500/10 shadow-lg shadow-indigo-500/5" : "border-slate-200 dark:border-white/5 hover:border-indigo-500/30"
+      )}
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", iconColor)}>
+          <FileText size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md">
+              {document.documentNumber || 'Số: ---'}
+            </span>
+          </div>
+          <h5 className="text-sm font-bold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug" title={document.name}>
+            {document.name}
+          </h5>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-white/5">
+        <button 
+          onClick={(e) => { e.stopPropagation(); onExpand(document.id); }}
+          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all border border-transparent hover:border-indigo-500/20"
+        >
+          <RefreshCw size={12} /> Xem chính
+        </button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onPreview(document); }}
+          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-xl transition-all"
+        >
+          <ExternalLink size={12} /> Tài liệu
+        </button>
+      </div>
+    </div>
+  );
+
+  const DocumentDetailPane = ({ document, title, onClosePane }: { document: AdminDocument; title: string; onClosePane?: () => void }) => (
+    <div className="flex flex-col h-full space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center justify-between px-1 shrink-0">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500">{title}</h4>
+        <div className="flex items-center gap-2">
+          {document.isVip && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[8px] font-black uppercase tracking-widest">
+              <ShieldCheck size={10} />
+              VIP
+            </div>
+          )}
+          {onClosePane && (
+            <button 
+              onClick={onClosePane}
+              className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-md transition-colors"
+              title="Đóng"
+            >
+              <X size={14} className="text-slate-400" />
+            </button>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex-1 flex flex-col space-y-4 bg-white dark:bg-zinc-900 p-5 md:p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+        <div className="flex-1 space-y-4">
+          <div>
+            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Tên tài liệu</label>
+            <p className="text-sm font-bold text-slate-800 dark:text-zinc-200 leading-relaxed">{document.name}</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Số ký hiệu</label>
+              <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded inline-block">
+                {document.documentNumber || '---'}
+              </p>
+            </div>
+            <div>
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Ngày ban hành</label>
+              <p className="text-xs font-bold text-slate-600 dark:text-zinc-400">{document.issuanceDate || '---'}</p>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Đơn vị ban hành</label>
+            <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">{document.issuingUnit || '---'}</p>
+          </div>
+
+          {document.note && (
+            <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Ghi chú</label>
+              <p className="text-xs text-slate-500 dark:text-zinc-500 italic leading-relaxed">{document.note}</p>
+            </div>
+          )}
+        </div>
+        
+        <div className="pt-4 flex gap-2 shrink-0">
+           <button 
+             onClick={() => onPreview(document)}
+             className="flex-1 py-2 px-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+           >
+             <Eye size={14} /> Xem tài liệu
+           </button>
+           <button 
+             onClick={() => onDownload(document)}
+             className="flex-1 py-2 px-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+           >
+             <Download size={14} /> Tải xuống
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-8">
+       <div className={cn(
+         "grid grid-cols-1 gap-6 md:gap-8 transition-all duration-500",
+         secondaryDoc ? "lg:grid-cols-2" : "grid-cols-1"
+       )}>
+         {/* Main Detail Pane */}
+         <DocumentDetailPane document={doc} title="Chi tiết văn bản hiện tại" onClosePane={onClose} />
+         
+         {/* Secondary Detail Pane */}
+         {secondaryDoc && (
+           <DocumentDetailPane 
+             document={secondaryDoc} 
+             title={`Văn bản: ${secondaryDoc.documentNumber || 'Liên quan'}`} 
+             onClosePane={() => setSecondaryDocId(null)} 
+           />
+         )}
+       </div>
+
+       {/* Relationship Section */}
+       <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-white/5">
+         <div className="flex items-center justify-between px-1">
+           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500">Chuỗi văn bản liên quan</h4>
+           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Nhấp để so sánh</span>
+         </div>
+         {!hasRelated ? (
+           <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
+             <FileSearch className="w-8 h-8 text-slate-200 dark:text-zinc-800 mb-3" />
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Không tìm thấy văn bản liên quan</p>
+           </div>
+         ) : (
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+             {related.map(rel => (
+               <DocRow key={rel.id} document={rel} iconColor="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400" />
+             ))}
+           </div>
+         )}
+       </div>
+    </div>
+  );
+};
+
 const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDelete, onEdit, isAdmin, getFileIcon, getFormatBadgeColor, isHighlighted }: any) => {
   return (
     <motion.div
@@ -1013,7 +1233,7 @@ const DocumentCard = ({ docItem, idx = 0, onPreview, onDownload, onShare, onDele
           </div>
           
           <h4 className="font-bold text-slate-900 dark:text-white leading-tight text-lg group-hover:text-indigo-600 transition-colors break-words w-full" title={docItem.name}>
-            <TruncatedName name={docItem.name} maxLength={40} />
+            {docItem.name}
           </h4>
           
           <p className="text-xs text-slate-500 dark:text-zinc-500 italic line-clamp-2 leading-relaxed break-words">

@@ -1058,20 +1058,6 @@ export default function PortalPage() {
           <Globe className="w-3.5 h-3.5 text-rose-500" />
           Tin tức VnExpress
         </button>
-        <button
-          onClick={() => {
-            setPortalSource('health');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-            portalSource === 'health'
-              ? 'bg-white dark:bg-zinc-900 text-teal-650 dark:text-white shadow-md border-b-2 border-teal-500'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-          }`}
-        >
-          <Heart className="w-3.5 h-3.5 text-rose-500 animate-pulse fill-rose-500/20" />
-          Thông tin Y tế
-        </button>
       </div>
 
       {/* Layout / View Mode Choice Selection */}

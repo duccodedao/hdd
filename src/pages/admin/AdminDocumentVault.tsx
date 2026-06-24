@@ -1,12 +1,12 @@
 import { useAuthStore } from '../../store/authStore';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, where, getDocs, orderBy, writeBatch, Timestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, where, getDocs, orderBy, writeBatch, Timestamp, arrayUnion } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../../lib/firebase';
 import { GitHubConfig, AdminDocument } from '../../types';
 import { githubService } from '../../services/githubService';
-import { Upload, X, Settings, Edit2, LayoutGrid, Check, FolderOpen, Save, Trash2, ChevronRight, FileText, Eye, EyeOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { Upload, X, Settings, Edit2, LayoutGrid, Check, FolderOpen, Save, Trash2, ChevronRight, FileText, Eye, EyeOff, RefreshCw, AlertCircle, PlusCircle } from 'lucide-react';
 import { cn, safeJsonStringify } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -25,6 +25,14 @@ interface UploadItem {
   originalName: string;
   name: string;
   categoryId: string;
+  documentNumber?: string;
+  issuingUnit?: string;
+  issuanceDate?: string;
+  level?: string;
+  parentId?: string;
+  isParentLocked?: boolean;
+  relatedDocIds?: string[];
+  replacesId?: string;
   note: string;
   hidden: boolean;
   isVip: boolean;
@@ -35,9 +43,166 @@ interface UploadItem {
   errorMessage?: string;
 }
 
+const DocumentSelector = ({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder = "Chọn văn bản...",
+  className = "",
+  multiple = false,
+  disabled = false,
+  placement = "top"
+}: { 
+  value: string | string[]; 
+  onChange: (val: any) => void; 
+  options: { id: string; name: string; number?: string; isNew?: boolean }[];
+  placeholder?: string;
+  className?: string;
+  multiple?: boolean;
+  disabled?: boolean;
+  placement?: "top" | "bottom";
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filtered = options.filter(opt => 
+    opt.name.toLowerCase().includes(search.toLowerCase()) || 
+    opt.number?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const isSelected = (id: string) => {
+    if (multiple && Array.isArray(value)) return value.includes(id);
+    return value === id;
+  };
+
+  const handleSelect = (id: string) => {
+    if (disabled) return;
+    if (multiple && Array.isArray(value)) {
+      if (value.includes(id)) {
+        onChange(value.filter(v => v !== id));
+      } else {
+        onChange([...value, id]);
+      }
+    } else {
+      onChange(id);
+      setIsOpen(false);
+    }
+  };
+
+  const selectedOptions = options.filter(opt => isSelected(opt.id));
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className={cn("relative", className, disabled && "opacity-75 cursor-not-allowed")} ref={dropdownRef}>
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onClick={disabled ? undefined : () => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full px-4 py-2.5 rounded-xl text-left flex items-center justify-between transition-all min-h-[42px]",
+          disabled 
+            ? "bg-slate-50 dark:bg-zinc-950/50 border-slate-200/40 dark:border-white/5 text-slate-400 dark:text-zinc-500 cursor-not-allowed" 
+            : "bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 cursor-pointer"
+        )}
+      >
+        <div className="flex flex-wrap gap-1 items-center overflow-hidden">
+          {selectedOptions.length > 0 ? (
+            multiple ? (
+              selectedOptions.map(opt => (
+                <span key={opt.id} className="text-[9px] font-black bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  {opt.number || opt.name.substring(0, 10) + '...'}
+                  {!disabled && (
+                    <div onClick={(e) => { e.stopPropagation(); handleSelect(opt.id); }} className="hover:text-rose-500 cursor-pointer">
+                      <X size={8} />
+                    </div>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="text-[11px] font-bold truncate">
+                {selectedOptions[0].name}{selectedOptions[0].number ? ` (${selectedOptions[0].number})` : ''}
+              </span>
+            )
+          ) : (
+            <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500">{placeholder}</span>
+          )}
+        </div>
+        {!disabled && <ChevronRight className={cn("w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform", isOpen ? "rotate-90" : "")} />}
+      </div>
+
+      {isOpen && !disabled && (
+        <div className={cn(
+          "absolute z-[100] w-full bg-white dark:bg-zinc-925 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200",
+          placement === "top" ? "bottom-full mb-2" : "top-full mt-2"
+        )}>
+          <div className="p-2 border-b border-slate-100 dark:border-white/5">
+            <input
+              type="text"
+              autoFocus
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-900 rounded-lg text-xs outline-none"
+              placeholder="Tìm kiếm..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
+            {!multiple && (
+              <button
+                type="button"
+                onClick={() => { onChange(""); setIsOpen(false); }}
+                className="w-full px-3 py-2 text-left text-[11px] font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+              >
+                -- Không chọn --
+              </button>
+            )}
+            {filtered.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelect(opt.id)}
+                className={cn(
+                  "w-full px-3 py-2 text-left flex flex-col gap-0.5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors",
+                  isSelected(opt.id) && "bg-indigo-50 dark:bg-indigo-500/10"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-3 h-3 rounded border flex items-center justify-center shrink-0",
+                    isSelected(opt.id) ? "bg-indigo-500 border-indigo-500 text-white" : "border-slate-300 dark:border-white/10"
+                  )}>
+                    {isSelected(opt.id) && <Check size={8} strokeWidth={4} />}
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 truncate">{opt.name}</span>
+                  {opt.isNew && (
+                    <span className="text-[8px] font-black bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 px-1 rounded uppercase">Mới</span>
+                  )}
+                </div>
+                {opt.number && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-5">{opt.number}</span>}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">Không tìm thấy</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminDocumentVault() {
   const { userData } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'upload' | 'category' | 'files' | 'trash'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'category' | 'files' | 'trash' | 'issuing_units'>('upload');
   
   // GH Config State
   const [ghConfig, setGhConfig] = useState<GitHubConfig | null>(null);
@@ -46,6 +211,9 @@ export default function AdminDocumentVault() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [newCatDesc, setNewCatDesc] = useState('');
+
+  const [issuingUnits, setIssuingUnits] = useState<{id: string; name: string}[]>([]);
+  const [newIssuingUnitName, setNewIssuingUnitName] = useState('');
   
   // Files State
   const [documents, setDocuments] = useState<AdminDocument[]>([]);
@@ -124,6 +292,84 @@ export default function AdminDocumentVault() {
 
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [quickUploadState, setQuickUploadState] = useState<{ itemId: string; field: 'parentId' | 'replacesId' | 'child' } | null>(null);
+  const quickUploadRef = useRef<HTMLInputElement>(null);
+
+  const createUploadItem = async (file: File): Promise<UploadItem> => {
+    const parts = file.name.split('---');
+    let categoryId = '';
+    let fileName = file.name;
+
+    if (parts.length > 1) {
+      const categoryName = parts[0];
+      let cat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+      
+      if (!cat) {
+        // Create category automatically
+        const catRef = await addDoc(collection(db, 'document_categories'), {
+          name: categoryName,
+          description: 'Tự động tạo từ import',
+          createdAt: serverTimestamp()
+        });
+        cat = { id: catRef.id, name: categoryName, description: 'Tự động tạo từ import' };
+      }
+      categoryId = cat.id;
+      fileName = parts.slice(1).join('---');
+    } else {
+      // Default category 'Khác'
+      const khacCat = categories.find(c => c.name === 'Khác');
+      if (khacCat) categoryId = khacCat.id;
+    }
+
+    return {
+      id: Math.random().toString(36).substring(7),
+      file,
+      originalName: file.name,
+      name: fileName.substring(0, fileName.lastIndexOf('.')) || fileName,
+      categoryId,
+      documentNumber: '',
+      issuingUnit: '',
+      issuanceDate: '',
+      level: 'tuyen_tren',
+      parentId: '',
+      isParentLocked: false,
+      relatedDocIds: [],
+      replacesId: '',
+      note: '',
+      hidden: false,
+      isVip: false,
+      vipCode: '',
+      price: 0,
+      salePrice: 0,
+      status: 'pending'
+    };
+  };
+
+  const handleQuickFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && quickUploadState) {
+      const newItem = await createUploadItem(file);
+      if (quickUploadState.field === 'child') {
+        const parentItem = uploadItems.find(i => i.id === quickUploadState.itemId);
+        if (parentItem) {
+          newItem.parentId = parentItem.id;
+          newItem.isParentLocked = true;
+          if (parentItem.categoryId) {
+            newItem.categoryId = parentItem.categoryId;
+          }
+          if (parentItem.level) newItem.level = parentItem.level;
+          if (parentItem.issuingUnit) newItem.issuingUnit = parentItem.issuingUnit;
+          if (parentItem.issuanceDate) newItem.issuanceDate = parentItem.issuanceDate;
+        }
+        setUploadItems(prev => [...prev, newItem]);
+      } else {
+        setUploadItems(prev => [...prev, newItem]);
+        updateUploadItem(quickUploadState.itemId, quickUploadState.field, newItem.id);
+      }
+    }
+    setQuickUploadState(null);
+    if (e.target) e.target.value = '';
+  };
 
   useEffect(() => {
     if (userData?.role === 'review') {
@@ -158,15 +404,43 @@ export default function AdminDocumentVault() {
     }, (err) => {
       console.error("AdminDocumentVault categories listener error:", err?.message || String(err));
     });
+
+    const unsubIssuingUnits = onSnapshot(collection(db, 'document_issuing_units'), async (snap) => {
+      const units = snap.docs.map(d => ({ id: d.id, name: d.data().name }));
+      setIssuingUnits(units);
+      if (units.length === 0 && snap.metadata.fromCache === false) {
+        const defaultUnits = ['Bộ Y tế', 'Sở Y tế Tỉnh Cà Mau', 'UBND tỉnh Cà Mau', 'Trung Tâm Kiểm Soát Bệnh Tật Tỉnh Cà Mau', 'Trạm Y tế'];
+        const batch = writeBatch(db);
+        defaultUnits.forEach(name => {
+          const docRef = doc(collection(db, 'document_issuing_units'));
+          batch.set(docRef, { name, createdAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
+    }, (err) => {
+      console.error("AdminDocumentVault issuing units listener error:", err?.message || String(err));
+    });
     
     // Documents listener
     const unsubDocs = onSnapshot(query(collection(db, 'documents'), orderBy('createdAt', 'desc')), (snap) => {
-      setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminDocument)));
+      setDocuments(snap.docs.map(d => {
+        const data = d.data();
+        const sanitized: any = { id: d.id };
+        for (const key in data) {
+          const val = data[key];
+          if (val && typeof val === 'object' && val.constructor.name === 'DocumentReference') {
+            sanitized[key] = val.path;
+          } else {
+            sanitized[key] = val;
+          }
+        }
+        return sanitized as AdminDocument;
+      }));
     }, (err) => {
       console.error("AdminDocumentVault documents listener error:", err?.message || String(err));
     });
 
-    return () => { unsubConfig(); unsubCat(); unsubDocs(); };
+    return () => { unsubConfig(); unsubCat(); unsubIssuingUnits(); unsubDocs(); };
   }, []);
 
   const normalizeFileName = (name: string) => {
@@ -179,9 +453,59 @@ export default function AdminDocumentVault() {
       .toLowerCase();
   };
 
+  const buildPhysicalFileName = (item: UploadItem) => {
+    const dateStr = item.issuanceDate ? normalizeFileName(item.issuanceDate).replace(/-/g, '') : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const numberStr = item.documentNumber ? normalizeFileName(item.documentNumber).replace(/[^a-zA-Z0-9.\-_]/g, '_') : 'KHONGSO';
+    const nameStr = item.name ? normalizeFileName(item.name).substring(0, 50) : 'FILE';
+    const ext = item.file.name.split('.').pop() || 'pdf';
+    return `${dateStr}_${numberStr}_${nameStr}.${ext}`;
+  };
+
   const scanFile = async (file: File): Promise<boolean> => {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate delay
       return Math.random() > 0.05; // Simulate 95% pass rate
+  };
+
+  const handleCreateIssuingUnit = async (e: React.FormEvent) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    e.preventDefault();
+    if (!newIssuingUnitName) return;
+    try {
+      await addDoc(collection(db, 'document_issuing_units'), {
+        name: newIssuingUnitName,
+        createdAt: serverTimestamp()
+      });
+      toast.success('Đã thêm đơn vị ban hành');
+      setNewIssuingUnitName('');
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi thêm đơn vị ban hành');
+    }
+  };
+
+  const handleDeleteIssuingUnit = (id: string, name: string) => {
+    if (userData?.role === 'review') {
+      toast.error('Tài khoản ở chế độ Review (Chỉ xem), không thể thực hiện thao tác này.');
+      return;
+    }
+    setConfirmState({
+      isOpen: true,
+      title: 'Xóa đơn vị ban hành',
+      message: `Bạn có chắc chắn muốn xóa đơn vị ban hành "${name}"? Thao tác này không thể hoàn tác.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'document_issuing_units', id));
+          toast.success('Đã xóa đơn vị ban hành');
+        } catch (err) {
+          console.error(err);
+          toast.error('Lỗi khi xóa đơn vị ban hành');
+        }
+      }
+    });
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -464,45 +788,8 @@ export default function AdminDocumentVault() {
       const newItems: UploadItem[] = [];
       
       for (const file of Array.from(e.target.files)) {
-        const parts = file.name.split('---');
-        let categoryId = '';
-        let fileName = file.name;
-
-        if (parts.length > 1) {
-          const categoryName = parts[0];
-          let cat = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-          
-          if (!cat) {
-            // Create category automatically
-            const catRef = await addDoc(collection(db, 'document_categories'), {
-              name: categoryName,
-              description: 'Tự động tạo từ import',
-              createdAt: serverTimestamp()
-            });
-            cat = { id: catRef.id, name: categoryName, description: 'Tự động tạo từ import' };
-          }
-          categoryId = cat.id;
-          fileName = parts.slice(1).join('---');
-        } else {
-          // Default category 'Khác'
-          const khacCat = categories.find(c => c.name === 'Khác');
-          if (khacCat) categoryId = khacCat.id;
-        }
-
-        newItems.push({
-          id: Math.random().toString(36).substring(7),
-          file,
-          originalName: file.name,
-          name: fileName.substring(0, fileName.lastIndexOf('.')) || fileName,
-          categoryId,
-          note: '',
-          hidden: false,
-          isVip: false,
-          vipCode: '',
-          price: 0,
-          salePrice: 0,
-          status: 'pending'
-        });
+        const item = await createUploadItem(file);
+        newItems.push(item);
       }
       setUploadItems(prev => [...prev, ...newItems]);
     }
@@ -565,6 +852,7 @@ export default function AdminDocumentVault() {
     }
 
     setUploading(true);
+    const localToFirestoreMap: Record<string, string> = {};
 
     for (const item of itemsToUpload) {
       setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'scanning' } : i));
@@ -577,17 +865,23 @@ export default function AdminDocumentVault() {
         
         const category = categories.find(c => c.id === item.categoryId);
         const folderName = category ? normalizeFileName(category.name) : 'general';
-        const normalizedName = normalizeFileName(item.file.name);
-        const fileName = `${Date.now()}-${normalizedName}`;
-        const path = `documents/${folderName}/${fileName}`;
+        const physicalFileName = buildPhysicalFileName(item);
+        const path = `documents/${folderName}/${physicalFileName}`;
         
         const githubData = await githubService.uploadFile(ghConfig, item.file, path);
         
-        await addDoc(collection(db, 'documents'), {
+        const docRef = await addDoc(collection(db, 'documents'), {
           name: item.name || item.file.name,
           originalName: item.originalName,
           categoryId: item.categoryId,
           categoryName: category?.name || 'Khác',
+          documentNumber: item.documentNumber || '',
+          issuingUnit: item.issuingUnit || '',
+          issuanceDate: item.issuanceDate || '',
+          level: item.level || 'tuyen_tren',
+          parentId: localToFirestoreMap[item.parentId || ''] || item.parentId || '',
+          relatedDocIds: (item.relatedDocIds || []).map(id => localToFirestoreMap[id] || id),
+          replacesId: localToFirestoreMap[item.replacesId || ''] || item.replacesId || '',
           note: item.note,
           githubUrl: githubData.url,
           githubSha: githubData.sha,
@@ -602,6 +896,21 @@ export default function AdminDocumentVault() {
           updatedAt: serverTimestamp()
         });
         
+        localToFirestoreMap[item.id] = docRef.id;
+
+        // Update replaced document
+        const finalReplacesId = localToFirestoreMap[item.replacesId || ''] || item.replacesId || '';
+        if (finalReplacesId) {
+          try {
+            await updateDoc(doc(db, 'documents', finalReplacesId), {
+              replacedById: docRef.id,
+              updatedAt: serverTimestamp()
+            });
+          } catch (err) {
+            console.error("Failed to update replacedById:", err);
+          }
+        }
+
         setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'success', errorMessage: undefined } : i));
         
         setTimeout(() => {
@@ -612,7 +921,47 @@ export default function AdminDocumentVault() {
         setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'error', errorMessage: error.message || 'Lỗi không xác định' } : i));
       }
     }
+
+    // Resolve any remaining local ID mappings (e.g. parent-child, replacement, related documents)
+    for (const item of itemsToUpload) {
+      const firestoreId = localToFirestoreMap[item.id];
+      if (!firestoreId) continue;
+
+      const realParentId = localToFirestoreMap[item.parentId || ''] || item.parentId || '';
+      const realReplacesId = localToFirestoreMap[item.replacesId || ''] || item.replacesId || '';
+      const realRelatedDocIds = (item.relatedDocIds || []).map(id => localToFirestoreMap[id] || id);
+
+      if (realParentId !== item.parentId || realReplacesId !== item.replacesId || JSON.stringify(realRelatedDocIds) !== JSON.stringify(item.relatedDocIds)) {
+        try {
+          await updateDoc(doc(db, 'documents', firestoreId), {
+            parentId: realParentId,
+            replacesId: realReplacesId,
+            relatedDocIds: realRelatedDocIds,
+            updatedAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.error("Failed to update post-upload relationships for", firestoreId, err);
+        }
+      }
+    }
     
+    const successfulDocIds = Object.values(localToFirestoreMap);
+    if (successfulDocIds.length > 1) {
+      for (const id of successfulDocIds) {
+        try {
+          const otherIds = successfulDocIds.filter(otherId => otherId !== id);
+          if (otherIds.length > 0) {
+            await updateDoc(doc(db, 'documents', id), {
+              relatedDocIds: arrayUnion(...otherIds),
+              updatedAt: serverTimestamp()
+            });
+          }
+        } catch (err) {
+          console.error("Failed to auto-link bulk upload items:", err);
+        }
+      }
+    }
+
     setUploading(false);
     toast.success('Đã xử lý xong các tệp trong hàng đợi');
   };
@@ -631,9 +980,8 @@ export default function AdminDocumentVault() {
 
         const category = categories.find(c => c.id === item.categoryId);
         const folderName = category ? normalizeFileName(category.name) : 'general';
-        const normalizedName = normalizeFileName(item.file.name);
-        const fileName = `${Date.now()}-${normalizedName}`;
-        const path = `documents/${folderName}/${fileName}`;
+        const physicalFileName = buildPhysicalFileName(item);
+        const path = `documents/${folderName}/${physicalFileName}`;
         
         const githubData = await githubService.uploadFile(ghConfig!, item.file, path);
         
@@ -642,6 +990,13 @@ export default function AdminDocumentVault() {
           originalName: item.originalName,
           categoryId: item.categoryId,
           categoryName: category?.name || 'Khác',
+          documentNumber: item.documentNumber || '',
+          issuingUnit: item.issuingUnit || '',
+          issuanceDate: item.issuanceDate || '',
+          level: item.level || 'tuyen_tren',
+          parentId: item.parentId || '',
+          relatedDocIds: item.relatedDocIds || [],
+          replacesId: item.replacesId || '',
           note: item.note,
           githubUrl: githubData.url,
           githubSha: githubData.sha,
@@ -699,6 +1054,7 @@ export default function AdminDocumentVault() {
           onClose={() => setEditingDoc(null)}
           doc={editingDoc}
           categories={categories}
+          documents={documents}
           onConfirm={handleUpdateDocument}
         />
       )}
@@ -714,6 +1070,9 @@ export default function AdminDocumentVault() {
         </button>
         <button onClick={() => setActiveTab('category')} className={cn("px-4 py-2 font-bold text-sm tracking-wide transition-colors whitespace-nowrap", activeTab === 'category' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white')}>
           <LayoutGrid className="w-4 h-4 inline-block mr-2" /> Danh Mục
+        </button>
+        <button onClick={() => setActiveTab('issuing_units')} className={cn("px-4 py-2 font-bold text-sm tracking-wide transition-colors whitespace-nowrap", activeTab === 'issuing_units' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white')}>
+          <Settings className="w-4 h-4 inline-block mr-2" /> Đơn vị ban hành
         </button>
       </div>
 
@@ -749,9 +1108,9 @@ export default function AdminDocumentVault() {
                 <input type="file" className="hidden" accept=".json" onChange={handleImport} />
              </label>
            </div>
-           <div className="overflow-x-auto no-scrollbar scroll-smooth">
+           <div className="overflow-auto max-h-[calc(100vh-250px)] relative">
              <table className="w-full text-left min-w-[1200px]">
-               <thead>
+               <thead className="sticky top-0 bg-white dark:bg-zinc-950 z-10 shadow-sm">
                  <tr className="border-b border-slate-100 dark:border-white/5">
                    <th className="px-6 py-4 whitespace-nowrap">
                      <input 
@@ -770,9 +1129,11 @@ export default function AdminDocumentVault() {
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Định dạng</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên file gốc</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên hiển thị</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Số ký hiệu</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Đơn vị ban hành</th>
+                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày ban hành</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
                    
-
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày tạo</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ghi chú</th>
                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
@@ -801,12 +1162,23 @@ export default function AdminDocumentVault() {
                        </span>
                      </td>
                      <td className="px-6 py-4">
-                       <div className="max-w-[200px] overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
-                        <span className="text-xs font-medium text-slate-500 dark:text-zinc-500">{docItem.originalName || 'N/A'}</span>
-                       </div>
+                        <div className="max-w-[250px] break-words">
+                         <span className="text-xs font-medium text-slate-500 dark:text-zinc-500">{docItem.originalName || 'N/A'}</span>
+                        </div>
                      </td>
                      <td className="px-6 py-4">
-                        <TruncatedName name={docItem.name} maxLength={25} />
+                        <span className="font-bold text-sm text-slate-800 dark:text-zinc-200 break-words">{docItem.name}</span>
+                     </td>
+                     <td className="px-6 py-4">
+                        <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded uppercase tracking-widest shrink-0">
+                          {docItem.documentNumber || '---'}
+                        </span>
+                     </td>
+                     <td className="px-6 py-4 text-xs text-slate-500">
+                        {docItem.issuingUnit || '---'}
+                     </td>
+                     <td className="px-6 py-4 text-xs text-slate-500">
+                        {docItem.issuanceDate || '---'}
                      </td>
                      <td className="px-6 py-4">
                         <select 
@@ -884,9 +1256,9 @@ export default function AdminDocumentVault() {
                 <button onClick={handleBulkPermanentDelete} className="text-xs px-3 py-1 bg-rose-100 dark:bg-rose-500/20 text-rose-600 rounded-lg">Xóa vĩnh viễn tất cả</button>
              )}
            </h3>
-           <div className="overflow-x-auto no-scrollbar scroll-smooth">
+           <div className="overflow-auto max-h-[calc(100vh-250px)] relative">
              <table className="w-full text-left min-w-[1000px]">
-                <thead>
+                <thead className="sticky top-0 bg-white dark:bg-zinc-950 z-10 shadow-sm">
                   <tr className="border-b border-slate-100 dark:border-white/5">
                     <th className="px-6 py-4 whitespace-nowrap">
                       <input 
@@ -904,6 +1276,9 @@ export default function AdminDocumentVault() {
                     </th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên tài liệu</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tên gốc</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Số ký hiệu</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Đơn vị ban hành</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày ban hành</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Danh mục</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày xóa</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Thao tác</th>
@@ -911,7 +1286,7 @@ export default function AdminDocumentVault() {
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-white/5">
                   {documents.filter(d => d.isDeleted).map(docItem => (
-                    <tr key={docItem.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                    <tr key={docItem.id} className="transition-colors group">
                       <td className="px-6 py-4">
                         <input 
                           type="checkbox"
@@ -926,10 +1301,25 @@ export default function AdminDocumentVault() {
                           }}
                         />
                       </td>
-                       <td className="px-6 py-4 whitespace-nowrap">
-                        <TruncatedName name={docItem.name} maxLength={25} />
+                       <td className="px-6 py-4">
+                         <span className="font-bold text-sm text-slate-800 dark:text-zinc-200 break-words">{docItem.name}</span>
                        </td>
-                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.originalName}</td>
+                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500">
+                         <div className="max-w-[250px] break-words">
+                           {docItem.originalName}
+                         </div>
+                       </td>
+                       <td className="px-6 py-4">
+                         <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded uppercase tracking-widest shrink-0">
+                           {docItem.documentNumber || '---'}
+                         </span>
+                       </td>
+                       <td className="px-6 py-4 text-xs text-slate-500">
+                          {docItem.issuingUnit || '---'}
+                       </td>
+                       <td className="px-6 py-4 text-xs text-slate-500">
+                          {docItem.issuanceDate || '---'}
+                       </td>
                        <td className="px-6 py-4 text-xs text-slate-500 dark:text-zinc-500 whitespace-nowrap">{docItem.categoryName}</td>
                        <td className="px-6 py-4 whitespace-nowrap">
                          <span className="text-xs text-slate-400 dark:text-zinc-600">
@@ -969,6 +1359,9 @@ export default function AdminDocumentVault() {
 
       {activeTab === 'upload' && (
          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+           <datalist id="issuing-units-list">
+             {issuingUnits.map(unit => <option key={unit.id} value={unit.name} />)}
+           </datalist>
            <form onSubmit={handleUpload} className="space-y-6">
               <div className="space-y-3">
                  <label className="text-xs font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Tài liệu (Chọn hoặc kéo thả nhiều file)</label>
@@ -982,6 +1375,7 @@ export default function AdminDocumentVault() {
                        <p className="text-xs text-slate-400 dark:text-zinc-600 mt-2">Kích thước tối đa 25MB / file.</p>
                     </div>
                     <input type="file" className="hidden" multiple onChange={handleFileChange} />
+                     <input type="file" className="hidden" ref={quickUploadRef} onChange={handleQuickFileChange} />
                  </label>
               </div>
 
@@ -995,42 +1389,59 @@ export default function AdminDocumentVault() {
                         <button onClick={retryAllFailed} className="ml-auto px-3 py-1 bg-rose-600 text-white rounded-lg hover:bg-rose-700">Tải lại tất cả thất bại</button>
                     )}
                   </div>
-                  <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-2 bg-slate-100 dark:bg-zinc-900/80 rounded-xl text-xs font-bold text-slate-500 dark:text-zinc-500">
-                     <div className="col-span-2">Tên file gốc</div>
-                     <div className="col-span-3">Tên hiển thị</div>
-                     <div className="col-span-3">Danh mục lưu trữ</div>
-                     <div className="col-span-2">Ghi chú bổ sung</div>
-                     <div className="col-span-1 text-center">Ẩn/Hiện</div>
-                     <div className="col-span-1 text-center">Hành động</div>
-                  </div>
+
                   
-                  <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
                     {uploadItems.map(item => (
-                      <div key={item.id} className="relative flex flex-col lg:grid lg:grid-cols-[1.5fr_2.5fr_2fr_2fr_1fr_1fr] gap-3 p-4 lg:p-0 bg-slate-50 dark:bg-zinc-925 lg:bg-transparent lg:dark:bg-transparent border lg:border-0 border-slate-200 dark:border-white/5 rounded-2xl lg:rounded-none">
-                         <div className="flex flex-col justify-center">
-                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tên file gốc</label>
+                      <div key={item.id} className="bg-white dark:bg-zinc-900/40 border border-slate-200 dark:border-white/5 rounded-[2rem] p-5 md:p-6 hover:border-indigo-500/30 transition-all shadow-sm space-y-5">
+                         <div className="flex flex-col justify-center overflow-hidden pb-4 border-b border-slate-100 dark:border-white/5 w-full">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1 block">Tên file gốc</label>
                             <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth px-1">
                                <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
-                               <span className="text-xs font-medium text-slate-700 dark:text-slate-300" title={item.originalName}>{item.originalName}</span>
+                               <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate" title={item.originalName}>{item.originalName}</span>
                             </div>
                          </div>
                          
-                         <div className="flex flex-col justify-center">
-                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Tên hiển thị</label>
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest block">Tên hiển thị <span className="text-rose-500">*</span></label>
                             <input 
                               type="text" 
                               placeholder="Tên hiển thị"
-                              className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs text-slate-900 dark:text-white transition-all font-medium"
+                              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:ring-1 focus:ring-indigo-500/20 text-xs text-slate-900 dark:text-white transition-all font-medium"
                               value={item.name}
                               onChange={(e) => updateUploadItem(item.id, 'name', e.target.value)}
                               required
                             />
                          </div>
 
-                         <div className="flex flex-col justify-center relative">
-                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Danh mục</label>
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Số ký hiệu</label>
+                            <input 
+                              type="text" 
+                              placeholder="Số ký hiệu"
+                              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:ring-1 focus:ring-indigo-500/20 text-[10px] text-slate-600 dark:text-zinc-400 font-bold"
+                              value={item.documentNumber}
+                              onChange={(e) => updateUploadItem(item.id, 'documentNumber', e.target.value)}
+                            />
+                         </div>
+
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Đơn vị ban hành</label>
+                            <input 
+                              type="text" 
+                              list="issuing-units-list"
+                              placeholder="Đơn vị ban hành"
+                              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:ring-1 focus:ring-indigo-500/20 text-[10px] text-slate-900 dark:text-white"
+                              value={item.issuingUnit}
+                              onChange={(e) => updateUploadItem(item.id, 'issuingUnit', e.target.value)}
+                            />
+                         </div>
+
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Danh mục <span className="text-rose-500">*</span></label>
                             <select 
-                              className="w-full pl-4 pr-8 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs appearance-none text-slate-900 dark:text-white font-medium transition-all"
+                              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-[10px] appearance-none"
                               value={item.categoryId}
                               onChange={(e) => updateUploadItem(item.id, 'categoryId', e.target.value)}
                               required
@@ -1038,59 +1449,94 @@ export default function AdminDocumentVault() {
                               <option value="">Chọn danh mục...</option>
                               {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                             </select>
-                            <ChevronRight className="absolute right-3 top-[34px] lg:top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 rotate-90 pointer-events-none" />
                          </div>
 
-                         <div className="flex flex-col justify-center">
-                            <label className="lg:hidden text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Ghi chú</label>
+                         <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Ngày ban hành</label>
                             <input 
-                              type="text"
-                              className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs text-slate-900 dark:text-white transition-all font-medium"
-                              placeholder="Ghi chú thêm..."
-                              value={item.note}
-                              onChange={(e) => updateUploadItem(item.id, 'note', e.target.value)}
+                              type="date"
+                              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-[10px]"
+                              value={item.issuanceDate}
+                              onChange={(e) => updateUploadItem(item.id, 'issuanceDate', e.target.value)}
                             />
                          </div>
 
+                         <div className="flex flex-col gap-1 w-full md:col-span-2">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Văn bản liên quan</label>
+                            <DocumentSelector 
+                                value={item.relatedDocIds || []}
+                                onChange={(val) => updateUploadItem(item.id, 'relatedDocIds', val)}
+                                placeholder="VB liên quan..."
+                                className="w-full"
+                                multiple={true}
+                                options={[
+                                  ...documents.map(d => ({ id: d.id, name: d.name, number: d.documentNumber })),
+                                  ...uploadItems.filter(ui => ui.id !== item.id).map(ui => ({ id: ui.id, name: ui.name, number: ui.documentNumber, isNew: true }))
+                                ]}
+                            />
+                         </div>
 
-
-                         <div className="absolute top-3 right-12 lg:static flex items-center justify-center gap-2">
+                         <div className="flex flex-col w-full">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Trạng thái</label>
                             <button 
                                type="button"
                                onClick={() => updateUploadItem(item.id, 'hidden', !item.hidden)}
                                className={cn(
-                                 "p-2 rounded-lg transition-all", 
-                                 item.hidden ? "text-amber-500 bg-amber-50 dark:bg-amber-500/10" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"
+                                 "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm w-fit", 
+                                 item.hidden ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400" : "text-slate-500 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10"
                                )}
                                title={item.hidden ? "Đang ẩn" : "Đang hiện"}
                             >
                                {item.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                               <span>{item.hidden ? "Ẩn" : "Công khai"}</span>
                             </button>
                          </div>
 
-                         <div className="absolute top-3 right-3 lg:static lg:col-span-1 flex items-center justify-center gap-2">
-                             <button 
-                               type="button"
-                               onClick={() => removeUploadItem(item.id)}
-                               className="p-2 text-rose-500 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 rounded-lg transition-all"
-                               title="Xóa khỏi danh sách"
-                             >
-                               <Trash2 size={14} />
-                             </button>
-                             {item.status === 'success' && <Check size={16} className="text-emerald-500" />}
-                             {item.status === 'error' && (
-                               <div className="flex items-center gap-2">
-                                   <div className="relative group">
-                                       <AlertCircle size={16} className="text-rose-500 cursor-help" />
-                                       <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                           {item.errorMessage}
-                                       </div>
-                                   </div>
-                                   <button onClick={() => retryUpload(item.id)} className="text-indigo-600 text-[10px] font-bold whitespace-nowrap hover:underline">Thử lại</button>
-                               </div>
-                             )}
-                             {item.status === 'uploading' && <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />}
-                             {item.status === 'scanning' && <div className="text-[10px] font-bold text-indigo-600 animate-pulse">Đang quét virus...</div>}
+                         <div className="flex flex-col w-full">
+                            <label className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1.5 block">Thao tác</label>
+                            <div className="flex flex-wrap items-center gap-2">
+                               <button 
+                                 type="button"
+                                 onClick={() => removeUploadItem(item.id)}
+                                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 shadow-sm w-fit"
+                                 title="Xóa khỏi danh sách"
+                               >
+                                 <Trash2 size={14} />
+                                 <span>Xóa</span>
+                               </button>
+                               
+                               {item.status === 'success' && (
+                                 <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 px-3 py-2 rounded-xl">
+                                   <Check size={14} />
+                                   <span>Thành công</span>
+                                 </div>
+                               )}
+                               {item.status === 'error' && (
+                                 <div className="relative group">
+                                     <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold text-xs bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 px-3 py-2 rounded-xl cursor-help">
+                                         <AlertCircle size={14} />
+                                         <span>Lỗi</span>
+                                     </div>
+                                     <div className="absolute bottom-full left-0 mb-2 w-48 p-2.5 bg-slate-800 text-white text-[10px] rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 font-medium">
+                                         {item.errorMessage}
+                                     </div>
+                                 </div>
+                               )}
+                               {item.status === 'uploading' && (
+                                 <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-bold text-xs bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 px-3 py-2 rounded-xl animate-pulse">
+                                   <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                                   <span>Đang tải...</span>
+                                 </div>
+                               )}
+                               {item.status === 'scanning' && (
+                                 <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold text-xs bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 px-3 py-2 rounded-xl animate-pulse">
+                                   <RefreshCw size={14} className="animate-spin" />
+                                   <span>Đang quét...</span>
+                                 </div>
+                               )}
+                            </div>
+                         </div>
+
                          </div>
                       </div>
                     ))}
@@ -1166,6 +1612,44 @@ export default function AdminDocumentVault() {
            </div>
         </div>
       )}
+
+      {activeTab === 'issuing_units' && (
+        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+           <form onSubmit={handleCreateIssuingUnit} className="mb-8 space-y-4 max-w-xl">
+              <h3 className="text-lg font-bold">Thêm Đơn Vị Ban Hành Mới</h3>
+              <input 
+                type="text" 
+                placeholder="Tên đơn vị ban hành..." 
+                value={newIssuingUnitName} 
+                onChange={e => setNewIssuingUnitName(e.target.value)} 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-white" 
+                required 
+              />
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium text-sm transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+                Thêm đơn vị
+              </button>
+           </form>
+           
+           <div>
+              <h3 className="text-lg font-bold mb-4">Danh sách Đơn vị ban hành ({issuingUnits.length})</h3>
+              <div className="space-y-2">
+                {issuingUnits.map(unit => (
+                  <div key={unit.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                     <div>
+                        <h4 className="font-bold text-slate-800 dark:text-white">{unit.name}</h4>
+                     </div>
+                     <div className="flex gap-2 mt-2 sm:mt-0">
+                       <button onClick={() => handleDeleteIssuingUnit(unit.id, unit.name)} className="text-rose-500 p-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all">
+                          <Trash2 className="w-4 h-4" />
+                       </button>
+                     </div>
+                  </div>
+                ))}
+                {issuingUnits.length === 0 && <p className="text-slate-500 text-sm">Chưa có đơn vị ban hành nào.</p>}
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1192,10 +1676,17 @@ const TruncatedName = ({ name, maxLength = 30 }: { name: string; maxLength?: num
   );
 };
 
-const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any) => {
+const EditDocumentModal = ({ isOpen, onClose, doc, categories, documents, onConfirm }: any) => {
   const [formData, setFormData] = useState({
     name: doc.name,
     categoryId: doc.categoryId,
+    documentNumber: doc.documentNumber || '',
+    issuingUnit: doc.issuingUnit || '',
+    issuanceDate: doc.issuanceDate || '',
+    level: doc.level || 'tuyen_tren',
+    parentId: doc.parentId || '',
+    replacesId: doc.replacesId || '',
+    relatedDocIds: doc.relatedDocIds || [],
     note: doc.note || '',
     isVip: doc.isVip || false,
     vipCode: doc.vipCode || '',
@@ -1219,7 +1710,7 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
 
   return (
     <div className={cn("fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all", isOpen ? "opacity-100" : "opacity-0 pointer-events-none")}>
-      <div className={cn("bg-white dark:bg-zinc-925 w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5 overflow-hidden transform transition-all duration-300", isOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4")}>
+      <div className={cn("bg-white dark:bg-zinc-925 w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5 overflow-hidden transform transition-all duration-300", isOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4")}>
         <div className="p-8 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
            <div>
               <h3 className="text-xl font-black text-slate-800 dark:text-zinc-200 uppercase tracking-tighter">Sửa thông tin tài liệu</h3>
@@ -1230,7 +1721,7 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
            </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Tên hiển thị</label>
@@ -1255,6 +1746,50 @@ const EditDocumentModal = ({ isOpen, onClose, doc, categories, onConfirm }: any)
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                  </select>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Số ký hiệu</label>
+                 <input 
+                   type="text"
+                   placeholder="VD: 123/QD-BYT"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.documentNumber}
+                   onChange={e => setFormData({ ...formData, documentNumber: e.target.value })}
+                 />
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Đơn vị ban hành</label>
+                 <input 
+                   type="text"
+                   list="issuing-units-list"
+                   placeholder="VD: Bộ Y tế"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.issuingUnit}
+                   onChange={e => setFormData({ ...formData, issuingUnit: e.target.value })}
+                 />
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Ngày ban hành</label>
+                 <input 
+                   type="date"
+                   className="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                   value={formData.issuanceDate}
+                   onChange={e => setFormData({ ...formData, issuanceDate: e.target.value })}
+                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                 <label className="text-[10px] font-black text-slate-500 dark:text-zinc-500 uppercase tracking-widest ml-1">Văn bản liên quan</label>
+                 <DocumentSelector 
+                    value={formData.relatedDocIds || []}
+                    onChange={(val) => setFormData({ ...formData, relatedDocIds: val })}
+                    options={documents.filter(d => d.id !== doc.id).map(d => ({ id: d.id, name: d.name, number: d.documentNumber }))}
+                    className="w-full"
+                    multiple={true}
+                 />
               </div>
            </div>
 

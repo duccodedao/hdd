@@ -46,7 +46,7 @@ export interface AccessRequest {
 }
 
 export default function AdminSecuritySessions() {
-  const [activeTab, setActiveTab] = useState<'guests' | 'auth' | 'approved' | 'pending'>('auth');
+  const [activeTab, setActiveTab] = useState<'guests' | 'auth' | 'approved' | 'pending' | 'warnings'>('auth');
   
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [guests, setGuests] = useState<GuestVisit[]>([]);
@@ -396,12 +396,16 @@ export default function AdminSecuritySessions() {
         </div>
       </div>
 
-      {/* Unapproved Admin Sessions Security Warnings */}
-      {(() => {
+      {/* Unapproved Admin Sessions Security Warnings - MOVED TO TAB */}
+      {activeTab === 'warnings' && (() => {
         const unapprovedActiveSessions = sessions.filter(
           s => s.active && !s.approved && s.id !== localStorage.getItem('active_admin_session_id')
         );
-        if (unapprovedActiveSessions.length === 0) return null;
+        if (unapprovedActiveSessions.length === 0) return (
+           <div className="p-8 text-center text-slate-500 dark:text-slate-450 text-sm">
+             Hiện tại không có cảnh báo bảo mật nào.
+           </div>
+        );
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500 text-left">
             <div className="flex items-center gap-2 text-rose-600 dark:text-rose-500 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 rounded-2xl">
@@ -502,6 +506,14 @@ export default function AdminSecuritySessions() {
         >
           <CheckCircle className="w-4 h-4" /> Danh sách Đã Duyệt
         </button>
+        <button
+          onClick={() => setActiveTab('warnings')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+            activeTab === 'warnings' ? 'bg-white dark:bg-zinc-800 text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" /> Cảnh báo ({sessions.filter(s => s.active && !s.approved && s.id !== localStorage.getItem('active_admin_session_id')).length})
+        </button>
       </div>
 
       {/* Control Box */}
@@ -531,22 +543,7 @@ export default function AdminSecuritySessions() {
         </div>
       </div>
 
-      {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-2xl animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-rose-600 text-white flex items-center justify-center text-xs font-bold font-bold">
-               {selectedIds.length}
-            </div>
-            <span className="text-sm font-bold text-rose-700 dark:text-rose-300">phiên lịch sử đã chọn</span>
-          </div>
-          <button 
-            onClick={handleBulkDelete}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-rose-700 transition-colors"
-          >
-            <Trash size={14} /> Xóa tất cả đã chọn
-          </button>
-        </div>
-      )}
+      
 
       {/* Main Sessions Table */}
       {activeTab === 'auth' && (

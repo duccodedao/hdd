@@ -6,15 +6,9 @@ import { db } from '../lib/firebase';
 import { statsService } from '../services/statsService';
 import { OfflineGuard } from '../components/OfflineGuard';
 import ImageToPdf from './utilities/ImageToPdf';
-import PdfToWord from './utilities/PdfToWord';
 import PdfMerger from './utilities/PdfMerger';
 import PdfSplitter from './utilities/PdfSplitter';
-import AiScanner from './utilities/AiScanner';
 import DocumentVault from './utilities/DocumentVault';
-import PersonalFileManager from './utilities/PersonalFileManager';
-import AvatarFrameManager from './utilities/AvatarFrameManager';
-import TextToSpeech from './utilities/TextToSpeech';
-import FindNearby from './utilities/FindNearby';
 import DocumentTemplates from './utilities/DocumentTemplates';
 import { Volume2, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -224,30 +218,6 @@ const UtilityCard = ({ item, idx, onSelect, systemTools, visits, realUsers = [],
 
 const nativeUtilities: UtilityItem[] = [
   {
-    id: 'find-nearby',
-    title: 'Tìm Quanh Đây',
-    description: 'Bản đồ tìm kiếm thực tế và kết nối người dùng xung quanh bạn theo vị trí chia sẻ thời gian thực.',
-    icon: Globe,
-    type: 'tool',
-    createdAt: Date.now() + 6000
-  },
-  {
-    id: 'avatar-frame',
-    title: 'Khung Ảnh Đại Diện',
-    description: 'Thiết kế lồng ghép khung ảnh đại diện (avatar frame) chuyên nghiệp cho các chiến dịch.',
-    icon: ImageIcon,
-    type: 'tool',
-    createdAt: Date.now() + 4000
-  },
-  {
-    id: 'file-manager',
-    title: 'Quản Lý File Cá Nhân',
-    description: 'Duyệt và xem toàn bộ tệp tin trong repository của bạn như chiếc máy tính di động cá nhân.',
-    icon: Laptop,
-    type: 'tool',
-    createdAt: Date.now() + 3000
-  },
-  {
     id: 'kho-van-ban',
     title: 'Kho Văn Bản',
     description: 'Hệ thống lưu trữ và quản lý biểu mẫu hành chính, văn bản quy phạm trực tuyến.',
@@ -256,28 +226,12 @@ const nativeUtilities: UtilityItem[] = [
     createdAt: Date.now() + 2000
   },
   {
-    id: 'ai-scanner',
-    title: 'Quét Văn Bản AI',
-    description: 'Trích xuất văn bản từ hình ảnh kỹ thuật số với độ chính xác cao bằng trí tuệ nhân tạo.',
-    icon: Scan,
-    type: 'tool',
-    createdAt: Date.now()
-  },
-  {
     id: 'image-to-pdf',
     title: 'Ảnh sang PDF',
     description: 'Tổng hợp nhiều hình ảnh thành file tài liệu định dạng PDF tiêu chuẩn bảo mật cao.',
     icon: FileImage,
     type: 'tool',
     createdAt: Date.now() - 1000
-  },
-  {
-    id: 'pdf-to-word',
-    title: 'PDF sang Word',
-    description: 'Chuyển đổi tài liệu PDF sang định dạng Word có thể chỉnh sửa.',
-    icon: FileText,
-    type: 'tool',
-    createdAt: Date.now() - 2000
   },
   {
     id: 'pdf-merger',
@@ -294,14 +248,6 @@ const nativeUtilities: UtilityItem[] = [
     icon: Scissors,
     type: 'tool',
     createdAt: Date.now() - 4500
-  },
-  {
-    id: 'text-to-speech',
-    title: 'Chuyển Văn Bản Thành Giọng Nói',
-    description: 'Chuyển văn bản thành giọng đọc tự nhiên tùy chọn vùng miền (Bắc, Trung, Nam) hỗ trợ tải file MP3.',
-    icon: Volume2,
-    type: 'tool',
-    createdAt: Date.now() + 5000
   }
 ];
 
@@ -331,7 +277,7 @@ export default function UtilitiesPage() {
     const viewId = params.get('view');
     
     if (viewId && !utilityId) {
-      navigate(`/utilities/kho-van-ban?view=${viewId}`, { replace: true });
+      navigate('/kho-van-ban', { replace: true });
       return;
     }
 
@@ -369,7 +315,11 @@ export default function UtilitiesPage() {
       return;
     }
 
-    navigate(`/utilities/${item.id}`);
+    if (item.id === 'kho-van-ban') {
+      navigate('/kho-van-ban');
+    } else {
+      navigate(`/utilities/${item.id}`);
+    }
   };
 
   const handleBack = () => {
@@ -557,22 +507,10 @@ export default function UtilitiesPage() {
       );
     }
 
-    if (activeUtility.id === 'find-nearby') {
-      return <FindNearby onBack={handleBack} />;
-    }
-
-    if (activeUtility.id === 'avatar-frame') {
-      return <AvatarFrameManager onBack={handleBack} />;
-    }
-
     if (activeUtility.id === 'document-templates') {
       return <DocumentTemplates onBack={handleBack} />;
     }
 
-    if (activeUtility.id === 'file-manager') {
-      return <PersonalFileManager onBack={handleBack} />;
-    }
-    
     if (activeUtility.id === 'kho-van-ban') {
       return <DocumentVault onBack={handleBack} />;
     }
@@ -581,24 +519,12 @@ export default function UtilitiesPage() {
       return <ImageToPdf onBack={handleBack} />;
     }
  
-    if (activeUtility.id === 'pdf-to-word') {
-      return <PdfToWord onBack={handleBack} />;
-    }
- 
     if (activeUtility.id === 'pdf-merger') {
       return <PdfMerger onBack={handleBack} />;
     }
  
     if (activeUtility.id === 'pdf-splitter') {
       return <PdfSplitter onBack={handleBack} />;
-    }
-
-    if (activeUtility.id === 'text-to-speech') {
-      return <TextToSpeech onBack={handleBack} />;
-    }
-
-    if (activeUtility.id === 'ai-scanner') {
-      return <AiScanner onBack={handleBack} />;
     }
 
     if (activeUtility.type === 'embed') {

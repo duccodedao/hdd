@@ -3,7 +3,7 @@ const urlsToCache = [
   "/",
   "/index.html",
   "/manifest.json",
-  "https://tytpht.hdd.io.vn/img/bmassloadings.png"
+  "https://raw.githubusercontent.com/duccodedao/Img/main/system/logo-1781680259856.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== 'GET') return;
 
   // Do not intercept external API requests like nominatim
-  if (!event.request.url.startsWith(self.location.origin) && !event.request.url.includes('tytpht.hdd.io.vn')) {
+  if (!event.request.url.startsWith(self.location.origin) && !event.request.url.includes('raw.githubusercontent.com')) {
     return;
   }
 
@@ -68,8 +68,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
-    badge: 'https://tytpht.hdd.io.vn/img/bmassloadings.png',
+    icon: 'https://raw.githubusercontent.com/duccodedao/Img/main/system/logo-1781680259856.png',
+    badge: 'https://raw.githubusercontent.com/duccodedao/Img/main/system/logo-1781680259856.png',
     data: data.url || '/',
     vibrate: [100, 50, 100],
     actions: [

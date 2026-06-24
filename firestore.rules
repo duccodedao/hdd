@@ -266,6 +266,14 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isWriteAdmin();
     }
+    match /health_videos/{id} {
+      allow read: if true;
+      allow write: if isWriteAdmin();
+    }
+    match /document_issuing_units/{id} {
+      allow read: if true;
+      allow write: if isWriteAdmin();
+    }
     match /{document=**} {
       allow read, write: if false;
     }

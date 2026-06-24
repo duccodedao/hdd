@@ -6,8 +6,8 @@ import { Helmet } from 'react-helmet-async';
 import { 
   User, Shield, Wifi, Globe, MapPin, 
   CloudSun, Activity, LogIn, AppWindow, Calendar, Contact, 
-  Heart, Users, LayoutDashboard, Clock, ArrowRight, Sparkles, 
-  Navigation, Signal, Bot, Lock, Sun, Moon, RefreshCw, LogOut, Laptop
+  Heart, Users, LayoutDashboard, Clock, ArrowRight, ChevronsRight, Sparkles, 
+  Navigation, Signal, Bot, Lock, Sun, Moon, RefreshCw, LogOut, Laptop, Copy
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { auth } from '../lib/firebase';
@@ -250,16 +250,17 @@ export default function IntroLandingPage() {
         <title>BMASS | Trung tâm điều hành & Cổng thông tin thông minh</title>
       </Helmet>
 
+
       {/* Background visual graphics */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10 bg-grid-pattern opacity-[0.03] dark:opacity-10" />
       
       {/* 1. VISIBLE HERO BANNER (Full width, Auto Height) */}
       {heroBanner && (
-        <div className="w-full overflow-hidden mb-10 shadow-sm pt-16 md:pt-14">
+        <div className="w-full overflow-hidden mb-10 shadow-sm pt-0 mt-0">
            <img 
             src={heroBanner} 
             alt="Hero Banner" 
-            className="w-full h-auto object-contain block" 
+            className="w-full h-auto object-cover block m-0 p-0" 
             referrerPolicy="no-referrer"
           />
         </div>
@@ -271,75 +272,7 @@ export default function IntroLandingPage() {
 
       <div className={`max-w-7xl mx-auto px-4 md:px-8 space-y-12 ${!heroBanner ? 'pt-20' : ''}`}>
         
-        {/* BRAND PLATFORM HEADER */}
-        <div className="text-center md:text-left flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200 dark:border-white/5">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-600 dark:text-indigo-400 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              Nền tảng Hệ điều hành Tổng thể Bmass
-            </div>
-            <h1 className="text-4xl md:text-5xl font-display font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-              Trung tâm Điều Hành <span className="text-indigo-600 dark:text-indigo-400">BMASS.</span>
-            </h1>
-            <p className="text-slate-550 dark:text-slate-400 max-w-2xl text-sm md:text-base leading-relaxed">
-              Cổng tích hợp công cụ ban ngành trực quan, hệ điều hành giám sát dữ liệu nội bộ và các tính năng bổ trợ kỹ thuật số tối tân.
-            </p>
-          </div>
-          <div className="flex flex-col items-center md:items-end justify-center shrink-0 gap-4">
-            {webLogo ? (
-              <img src={webLogo} alt="Bmass Logo" className="w-16 h-16 object-contain filter drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center font-display font-black text-2xl text-white shadow-lg shadow-indigo-500/30">
-                BM
-              </div>
-            )}
-            
-            {/* THEME CONTROL BAR: 3 POLISHED PRESET OPTIONS (LIGHT, DARK, SYSTEM) */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 p-1.5 rounded-2xl shadow-inner">
-              <button
-                id="theme-btn-light"
-                onClick={() => handleThemeChange('light')}
-                className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold ${
-                  themePref === 'light' 
-                  ? 'bg-white text-slate-900 shadow-md ring-1 ring-slate-250' 
-                  : 'text-slate-500 hover:text-slate-950 dark:hover:text-slate-200'
-                }`}
-                title="Giao diện Sáng"
-              >
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Sáng</span>
-              </button>
-              
-              <button
-                id="theme-btn-dark"
-                onClick={() => handleThemeChange('dark')}
-                className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold ${
-                  themePref === 'dark' 
-                  ? 'bg-slate-800 text-white shadow-md' 
-                  : 'text-slate-500 hover:text-slate-950 dark:text-zinc-400 dark:hover:text-white'
-                }`}
-                title="Giao diện Tối"
-              >
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="hidden sm:inline">Tối</span>
-              </button>
 
-              <button
-                id="theme-btn-system"
-                onClick={() => handleThemeChange('system')}
-                className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold ${
-                  themePref === 'system' 
-                  ? 'bg-slate-200 dark:bg-slate-850 text-slate-900 dark:text-white shadow-md' 
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-950 dark:hover:text-white'
-                }`}
-                title="Giao diện Hệ thống"
-              >
-                <Laptop className="w-3.5 h-3.5 text-sky-400" />
-                <span className="hidden sm:inline">Hệ Thống</span>
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* DOUBLE COLUMN CONTAINER: PROFILE & TELEMETRY */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -422,8 +355,19 @@ export default function IntroLandingPage() {
                     </div>
                     <div className="flex justify-between items-center text-[11px]">
                       <span>Khóa Định Danh UID:</span>
-                      <span className="font-mono bg-slate-200/50 dark:bg-white/5 rounded px-2 py-0.5 text-[10px] text-slate-800 dark:text-slate-350">
+                      <span className="font-mono bg-slate-200/50 dark:bg-white/5 rounded px-2 py-0.5 text-[10px] text-slate-800 dark:text-slate-350 flex items-center gap-1">
                         {user.uid.substring(0, 16)}...
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(user.uid);
+                            toast.success("Đã sao chép mã UID!");
+                          }}
+                          className="hover:text-indigo-600 dark:hover:text-white transition-colors cursor-pointer"
+                          title="Sao chép UID"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                        </button>
                       </span>
                     </div>
                   </div>
@@ -473,7 +417,16 @@ export default function IntroLandingPage() {
             <div className="pt-6 mt-6 border-t border-slate-200 dark:border-white/5 space-y-3">
               {user ? (
                 <div className="space-y-3">
-                  {/* SPLIT TO 2 COLUMNS: Profile Navigation & Direct App Nav */}
+                  {/* Standalone large button: Truy cập */}
+                  <button 
+                    id="nav-utilities-direct"
+                    onClick={() => navigate('/utilities')}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-2xl tracking-widest transition-all uppercase shadow-lg shadow-indigo-500/30 ring-2 ring-offset-2 ring-indigo-500/20"
+                  >
+                    <AppWindow className="w-4 h-4 text-white" />
+                    Truy cập hệ thống
+                  </button>
+
                   <div className="grid grid-cols-2 gap-3">
                     {/* Column 1: Quản lý */}
                     <button 
@@ -485,26 +438,16 @@ export default function IntroLandingPage() {
                       Quản lý
                     </button>
 
-                    {/* Column 2: Truy cập */}
+                    {/* Column 2: Đăng xuất */}
                     <button 
-                      id="nav-utilities-direct"
-                      onClick={() => navigate('/utilities')}
-                      className="flex items-center justify-center gap-1.5 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-2xl tracking-wider transition-all uppercase shadow-md shadow-indigo-500/10"
+                      id="action-btn-logout"
+                      onClick={handleLogout}
+                      className="flex items-center justify-center gap-1.5 px-4 py-3 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200/40 dark:border-rose-500/20 active:scale-95 text-xs font-extrabold rounded-2xl tracking-wider transition-all uppercase"
                     >
-                      <AppWindow className="w-4 h-4 text-white" />
-                      Truy cập
+                      <LogOut className="w-3.5 h-3.5 text-rose-600 dark:text-rose-450" />
+                      Đăng xuất
                     </button>
                   </div>
-
-                  {/* DECO LOGOUT UTILITY */}
-                  <button 
-                    id="action-btn-logout"
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200/40 dark:border-rose-500/20 active:scale-95 text-xs font-extrabold rounded-2xl tracking-wider transition-all uppercase"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-rose-600 dark:text-rose-450" />
-                    Đăng xuất
-                  </button>
                 </div>
               ) : (
                 /* GUEST ACTION BAR: SIGN IN TRIGGER */
@@ -574,18 +517,6 @@ export default function IntroLandingPage() {
                     {deviceIp}
                   </div>
                   <div className="text-[10px] text-slate-400">WAN Address</div>
-                </div>
-
-                {/* 3. LAN Subnet Router Endpoint (Real WebRTC candidate) */}
-                <div className="bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-white/5 rounded-2xl p-4 space-y-1.5 transition-colors">
-                  <div className="flex items-center gap-2 text-slate-450 dark:text-slate-500">
-                    <Wifi className="w-4 h-4 text-sky-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">IP WIFI / LAN</span>
-                  </div>
-                  <div className="font-mono text-xs font-black text-slate-900 dark:text-white truncate" title={wifiIp}>
-                    {wifiIp}
-                  </div>
-                  <div className="text-[10px] text-slate-405 dark:text-zinc-500">Client Private IP</div>
                 </div>
 
                 {/* 4. Geography Geography location */}
@@ -733,34 +664,6 @@ export default function IntroLandingPage() {
                 </div>
               );
             })}
-          </div>
-        </div>
-
-        {/* ACCESS POLICY BANNER FOOTER */}
-        <div className="bg-slate-100 dark:bg-slate-900/20 border border-slate-200 dark:border-white/5 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex gap-4 items-start md:items-center">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-              <Lock className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Tường lửa truy cập phân quyền
-              </h4>
-              <p className="text-[11px] text-slate-550 dark:text-slate-400 leading-relaxed max-w-4xl">
-                Một số Tiện ích cốt lõi như HRM/Bản tin số chỉ giới hạn cho các cán bộ đơn vị chuyên trách đã thông qua rào cản an ninh mạng của chúng tôi. 
-                Tất cả lượt cố gắng vượt rào cản bất hợp pháp mà chưa có sự chuẩn chuẩn hợp lệ đều sẽ được log trực tiếp trên hệ thống an ninh.
-              </p>
-            </div>
-          </div>
-          
-          <div className="shrink-0">
-            <button 
-              id="footer-btn-guide"
-              onClick={() => navigate('/guide')}
-              className="px-5 py-2.5 bg-slate-205 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-all"
-            >
-              Tài Liệu Hướng Dẫn
-            </button>
           </div>
         </div>
 

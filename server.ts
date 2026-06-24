@@ -1501,10 +1501,14 @@ app.use(cookieParser());
           const docData = doc.data();
           const sanitized: any = { id: doc.id };
           for (const key in docData) {
-            if (docData[key] instanceof Timestamp) {
-              sanitized[key] = { _t: 'timestamp', val: docData[key].toDate().toISOString() };
+            const val = docData[key];
+            if (val instanceof Timestamp) {
+              sanitized[key] = { _t: 'timestamp', val: val.toDate().toISOString() };
+            } else if (val && typeof val === 'object' && val.constructor.name === 'DocumentReference') {
+              // Handle Firestore DocumentReference (cyclic)
+              sanitized[key] = { _t: 'reference', path: val.path };
             } else {
-              sanitized[key] = docData[key];
+              sanitized[key] = val;
             }
           }
           return sanitized;
@@ -1513,9 +1517,19 @@ app.use(cookieParser());
       
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', 'attachment; filename="system_data_backup.json"');
-      res.json(data);
+      
+      // Use a custom stringifier to handle any missed cyclic structures
+      const jsonStr = JSON.stringify(data, (key, value) => {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // Check for common cyclic fields in internal objects if any
+          if (value._firestore || value.firestore) return undefined;
+        }
+        return value;
+      }, 2);
+      
+      res.send(jsonStr);
     } catch (e) {
-      console.error(e);
+      console.error("Export data error:", e);
       res.status(500).json({ error: "Failed to fetch data." });
     }
   });
@@ -1625,8 +1639,8 @@ app.use(cookieParser());
     // Serve static files
     app.use(express.static(distPath, { index: false }));
 
-    // SPA catch-all for undefined GET requests
-    app.get('*', (req, res, next) => {
+    // SPA catch-all for undefined GET requests (Express 5 compatible)
+    app.get('*all', (req, res, next) => {
       // Don't intercept API or webhook routes
       if (req.path.startsWith('/api/') || req.path.startsWith('/hooks/')) {
         return next();

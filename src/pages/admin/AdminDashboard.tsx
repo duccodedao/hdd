@@ -4,7 +4,7 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setD
 import { initializeApp, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { db, firebaseConfig } from '../../lib/firebase';
-import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, Copy, X, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag, FileSpreadsheet } from 'lucide-react';
+import { Shield, Sparkles, Users, Activity, Settings, BookOpen, FilePlus, FileArchive, Scissors, Trash2, StopCircle, Copy, X, RefreshCcw, Lock, Box, Wrench, AppWindow, Gamepad2, FileText, Newspaper, Code, Info, Mail, MessageSquare, ShieldAlert, Gift, Landmark, LineChart, Bell, Globe, Server, MapPin, UserCircle, CheckSquare, Play, Phone, Apple, MonitorSmartphone, Files, Clock, Layout, Scan, FileImage, FolderOpen, Laptop, Save, Github, ExternalLink, Download, Upload, Edit2, Image as ImageIcon, Music, ChevronDown, Lightbulb, Calendar, Plus, ShoppingBag, FileSpreadsheet, Heart } from 'lucide-react';
 import { useAuthStore, UserData } from '../../store/authStore';
 import { useAppStore } from '../../store/appStore';
 import toast from 'react-hot-toast';
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [userFilter, setUserFilter] = useState<'all' | 'review'>('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'affiliate'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'apps' | 'system' | 'banned' | 'utilities' | 'contacts' | 'about' | 'apikeys' | 'forms' | 'document_vault' | 'admin_system' | 'versions' | 'partners' | 'ai_tools' | 'security_sessions' | 'affiliate' | 'health'>('dashboard');
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [allUtilities, setAllUtilities] = useState<any[]>([]);

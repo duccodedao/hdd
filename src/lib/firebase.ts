@@ -5,6 +5,7 @@ import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
 // @ts-ignore
 import configFromFile from "../../firebase-applet-config.json";
+import { safeJsonStringify } from "./utils";
 
 const config: any = configFromFile || {};
 
@@ -84,6 +85,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: ', safeJsonStringify(errInfo));
+  throw new Error(safeJsonStringify(errInfo));
 }

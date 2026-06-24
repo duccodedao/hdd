@@ -392,6 +392,16 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["title", "summary", "content", "category", "background", "authorId", "authorName", "createdAt"]
+    },
+    "DocumentIssuingUnit": {
+      "title": "Document Issuing Unit",
+      "description": "Organizations or units that issue administrative documents",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["name"]
     }
   },
   "firestore": {
@@ -498,6 +508,10 @@
     "portal_posts": {
       "schema": "PortalPost",
       "description": "Official announcements, informational posts, and articles"
+    },
+    "document_issuing_units": {
+      "schema": "DocumentIssuingUnit",
+      "description": "Collection of units that can issue documents"
     }
   }
 }

@@ -16,7 +16,7 @@ import {
   Check, Info, Sparkles, Sliders, Laptop, ShieldCheck, Moon, Sun,
   Award
 } from 'lucide-react';
-import { toSafeDate, cn } from '../lib/utils';
+import { toSafeDate, cn, safeJsonStringify } from '../lib/utils';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { useConfirmStore } from '../store/confirmStore';
@@ -343,7 +343,8 @@ export default function Profile() {
               recentSystemLogs: activities.map(a => ({ type: a.type, desc: a.description, date: a.timestamp ? toSafeDate(a.timestamp).toISOString() : 'N/A' }))
             };
 
-            const blob = new Blob([JSON.stringify(dataPackage, null, 2)], { type: 'application/json' });
+            const jsonStr = safeJsonStringify(dataPackage, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

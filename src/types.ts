@@ -11,7 +11,11 @@ export interface GitHubConfig {
 export interface Category {
   id: string;
   name: string;
+  description?: string;
+  createdAt?: any;
 }
+
+export type DocumentLevel = 'tuyen_tren' | 'tuyen_tinh' | 'cdc_so_y_te' | 'tuyen_co_so';
 
 export interface AdminDocument {
   id: string;
@@ -19,6 +23,14 @@ export interface AdminDocument {
   originalName?: string;
   categoryId: string;
   categoryName: string;
+  documentNumber?: string; // Số ký hiệu
+  issuingUnit?: string; // Đơn vị ban hành
+  issuanceDate?: string; // Ngày ban hành
+  level?: DocumentLevel;
+  parentId?: string; // Văn bản mẹ
+  relatedDocIds?: string[]; // Văn bản liên quan
+  replacesId?: string; // Văn bản bị thay thế
+  replacedById?: string; // Văn bản thay thế mới
   note: string;
   githubUrl: string;
   githubSha: string;
